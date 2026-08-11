@@ -27,6 +27,10 @@ Start from .agents/skills/TEMPLATE/SKILL.md. -->
 - **Adding a Frostyard-branded Astro docs site to a project repo** →
   [.agents/skills/frostyard-docs-site/SKILL.md](.agents/skills/frostyard-docs-site/SKILL.md)
   — applies the `scaffold/` payload as `site/`.
+- **Creating or conforming a frostyard Go repository** →
+  [.agents/skills/frostyard-go-repo/SKILL.md](.agents/skills/frostyard-go-repo/SKILL.md)
+  — SDK-first layout, clix CLI, Makefile check gate, GoReleaser Pro + svu
+  releases (extracted from updex).
 
 ## Code conventions (live — the code exists)
 
