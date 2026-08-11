@@ -21,7 +21,12 @@ them rather than improvising, whichever agent you are:
 Add a skill whenever you find yourself re-explaining a multi-step procedure.
 Start from .agents/skills/TEMPLATE/SKILL.md. -->
 
-- *(none yet — add the first one when a procedure repeats)*
+- **Designing any Frostyard-branded interface, page, mock, or asset** →
+  [.agents/skills/frostyard-design/SKILL.md](.agents/skills/frostyard-design/SKILL.md)
+  — brand law, tokens, guidelines, components, UI kits, hero art.
+- **Adding a Frostyard-branded Astro docs site to a project repo** →
+  [.agents/skills/frostyard-docs-site/SKILL.md](.agents/skills/frostyard-docs-site/SKILL.md)
+  — applies the `scaffold/` payload as `site/`.
 
 ## Code conventions (live — the code exists)
 

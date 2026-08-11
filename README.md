@@ -14,7 +14,10 @@ four-question docs taxonomy, and skills as first-class files.
 ## What lives here
 
 - **`.agents/skills/`** — org-wide agent skills, shared across frostyard
-  repos (`.claude/skills` is a symlink).
+  repos (`.claude/skills` is a symlink). Includes the
+  [Frostyard design system](.agents/skills/frostyard-design/) (migrated from
+  the archived `frostyard/design-system` repo, history preserved) and the
+  [docs-site scaffolding skill](.agents/skills/frostyard-docs-site/).
 - **`templates/`** — document and repository templates for starting new
   frostyard work.
 - **`assets/`** — shared assets: logos, badges, diagrams, and other common
