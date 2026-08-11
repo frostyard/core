@@ -1,0 +1,64 @@
+<!-- @dsCard group="Docs" viewport="1440x900" name="Docs shell" subtitle="Shared documentation shell — same design, per-project content (snosi / updex / ChairLift)" -->
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Frostyard docs — UI kit</title>
+<link rel="stylesheet" href="../../styles.css"><link rel="stylesheet" href="docs.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<style>body{margin:0;background-color:var(--ink);background-image:var(--gradient-page);color:var(--text-body);font-family:var(--font-sans);line-height:1.5}a{color:var(--link)}a:hover{color:var(--link-hover)}</style>
+</head><body><div id="root"></div>
+<script type="text/babel" src="docsData.jsx"></script>
+<script type="text/babel">
+function DocsApp() {
+  const projects = window.fyDocsProjects;
+  const [proj, setProj] = React.useState(localStorage.getItem("fy-docs-proj") || "snosi");
+  const pick = p => { setProj(p); localStorage.setItem("fy-docs-proj", p); };
+  const d = projects[proj];
+  const activeItem = d.page.title;
+  return <div>
+    <div className="dk-topbar">
+      <div style={{ display: "flex", alignItems: "baseline", gap: "1rem" }}>
+        <a href="#" style={{ fontWeight: 720, letterSpacing: "-.04em", fontSize: "1.1rem", color: "var(--text-body)", textDecoration: "none", whiteSpace: "nowrap" }}><span style={{ color: "var(--ice)", fontSize: "1.35rem", marginRight: ".3rem" }}>❄</span> frostyard</a>
+        <span style={{ color: "var(--text-footer)", fontSize: ".85rem" }}>/ docs</span>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+        <label style={{ font: "700 .6rem var(--font-mono)", letterSpacing: ".12em", textTransform: "uppercase", color: "var(--text-eyebrow)" }}>Project</label>
+        <select className="dk-select" value={proj} onChange={e => pick(e.target.value)}>
+          {Object.entries(projects).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+        </select>
+        <a href="#" style={{ fontSize: ".78rem", border: "1px solid var(--line)", padding: ".45rem .7rem", borderRadius: "var(--radius-pill)", color: "#d9f2ff", textDecoration: "none", whiteSpace: "nowrap" }}>Source <span style={{ color: "var(--ice)" }}>↗</span></a>
+      </div>
+    </div>
+    <div className="dk-shell">
+      <aside className="dk-side">
+        <div style={{ font: "700 .62rem var(--font-mono)", letterSpacing: ".14em", textTransform: "uppercase", color: "var(--ice)", marginBottom: ".2rem" }}>{d.label}</div>
+        <div style={{ fontSize: ".72rem", color: "var(--text-footer)", marginBottom: "1.2rem" }}>{d.kicker}</div>
+        <nav className="dk-nav">
+          {d.nav.map(([group, items]) => <div key={group}>
+            <div className="dk-group">{group}</div>
+            {items.map(item => <a key={item} href="#" className={item === activeItem ? "active" : ""} onClick={e => e.preventDefault()}>{item}</a>)}
+          </div>)}
+        </nav>
+      </aside>
+      <main className="dk-main">
+        <div className="dk-prose">
+          <p style={{ font: "700 .62rem var(--font-mono)", letterSpacing: ".14em", textTransform: "uppercase", color: "var(--text-eyebrow)", margin: "0 0 .8rem" }}><span style={{ width: 24, height: 1, background: "var(--sky)", display: "inline-block", verticalAlign: "middle", marginRight: ".6rem" }}></span>{d.label} docs</p>
+          <h1>{d.page.title}</h1>
+          {d.page.sections.map(([h, body, extra]) => <div key={h}>
+            <h2 id={h}>{h}</h2>
+            <p>{body}</p>
+            {extra.code && <pre><code>$ {extra.code}</code></pre>}
+            {extra.callout && <div className="dk-callout"><b>{extra.callout[0]}</b>{extra.callout[1]}</div>}
+          </div>)}
+          <div className="dk-next"><a href="#">← Previous</a><a href="#">Next →</a></div>
+        </div>
+      </main>
+      <aside className="dk-toc">
+        <p>On this page</p>
+        {d.page.toc.map(t => <a key={t} href="#">{t}</a>)}
+      </aside>
+    </div>
+  </div>;
+}
+ReactDOM.createRoot(document.getElementById("root")).render(<DocsApp />);
+</script></body></html>

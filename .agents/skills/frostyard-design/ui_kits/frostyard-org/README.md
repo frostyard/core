@@ -1,0 +1,2 @@
+# frostyard.org UI kit
+Click-through recreation of the live site (https://frostyard-org.bjk.workers.dev), built from `frostyard/frostyard-org` source. Screens: Home, Tools, Why Atomic — switch via the nav. Composes the design-system components (NavBar, Button, Tag, ImageCard, SectionHeading, SiteFooter). Extension catalog data mirrors `src/data/extensions.json`.

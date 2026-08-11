@@ -1,0 +1,47 @@
+---
+import "../styles/global.css";
+import "../styles/docs.css";
+import "../styles/landing.css";
+import TopBar from "../components/TopBar.astro";
+import { orderedDocs } from "../lib/nav";
+import { site } from "../site.config";
+
+const docs = await orderedDocs();
+if (docs.length === 0) {
+  throw new Error("No docs content found: add at least one page under content/ with title/group/order frontmatter.");
+}
+const startUrl = `/${docs[0].id}/`;
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="description" content={site.landing.description} />
+    <title>{site.name} docs</title>
+  </head>
+  <body>
+    <TopBar />
+    <main class="dk-landing">
+      <section class="dk-landing-hero">
+        <p class="dk-landing-eyebrow"><span class="dk-dash"></span>{site.kicker}</p>
+        <h1>{site.landing.headline[0]}<br /><span>{site.landing.headline[1]}</span></h1>
+        <p class="dk-landing-lede">{site.landing.description}</p>
+        <div class="dk-landing-actions">
+          <a class="dk-landing-action dk-landing-action-primary" href={startUrl}>Read the docs <span>→</span></a>
+          <a class="dk-landing-action dk-landing-action-secondary" href={site.sourceUrl}>View source <span>↗</span></a>
+        </div>
+      </section>
+      <section class="dk-landing-summary" aria-label="Documentation paths">
+        {site.landing.points.map((point, index) => (
+          <article>
+            <span class="dk-landing-number" aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
+            <h2>{point.title}</h2>
+            <p>{point.description}</p>
+          </article>
+        ))}
+      </section>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,35 @@
+<!-- @dsCard group="frostyard.org" viewport="1440x900" name="frostyard.org" subtitle="Click-through site recreation — Home, Tools, Why Atomic" -->
+<!-- @startingPoint section="frostyard.org" subtitle="Full site recreation" viewport="1440x900" -->
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>frostyard.org — UI kit</title>
+<link rel="stylesheet" href="../../styles.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<style>html{scroll-behavior:smooth}body{margin:0;background-color:var(--ink);background-image:var(--gradient-page);color:var(--text-body);font-family:var(--font-sans);line-height:1.5}a{color:var(--link)}a:hover{color:var(--link-hover)}h1,h2,h3,h4{color:var(--text-body)}</style>
+</head><body><div id="root"></div>
+<script type="text/babel" src="Home.jsx"></script>
+<script type="text/babel" src="Tools.jsx"></script>
+<script type="text/babel" src="WhyAtomic.jsx"></script>
+<script type="text/babel">
+const { NavBar, SiteFooter } = window.FrostyardDesignSystem_375ef6;
+function App() {
+  const [page, setPage] = React.useState(localStorage.getItem("fy-kit-page") || "home");
+  const go = p => { setPage(p); localStorage.setItem("fy-kit-page", p); window.scrollTo(0, 0); };
+  const route = href => {
+    if (href === "home" || href === "/base" ) return go("home");
+    if (href === "/tools") return go("tools");
+    if (href === "/why-atomic") return go("atomic");
+    if (href.startsWith("#")) { go("home"); setTimeout(() => { const el = document.querySelector(href); if (el) window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY, behavior: "smooth" }); }, 50); }
+  };
+  const current = { home: "Images", tools: "Tools", atomic: "Why Atomic" }[page];
+  return <main style={{ maxWidth: "var(--container-max)", margin: "auto", padding: "0 var(--container-pad)" }}>
+    <NavBar current={current} onNavigate={route} />
+    {page === "home" && <window.FyHome />}
+    {page === "tools" && <window.FyTools />}
+    {page === "atomic" && <window.FyWhyAtomic />}
+    <SiteFooter />
+  </main>;
+}
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script></body></html>

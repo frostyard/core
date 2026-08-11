@@ -1,0 +1,2 @@
+/** Hairline capability tag (2px radius). Optional version line for extension catalog entries. */
+export interface TagProps { children: React.ReactNode; /** renders "v{version}" underneath, catalog-style */ version?: string; style?: React.CSSProperties; }

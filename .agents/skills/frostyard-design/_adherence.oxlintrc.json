@@ -1,0 +1,274 @@
+{
+  "plugins": [
+    "react",
+    "import"
+  ],
+  "rules": {
+    "react/forbid-elements": [
+      "warn",
+      {
+        "forbid": []
+      }
+    ],
+    "no-restricted-imports": [
+      "warn",
+      {
+        "patterns": [
+          {
+            "group": [
+              "components/core/**",
+              "components/site/**",
+              "ui_kits/docs/**",
+              "ui_kits/frostyard-org/**",
+              "ui_kits/pilothouse/**"
+            ],
+            "message": "Import design-system components from 'index.js', not component internals."
+          }
+        ]
+      }
+    ],
+    "no-restricted-syntax": [
+      "warn",
+      {
+        "selector": "Literal[value=/#[0-9a-fA-F]{3,8}\\b/]",
+        "message": "Raw hex color — use a design-system color token via var()."
+      },
+      {
+        "selector": "Literal[value=/\\b\\d+px\\b/]",
+        "message": "Raw px value — use a design-system spacing token via var()."
+      },
+      {
+        "selector": "Literal[value=/font-family\\s*:\\s*(?!['\\\"]?(?:Inter))/i]",
+        "message": "Font not provided by the design system. Available: Inter."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='Button'] > JSXAttribute > JSXIdentifier[name!=/^(?:variant|href|glyph|onClick|children|style|key|ref|className|style|children)$/]",
+        "message": "<Button> doesn't accept that prop. Declared props: variant, href, glyph, onClick, children, style."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='Button'] > JSXAttribute[name.name='variant'] > Literal[value!=/^(?:primary|ghost)$/]",
+        "message": "<Button> variant must be one of 'primary' | 'ghost'."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='Eyebrow'] > JSXAttribute > JSXIdentifier[name!=/^(?:children|style|key|ref|className|style|children)$/]",
+        "message": "<Eyebrow> doesn't accept that prop. Declared props: children, style."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='ImageCard'] > JSXAttribute > JSXIdentifier[name!=/^(?:type|index|name|title|body|tags|href|artSrc|assetsBase|key|ref|className|style|children)$/]",
+        "message": "<ImageCard> doesn't accept that prop. Declared props: type, index, name, title, body, tags, href, artSrc, assetsBase."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='NavBar'] > JSXAttribute > JSXIdentifier[name!=/^(?:links|current|sourceLabel|sourceHref|onNavigate|key|ref|className|style|children)$/]",
+        "message": "<NavBar> doesn't accept that prop. Declared props: links, current, sourceLabel, sourceHref, onNavigate."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='SectionHeading'] > JSXAttribute > JSXIdentifier[name!=/^(?:eyebrow|title|lede|compact|style|key|ref|className|style|children)$/]",
+        "message": "<SectionHeading> doesn't accept that prop. Declared props: eyebrow, title, lede, compact, style."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='SiteFooter'] > JSXAttribute > JSXIdentifier[name!=/^(?:tagline|linkLabel|linkHref|key|ref|className|style|children)$/]",
+        "message": "<SiteFooter> doesn't accept that prop. Declared props: tagline, linkLabel, linkHref."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='Tag'] > JSXAttribute > JSXIdentifier[name!=/^(?:children|version|style|key|ref|className|style|children)$/]",
+        "message": "<Tag> doesn't accept that prop. Declared props: children, version, style."
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": [
+        "**/index.js"
+      ],
+      "rules": {
+        "no-restricted-imports": "off"
+      }
+    }
+  ],
+  "x-omelette": {
+    "components": {
+      "Button": {
+        "replaces": []
+      },
+      "Eyebrow": {
+        "replaces": []
+      },
+      "ImageCard": {
+        "replaces": []
+      },
+      "NavBar": {
+        "replaces": []
+      },
+      "SectionHeading": {
+        "replaces": []
+      },
+      "SiteFooter": {
+        "replaces": []
+      },
+      "Tag": {
+        "replaces": []
+      }
+    },
+    "tokens": [
+      "--blue",
+      "--brand-ls",
+      "--brand-size",
+      "--brand-weight",
+      "--card-pad",
+      "--container-max",
+      "--container-pad",
+      "--container-pad-mobile",
+      "--deep",
+      "--eyebrow-dash-w",
+      "--font-mono",
+      "--font-sans",
+      "--font-serif-accent",
+      "--gradient-card",
+      "--gradient-card-alt",
+      "--gradient-card-deep",
+      "--gradient-ice-line",
+      "--gradient-page",
+      "--gradient-panel",
+      "--gradient-primary",
+      "--gradient-signal",
+      "--ice",
+      "--ink",
+      "--line",
+      "--line-strong",
+      "--line-tag",
+      "--link",
+      "--link-hover",
+      "--mist",
+      "--mist-bright",
+      "--nav-height",
+      "--nav-height-mobile",
+      "--on-primary",
+      "--panel",
+      "--panel-bright",
+      "--panel-pad",
+      "--radius-button",
+      "--radius-node",
+      "--radius-pill",
+      "--radius-tag",
+      "--section-pad",
+      "--section-pad-mobile",
+      "--sky",
+      "--state-danger",
+      "--state-danger-dim",
+      "--state-ok",
+      "--state-ok-dim",
+      "--state-warn",
+      "--state-warn-dim",
+      "--surface-code",
+      "--surface-page",
+      "--surface-panel",
+      "--tag-text",
+      "--text-body",
+      "--text-body-size",
+      "--text-caption-size",
+      "--text-dim",
+      "--text-display-lh",
+      "--text-display-ls",
+      "--text-display-size",
+      "--text-display-weight",
+      "--text-eyebrow",
+      "--text-eyebrow-ls",
+      "--text-eyebrow-size",
+      "--text-eyebrow-weight",
+      "--text-footer",
+      "--text-h2-compact-size",
+      "--text-h2-lh",
+      "--text-h2-ls",
+      "--text-h2-size",
+      "--text-lede-size",
+      "--text-mono-accent",
+      "--text-mono-size",
+      "--text-muted",
+      "--text-small-size",
+      "--text-tag-size",
+      "--tool-pad"
+    ],
+    "tokenKinds": {
+      "--ink": "color",
+      "--deep": "color",
+      "--panel": "color",
+      "--panel-bright": "color",
+      "--ice": "color",
+      "--sky": "color",
+      "--blue": "color",
+      "--mist": "color",
+      "--mist-bright": "color",
+      "--text-body": "font",
+      "--text-muted": "font",
+      "--text-dim": "font",
+      "--text-eyebrow": "font",
+      "--text-footer": "font",
+      "--text-mono-accent": "font",
+      "--line": "color",
+      "--line-strong": "color",
+      "--line-tag": "color",
+      "--surface-page": "color",
+      "--surface-panel": "color",
+      "--surface-code": "color",
+      "--gradient-page": "color",
+      "--gradient-card": "color",
+      "--gradient-card-alt": "color",
+      "--gradient-card-deep": "color",
+      "--gradient-panel": "color",
+      "--gradient-signal": "color",
+      "--gradient-primary": "color",
+      "--gradient-ice-line": "color",
+      "--on-primary": "color",
+      "--link": "color",
+      "--link-hover": "color",
+      "--tag-text": "font",
+      "--state-ok": "color",
+      "--state-ok-dim": "color",
+      "--state-warn": "color",
+      "--state-warn-dim": "color",
+      "--state-danger": "color",
+      "--state-danger-dim": "color",
+      "--font-sans": "font",
+      "--font-serif-accent": "font",
+      "--font-mono": "font",
+      "--text-display-size": "font",
+      "--text-display-lh": "font",
+      "--text-display-ls": "font",
+      "--text-display-weight": "font",
+      "--text-h2-size": "font",
+      "--text-h2-lh": "font",
+      "--text-h2-ls": "font",
+      "--text-h2-compact-size": "font",
+      "--text-eyebrow-size": "font",
+      "--text-eyebrow-ls": "font",
+      "--text-eyebrow-weight": "font",
+      "--text-lede-size": "font",
+      "--text-body-size": "font",
+      "--text-small-size": "font",
+      "--text-caption-size": "font",
+      "--text-mono-size": "font",
+      "--text-tag-size": "font",
+      "--brand-weight": "font",
+      "--brand-ls": "spacing",
+      "--brand-size": "spacing",
+      "--container-max": "spacing",
+      "--container-pad": "spacing",
+      "--container-pad-mobile": "spacing",
+      "--nav-height": "spacing",
+      "--nav-height-mobile": "spacing",
+      "--section-pad": "spacing",
+      "--section-pad-mobile": "spacing",
+      "--panel-pad": "spacing",
+      "--card-pad": "spacing",
+      "--tool-pad": "spacing",
+      "--radius-tag": "radius",
+      "--radius-node": "radius",
+      "--radius-button": "radius",
+      "--radius-pill": "radius",
+      "--eyebrow-dash-w": "spacing"
+    },
+    "fontFamilies": [
+      "Inter"
+    ]
+  }
+}

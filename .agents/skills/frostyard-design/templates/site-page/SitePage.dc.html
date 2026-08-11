@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<!-- @template name="Frostyard site page" description="Marketing/site page starter: nav, hero with two-beat headline, principles row, footer" -->
+<helmet><script src="./ds-base.js"></script></helmet>
+<div style="min-height:100vh;background-color:#06111d;background-image:radial-gradient(circle at 82% 2%,#10416455,transparent 27rem),linear-gradient(180deg,#071a2a 0%,#06111d 38%,#06111d 100%);color:#edf8ff;font-family:Inter,ui-sans-serif,system-ui,sans-serif;line-height:1.5">
+<main style="max-width:1240px;margin:auto;padding:0 32px">
+<x-import component-from-global-scope="FrostyardDesignSystem_375ef6.NavBar" current="Images" hint-size="100%,93px"></x-import>
+<section style="padding:6rem 0 7rem;max-width:820px">
+<p style="font-size:.7rem;text-transform:uppercase;letter-spacing:.17em;font-weight:700;color:#82b6d0;margin:0 0 1.1rem"><span style="width:24px;height:1px;background:#47b8ef;display:inline-block;vertical-align:middle;margin-right:.6rem"></span>Debian · mkosi · bootc or A/B root</p>
+<h1 style="font-size:clamp(3.4rem,6.4vw,6.4rem);line-height:.94;letter-spacing:-.072em;margin:0;font-weight:700">Keep the system<br><em style="font-family:Georgia,serif;font-weight:400;font-style:italic;color:#aee9ff">boring.</em> Make the work interesting.</h1>
+<p style="font-size:1.08rem;color:#b6d0df;max-width:565px;margin:2rem 0 2.4rem">Frostyard images are atomic, updateable operating systems for desktops and servers. A known-good base stays put; your tools arrive as deliberate layers.</p>
+<div style="display:flex;gap:.8rem">
+<x-import component-from-global-scope="FrostyardDesignSystem_375ef6.Button" variant="primary" glyph="↓" href="#content" hint-size="160px,44px">Explore</x-import>
+<x-import component-from-global-scope="FrostyardDesignSystem_375ef6.Button" variant="ghost" glyph="↗" href="https://github.com/frostyard" hint-size="160px,44px">Read the build</x-import>
+</div>
+</section>
+<section id="content" style="display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid rgba(162,222,255,.18);border-bottom:1px solid rgba(162,222,255,.18)">
+<article style="padding:2.25rem 2rem 2.4rem 0"><span style="color:#47b8ef;font-family:ui-monospace,monospace;font-size:.72rem">01</span><h2 style="font-size:1.08rem;margin:.75rem 0">Atomic by default</h2><p style="color:#a6c1d0;font-size:.91rem;margin:0">Update the whole operating system as a coherent image. Reboot into the new deployment; keep the previous one available.</p></article>
+<article style="padding:2.25rem 2rem 2.4rem;border-left:1px solid rgba(162,222,255,.18)"><span style="color:#47b8ef;font-family:ui-monospace,monospace;font-size:.72rem">02</span><h2 style="font-size:1.08rem;margin:.75rem 0">Mutable where it counts</h2><p style="color:#a6c1d0;font-size:.91rem;margin:0">Your data, configuration, containers, and projects live in persistent writable storage.</p></article>
+<article style="padding:2.25rem 2rem 2.4rem;border-left:1px solid rgba(162,222,255,.18)"><span style="color:#47b8ef;font-family:ui-monospace,monospace;font-size:.72rem">03</span><h2 style="font-size:1.08rem;margin:.75rem 0">Tools without drift</h2><p style="color:#a6c1d0;font-size:.91rem;margin:0">Add capabilities as system extensions, containers, or user-space package environments.</p></article>
+</section>
+<section style="padding:6rem 0 4rem"></section>
+<x-import component-from-global-scope="FrostyardDesignSystem_375ef6.SiteFooter" hint-size="100%,80px"></x-import>
+</main>
+</div>
+</x-dc>
+</body>
+</html>

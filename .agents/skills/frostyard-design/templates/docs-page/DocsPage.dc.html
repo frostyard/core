@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<!-- @template name="Frostyard docs page" description="Documentation shell: top bar, section rail, prose with code + callout, TOC" -->
+<helmet><script src="./ds-base.js"></script></helmet>
+<div style="min-height:100vh;background-color:#06111d;background-image:radial-gradient(circle at 82% 2%,#10416455,transparent 27rem),linear-gradient(180deg,#071a2a 0%,#06111d 38%,#06111d 100%);color:#edf8ff;font-family:Inter,ui-sans-serif,system-ui,sans-serif;line-height:1.5">
+<div style="height:64px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(162,222,255,.18);max-width:1240px;margin:auto;padding:0 32px">
+<div style="display:flex;align-items:baseline;gap:1rem"><a href="#" style="font-weight:720;letter-spacing:-.04em;font-size:1.1rem;color:#edf8ff;text-decoration:none;white-space:nowrap"><span style="color:#aee9ff;font-size:1.35rem;margin-right:.3rem">❄</span> frostyard</a><span style="color:#7799ab;font-size:.85rem">/ docs</span></div>
+<a href="#" style="font-size:.78rem;border:1px solid rgba(162,222,255,.18);padding:.45rem .7rem;border-radius:100px;color:#d9f2ff;text-decoration:none;white-space:nowrap">Source <span style="color:#aee9ff">↗</span></a>
+</div>
+<div style="display:grid;grid-template-columns:230px minmax(0,1fr) 180px;max-width:1240px;margin:auto;padding:0 32px">
+<aside style="border-right:1px solid rgba(162,222,255,.18);padding:2rem 1.5rem 2rem 0">
+<div style="font:700 .62rem ui-monospace,monospace;letter-spacing:.14em;text-transform:uppercase;color:#aee9ff;margin-bottom:.2rem">project</div>
+<div style="font-size:.72rem;color:#7799ab;margin-bottom:1.2rem">One-line project kicker</div>
+<div style="font:700 .62rem ui-monospace,monospace;letter-spacing:.14em;text-transform:uppercase;color:#7cbddc;margin:0 0 .6rem">Getting started</div>
+<div style="display:grid">
+<a href="#" style="font-size:.82rem;color:#b7d0df;padding:.38rem 0 .38rem .75rem;border-left:1px solid rgba(162,222,255,.18);text-decoration:none">Overview</a>
+<a href="#" style="font-size:.82rem;color:#aee9ff;padding:.38rem 0 .38rem .75rem;border-left:1px solid #47b8ef;text-decoration:none">Installation</a>
+<a href="#" style="font-size:.82rem;color:#b7d0df;padding:.38rem 0 .38rem .75rem;border-left:1px solid rgba(162,222,255,.18);text-decoration:none">Quickstart</a>
+</div>
+<div style="font:700 .62rem ui-monospace,monospace;letter-spacing:.14em;text-transform:uppercase;color:#7cbddc;margin:1.6rem 0 .6rem">Reference</div>
+<div style="display:grid">
+<a href="#" style="font-size:.82rem;color:#b7d0df;padding:.38rem 0 .38rem .75rem;border-left:1px solid rgba(162,222,255,.18);text-decoration:none">CLI</a>
+<a href="#" style="font-size:.82rem;color:#b7d0df;padding:.38rem 0 .38rem .75rem;border-left:1px solid rgba(162,222,255,.18);text-decoration:none">Configuration</a>
+</div>
+</aside>
+<main style="padding:2.5rem 3rem;min-width:0">
+<p style="font:700 .62rem ui-monospace,monospace;letter-spacing:.14em;text-transform:uppercase;color:#82b6d0;margin:0 0 .8rem"><span style="width:24px;height:1px;background:#47b8ef;display:inline-block;vertical-align:middle;margin-right:.6rem"></span>project docs</p>
+<h1 style="font-size:2.6rem;letter-spacing:-.06em;line-height:1;margin:0 0 1rem;font-weight:700">Installation</h1>
+<p style="font-size:.9rem;color:#b6d0df;line-height:1.65;margin:0 0 1rem;max-width:640px">Start with a short, declarative paragraph. What the page covers, in the calm Frostyard voice: short sentences, boundaries over prohibitions.</p>
+<h2 style="font-size:1.4rem;letter-spacing:-.04em;margin:2.4rem 0 .8rem;padding-top:1.4rem;border-top:1px solid rgba(162,222,255,.18);font-weight:700">First section</h2>
+<p style="font-size:.9rem;color:#b6d0df;line-height:1.65;margin:0 0 1rem;max-width:640px">Body copy for the first step. Keep it to a few sentences per paragraph.</p>
+<pre style="background:#061826;border:1px solid rgba(162,222,255,.18);padding:1rem 1.2rem;overflow-x:auto;margin:0 0 1rem;max-width:640px"><code style="font-family:ui-monospace,monospace;font-size:.76rem;color:#a9d8ef;line-height:1.6">$ your-command --here</code></pre>
+<div style="border:1px solid rgba(162,222,255,.18);border-left:2px solid #47b8ef;background:linear-gradient(135deg,#0d2d45,#071827);padding:.9rem 1.1rem;font-size:.84rem;color:#b6d0df;margin:0 0 1rem;max-width:640px"><b style="color:#93dff7;font:700 .62rem ui-monospace,monospace;letter-spacing:.12em;text-transform:uppercase;display:block;margin-bottom:.35rem">Note</b>Callouts get a mono kicker and a sky left rule. Use sparingly.</div>
+<h2 style="font-size:1.4rem;letter-spacing:-.04em;margin:2.4rem 0 .8rem;padding-top:1.4rem;border-top:1px solid rgba(162,222,255,.18);font-weight:700">Second section</h2>
+<p style="font-size:.9rem;color:#b6d0df;line-height:1.65;margin:0 0 1rem;max-width:640px">Continue the page. Inline code like <code style="font-family:ui-monospace,monospace;font-size:.78em;color:#8ee3ff;background:#061826;padding:.15rem .35rem">updex enable</code> uses the code chip treatment.</p>
+<div style="display:flex;justify-content:space-between;gap:1rem;margin-top:3rem;border-top:1px solid rgba(162,222,255,.18);padding-top:1.2rem"><a href="#" style="font-size:.8rem;color:#93e0fb;text-decoration:none">← Previous</a><a href="#" style="font-size:.8rem;color:#93e0fb;text-decoration:none">Next →</a></div>
+</main>
+<aside style="padding:2.5rem 0 2rem 1.5rem;border-left:1px solid rgba(162,222,255,.18);font-size:.75rem">
+<p style="font:700 .62rem ui-monospace,monospace;letter-spacing:.14em;text-transform:uppercase;color:#7cbddc;margin:0 0 .7rem">On this page</p>
+<a href="#" style="display:block;color:#91b8cb;padding:.28rem 0;text-decoration:none">First section</a>
+<a href="#" style="display:block;color:#91b8cb;padding:.28rem 0;text-decoration:none">Second section</a>
+</aside>
+</div>
+</div>
+</x-dc>
+</body>
+</html>

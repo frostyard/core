@@ -1,0 +1,2 @@
+# Frostyard docs UI kit
+Shared documentation shell for every Frostyard project — one design, per-project content. The kit ships three content packs (snosi, updex, ChairLift) switchable from the top bar to prove the shell is content-agnostic. Layout follows the frostyard.github.io plan (top bar · left section tree · prose · right TOC) restyled in the frostyard-org language: ink background, hairlines, ice accents, mono kickers. Composes NavBar-style wordmark, Button, Tag from the design system.

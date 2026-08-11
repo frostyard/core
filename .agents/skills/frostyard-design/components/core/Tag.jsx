@@ -1,0 +1,3 @@
+export function Tag({ children, version, style }) {
+  return <span style={{ fontSize: "var(--text-tag-size)", border: "1px solid var(--line-tag)", color: "var(--tag-text)", padding: ".28rem .45rem", borderRadius: "var(--radius-tag)", fontFamily: "var(--font-sans)", display: "inline-block", lineHeight: 1.4, ...style }}>{children}{version && <small style={{ color: "#72bad8", display: "block", fontSize: ".57rem", lineHeight: 1.3, marginTop: ".15rem", maxWidth: 160, overflowWrap: "anywhere" }}>v{version}</small>}</span>;
+}

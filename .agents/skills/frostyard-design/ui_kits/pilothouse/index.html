@@ -1,0 +1,61 @@
+<!-- @dsCard group="Pilothouse" viewport="1440x900" name="Pilothouse" subtitle="Admin console restyled to the Frostyard language — login, overview, sysexts, services, podman" -->
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Pilothouse — UI kit</title>
+<link rel="stylesheet" href="../../styles.css"><link rel="stylesheet" href="pilothouse.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<style>body{margin:0;background-color:var(--ink);background-image:var(--gradient-page);color:var(--text-body);font-family:var(--font-sans);line-height:1.5}a{color:var(--link)}a:hover{color:var(--link-hover)}</style>
+</head><body><div id="root"></div>
+<script type="text/babel" src="Screens.jsx"></script>
+<script type="text/babel">
+const phPages = [
+  ["Overview", "overview", "01"], ["Fleet", "fleet", "02"], ["Attention", "attention", "03"],
+];
+const phModules = [
+  ["Sysexts", "sysext", "04"], ["Services", "services", "05"], ["Podman", "podman", "06"], ["Docker", "docker", "07"], ["Incus", "incus", "08"], ["System", "system", "09"],
+];
+const phTitles = { overview: ["System overview", null], fleet: ["Fleet", "4 systems · one shared base"], attention: ["Needs attention", "disk · memory · load · units"], sysext: ["System extensions", "updex · systemd-sysext"], services: ["Services", "systemd units"], podman: ["Podman", "system store · libpod api"], docker: ["Docker", "system engine"], incus: ["Incus", "default project"], system: ["System", "host · os · kernel"] };
+
+function PhApp() {
+  const [page, setPage] = React.useState(localStorage.getItem("ph-page") || "login");
+  const [sysId, setSysId] = React.useState(localStorage.getItem("ph-sys") || "workstation-01");
+  const sys = window.phFleet.find(f => f.id === sysId) || window.phFleet[0];
+  const go = p => { setPage(p); localStorage.setItem("ph-page", p); };
+  const pickSys = id => { setSysId(id); localStorage.setItem("ph-sys", id); go("overview"); };
+  if (page === "login") return <window.PhLogin onLogin={() => go("overview")} />;
+  const [title, subT] = phTitles[page] || phTitles.overview;
+  const sub = subT || (sys.image + " · " + sys.id);
+  const body = { overview: <window.PhOverview go={go} sys={sys} />, fleet: <window.PhFleet current={sysId} onPick={pickSys} />, sysext: <window.PhSysexts />, services: <window.PhServices />, podman: <window.PhPodman />, docker: <window.PhPodman />, incus: <window.PhPodman />, attention: <window.PhServices />, system: <window.PhOverview go={go} sys={sys} /> }[page];
+  return <div className="ph-shell">
+    <aside className="ph-sidebar">
+      <a className="ph-brand" href="#" onClick={e => { e.preventDefault(); go("overview"); }}><span className="flake">❄</span><span><strong>Pilothouse</strong><small>frostyard admin</small></span></a>
+      <div className="ph-sys-picker">
+        <label>System</label>
+        <select value={sysId} onChange={e => pickSys(e.target.value)}>
+          {window.phFleet.map(f => <option key={f.id} value={f.id}>{f.id} · {f.image}</option>)}
+        </select>
+      </div>
+      <nav className="ph-nav">
+        <div className="ph-nav-group">Console</div>
+        {phPages.map(([label, id, n]) => <a key={id} href="#" className={"ph-nav-link" + (page === id ? " active" : "")} onClick={e => { e.preventDefault(); go(id); }}><span className="ph-nav-num">{n}</span>{label}</a>)}
+        <div className="ph-nav-group">Modules</div>
+        {phModules.map(([label, id, n]) => <a key={id} href="#" className={"ph-nav-link" + (page === id ? " active" : "")} onClick={e => { e.preventDefault(); go(id); }}><span className="ph-nav-num">{n}</span>{label}</a>)}
+      </nav>
+      <div className="ph-side-foot">
+        <div className="ph-avatar">BJ</div>
+        <div className="ph-side-user"><strong>bjk</strong><small>administrator</small></div>
+        <button className="ph-button secondary" style={{ minHeight: 28, padding: "0 8px" }} onClick={() => go("login")}>↩</button>
+      </div>
+    </aside>
+    <main className="ph-main">
+      <div className="ph-topbar">
+        <div><div className="ph-eyebrow"><i></i>{sub}</div><h1>{title}</h1></div>
+        <div className="ph-topbar-actions"><div className="ph-live"><span></span>Live · 15s</div><button className="ph-button secondary">Refresh</button></div>
+      </div>
+      {body}
+    </main>
+  </div>;
+}
+ReactDOM.createRoot(document.getElementById("root")).render(<PhApp />);
+</script></body></html>
