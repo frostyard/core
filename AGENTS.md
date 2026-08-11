@@ -1,11 +1,9 @@
-# Project Name
+# frostyard/core
 
-<!-- One paragraph: what this project is and who it serves. Point at
-docs/README.md as the entry point for everything else. Keep this file under
-~200 lines — it is loaded into every agent session; long files dilute the
-rules that matter. -->
-
-One or two sentences describing the project. Start at
+The org-wide hub for the [frostyard](https://github.com/frostyard)
+organization: shared agent skills, document and repo templates, org-level
+issues and discussions, and common assets. It contains no application code —
+other frostyard repos reference or copy what lives here. Start at
 [docs/README.md](docs/README.md).
 
 This file (`AGENTS.md`) is the CANONICAL agent instructions — `CLAUDE.md`,
@@ -39,16 +37,19 @@ every structural rule. Rules that remove a degree of freedom are the
 valuable ones: every choice an agent doesn't have to make is a failure mode
 removed. -->
 
-- *(add rules as the code that enforces them lands)*
-- Run the project's full check (`just check`, `make check`, or equivalent —
-  define it early) before calling any change done. CI runs the same recipe,
-  so a local pass is a CI pass.
+- *(add rules as the content that enforces them lands — this repo holds docs,
+  skills, templates, and assets, not application code)*
 
 ## Repository boundary
 
-<!-- What does NOT belong in this repo (secrets, personal data, generated
-files that are actually build outputs, apps that belong elsewhere)? How are
-releases cut? Delete the section if genuinely not applicable. -->
+This repo hosts org-wide shared material only:
+
+- **In scope:** agent skills (`.agents/skills/`), document/repo templates
+  (`templates/`), shared assets like logos and badges (`assets/`), org-level
+  docs (`docs/`), and org-wide issues and discussions on GitHub.
+- **Out of scope:** application code, secrets or credentials, personal data,
+  and anything specific to a single frostyard repo — that belongs in the repo
+  it serves.
 
 ## Documentation rules (enforced)
 

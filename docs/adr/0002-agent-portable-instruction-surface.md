@@ -1,7 +1,7 @@
 # 0002 — Agent-portable instruction surface
 
 - **Status:** Accepted
-- **Date:** YYYY-MM-DD <!-- set when you adopt the template -->
+- **Date:** 2026-08-11
 
 ## Context
 

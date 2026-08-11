@@ -1,7 +1,7 @@
 # 0001 — Record architecture decisions
 
 - **Status:** Accepted
-- **Date:** YYYY-MM-DD <!-- set when you adopt the template -->
+- **Date:** 2026-08-11
 
 ## Context
 
