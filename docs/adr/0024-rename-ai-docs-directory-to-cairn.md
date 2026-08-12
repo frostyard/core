@@ -1,6 +1,6 @@
 # 0024 — Rename the AI-facing docs directory from yeti/ to cairn/
 
-- **Status:** Accepted
+- **Status:** Superseded by [0025](0025-consolidate-repository-docs-into-docs.md)
 - **Date:** 2026-08-11
 
 ## Context

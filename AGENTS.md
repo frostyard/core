@@ -31,12 +31,12 @@ Start from .agents/skills/TEMPLATE/SKILL.md. -->
   [.agents/skills/frostyard-go-repo/SKILL.md](.agents/skills/frostyard-go-repo/SKILL.md)
   — SDK-first layout, clix CLI, Makefile check gate, GoReleaser Pro + svu
   releases (extracted from updex).
-- **Creating, updating, or migrating a repo's AI-facing architecture docs
-  (`cairn/`, formerly `yeti/`)** →
-  [.agents/skills/frostyard-cairn/SKILL.md](.agents/skills/frostyard-cairn/SKILL.md)
-  — OVERVIEW structure, learnings folding, the yeti→cairn rename
-  ([ADR-0024](docs/adr/0024-rename-ai-docs-directory-to-cairn.md); replaces
-  the retired yeti doc-maintainer).
+- **Creating or updating a repo's architecture/reference docs, or retiring
+  a legacy `yeti/`/`cairn/` tree** →
+  [.agents/skills/frostyard-repo-docs/SKILL.md](.agents/skills/frostyard-repo-docs/SKILL.md)
+  — one `docs/` tree per repo, agent-maintained
+  ([ADR-0025](docs/adr/0025-consolidate-repository-docs-into-docs.md);
+  replaces the retired yeti doc-maintainer).
 
 ## Code conventions (live — the code exists)
 
