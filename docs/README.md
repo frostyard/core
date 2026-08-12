@@ -39,6 +39,8 @@ Docs are split by the question they answer:
 - [0024 — Rename the AI-facing docs directory from yeti/ to cairn/](adr/0024-rename-ai-docs-directory-to-cairn.md) *(superseded by 0025)*
 - [0025 — One docs/ tree per repository, in core's four-category shape](adr/0025-consolidate-repository-docs-into-docs.md)
 - [0026 — Distribute core agent skills to repos via sync PRs from core](adr/0026-distribute-core-skills-via-sync-prs.md)
+- [0027 — Retire fisherman; firn is the frostyard bootc installer](adr/0027-retire-fisherman-superseded-by-firn.md)
+- [0028 — Retire snosi-install; firn is the frostyard A/B installer](adr/0028-retire-snosi-install-superseded-by-firn.md)
 
 ### Design
 
