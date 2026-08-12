@@ -4,10 +4,17 @@ Applies a Frostyard-branded Astro docs site to any project repo as `site/`. The 
 
 ## Install (once, to use from any repo)
 
+Run this from any clone of the core repository:
+
 ```sh
-ln -sfn "$HOME/projects/frostyard/core/.agents/skills/frostyard-docs-site" \
+core_dir=$(git rev-parse --show-toplevel)
+mkdir -p "$HOME/.claude/skills"
+ln -sfn "$core_dir/.agents/skills/frostyard-docs-site" \
   "$HOME/.claude/skills/frostyard-docs-site"
 ```
+
+This installs a symlink in Claude Code's user-level skill-discovery directory;
+the source remains the checkout you ran the command from.
 
 ## Maintenance
 
