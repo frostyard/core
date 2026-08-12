@@ -51,7 +51,7 @@ updex is the completed reference (updex#256, #257 merged).
   (intuneme#184 was the last merge). The pilothouse overview split remains
   as a follow-up item above.
 
-## Phase 3 — Repo-local ADRs from the sweep
+## Phase 3 — Repo-local ADRs from the sweep ✅ 2026-08-12
 
 - [x] Write the 2026-08-11 sweep's repo-local ADR-worthy findings into each
   repo's `docs/adr/` — all six PRs written 2026-08-12, every claim
@@ -64,8 +64,8 @@ updex is the completed reference (updex#256, #257 merged).
   into 10 subsystem docs (overview now 498 lines, within the skill's cap).
 - **Done when:** each of the six swept repos has at least its top sweep
   findings recorded as numbered ADRs, indexed, and cross-linked to the
-  core ADRs in `docs/org-adrs.md`. *(Pending: owner merges of the PRs
-  above.)*
+  core ADRs in `docs/org-adrs.md`. ✅ all seven PRs (including the
+  pilothouse overview split) merged 2026-08-12 — 63 repo-local ADRs live.
 
 ## Phase 4 — Supply-chain cleanup
 
