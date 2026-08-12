@@ -1,5 +1,5 @@
 {
-  "defaults": ["frostyard-repo-docs"],
+  "defaults": ["frostyard-repo-docs", "frostyard-acmm-conformance"],
   "repos": {
     "snosi": [],
     "updex": ["frostyard-go-repo"],
