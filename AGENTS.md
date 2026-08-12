@@ -7,10 +7,12 @@ other frostyard repos reference or copy what lives here. Start at
 [docs/README.md](docs/README.md).
 
 This file (`AGENTS.md`) is the CANONICAL agent instructions — `CLAUDE.md`,
-`GEMINI.md`, and `.github/copilot-instructions.md` are symlinks to it, and
-`.claude/skills` symlinks to `.agents/skills/`
-([ADR-0002](docs/adr/0002-agent-portable-instruction-surface.md)). Edit only
-the canonical paths; keep content tool-agnostic.
+`GEMINI.md`, `CONTRIBUTING.md`, `.cursorrules`, and
+`.github/copilot-instructions.md` are symlinks to it, and `.claude/skills`
+symlinks to `.agents/skills/`
+([ADR-0002](docs/adr/0002-agent-portable-instruction-surface.md),
+[ADR-0029](docs/adr/0029-acmm-conformance-via-canonical-aliases.md)). Edit
+only the canonical paths; keep content tool-agnostic.
 
 ## Skills (follow these for common tasks)
 
@@ -47,6 +49,10 @@ Start from .agents/skills/TEMPLATE/SKILL.md. -->
 - Current org-wide work is sequenced in
   [docs/plans/0001-docs-shape-rollout.md](docs/plans/0001-docs-shape-rollout.md);
   update it as phases land.
+- Every PR declares its risk tier (highest applicable, never lower) in the
+  PR template's Risk tier section; reviews apply
+  [docs/specs/pr-review-rubric.md](docs/specs/pr-review-rubric.md)
+  ([ADR-0019](docs/adr/0019-governance-as-code-and-risk-tiers.md)).
 
 ## Code conventions (live — the code exists)
 
@@ -62,8 +68,22 @@ every structural rule. Rules that remove a degree of freedom are the
 valuable ones: every choice an agent doesn't have to make is a failure mode
 removed. -->
 
-- *(add rules as the content that enforces them lands — this repo holds docs,
-  skills, templates, and assets, not application code)*
+- CI gate: [.github/workflows/ci.yml](.github/workflows/ci.yml) runs
+  `node scripts/check-docs.mjs` (every doc indexed, every relative link
+  resolving, every symlink intact — thresholds in
+  `.coverage-thresholds.json`, `never_relax`) and the docs-site scaffold
+  e2e suite (`npm ci && npm test` in
+  `.agents/skills/frostyard-docs-site/scaffold/`). Run both locally before
+  pushing.
+- Conformance alias symlinks are listed in
+  [ADR-0029](docs/adr/0029-acmm-conformance-via-canonical-aliases.md) —
+  edit their canonical targets, never the aliases.
+- Corrections go to `.memory/corrections.jsonl` (append-only five-field
+  schema, [ADR-0018](docs/adr/0018-org-wide-agent-instruction-and-knowledge-surfaces.md));
+  promote into this file, docs, or skills — never duplicate without
+  setting `promoted_to`.
+- Task runbooks live in [.github/prompts/](.github/prompts/README.md) as
+  `*.prompt.md`; rules stay here.
 
 ## Repository boundary
 
