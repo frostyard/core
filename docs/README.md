@@ -15,6 +15,27 @@ Docs are split by the question they answer:
 
 - [0001 — Record architecture decisions](adr/0001-record-architecture-decisions.md)
 - [0002 — Agent-portable instruction surface](adr/0002-agent-portable-instruction-surface.md)
+- [0003 — Record image provenance in /usr/share/frostyard](adr/0003-image-provenance-in-usr-share-frostyard.md)
+- [0004 — Product-namespaced filesystem paths, split by lifetime tier](adr/0004-product-namespaced-filesystem-tiers.md)
+- [0005 — Transport discrimination by marker file and /run update-state contract](adr/0005-native-ab-marker-and-update-state-files.md)
+- [0006 — OS artifact versions are 14-digit UTC timestamps](adr/0006-os-artifact-versions-are-utc-timestamps.md)
+- [0007 — The Frostyard sysext filename pattern and derived versions](adr/0007-frostyard-sysext-filename-pattern.md)
+- [0008 — Sysext distribution layout and update contract](adr/0008-sysext-distribution-and-update-contract.md)
+- [0009 — repository.frostyard.org is the single artifact origin](adr/0009-single-artifact-origin-repository-frostyard-org.md)
+- [0010 — Publish packages through the shared repogen action](adr/0010-publish-packages-via-repogen-to-r2.md)
+- [0011 — Distro packages are named frostyard-&lt;tool&gt;](adr/0011-frostyard-prefixed-package-names.md)
+- [0012 — svu-derived versions, make bump, and the rolling dev prerelease](adr/0012-svu-versioning-and-rolling-dev-prerelease.md)
+- [0013 — Component releases trigger image rebuilds via repository_dispatch](adr/0013-release-fanout-via-repository-dispatch.md)
+- [0014 — One GPG repository key, baked into images](adr/0014-single-gpg-trust-root.md)
+- [0015 — os-release is the image identity surface](adr/0015-os-release-image-identity.md)
+- [0016 — Reverse-DNS org.frostyard.* identifiers](adr/0016-reverse-dns-org-frostyard-identifiers.md)
+- [0017 — io.snosi.* OCI capability labels and the mechanics QA tier](adr/0017-io-snosi-capability-labels-and-mechanics-tier.md)
+- [0018 — Org-wide agent instruction and knowledge surfaces](adr/0018-org-wide-agent-instruction-and-knowledge-surfaces.md)
+- [0019 — Repository governance as machine-readable policy with risk tiers](adr/0019-governance-as-code-and-risk-tiers.md)
+- [0020 — Trust boundaries for AI automation in CI](adr/0020-ai-automation-trust-boundaries.md)
+- [0021 — SHA-pinned actions and least-privilege CI workflows](adr/0021-sha-pinned-actions-and-least-privilege-ci.md)
+- [0022 — make ci is the canonical gate; TestI* is reserved](adr/0022-make-ci-gate-and-test-naming-filter.md)
+- [0023 — External downloads are version-pinned and checksum-verified](adr/0023-verified-pinned-downloads.md)
 
 ### Design
 
