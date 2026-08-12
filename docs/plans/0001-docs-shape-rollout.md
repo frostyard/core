@@ -8,13 +8,15 @@ org ADR back-links, core-managed skills installed by sync
 2026-08-11 org sweep's repo-local findings written down as repo-local ADRs.
 updex is the completed reference (updex#256, #257 merged).
 
-## Phase 1 — Unblock the skills sync (tiny)
+## Phase 1 — Unblock the skills sync (tiny) ✅ 2026-08-11
 
-- Add **Pull requests: Read and write** to `ORG_PAT`
-  ([core#15](https://github.com/frostyard/core/issues/15)), then dispatch
-  `sync-skills.yml`. Sync branches are already pushed in all six repos.
+- [x] Add **Pull requests: Read and write** to `ORG_PAT`
+  ([core#15](https://github.com/frostyard/core/issues/15); token now
+  expires 2027-08-11), then dispatch `sync-skills.yml`.
 - **Done when:** `chore/sync-core-skills` PRs are open in snosi, updex,
   chairlift, pilothouse, lab, and repogen, and the sync run is green.
+  ✅ snosi#695, updex#258, chairlift#197, pilothouse#188, lab#107,
+  repogen#26; run 31556216685 green.
 
 ## Phase 2 — Merge sync PRs, migrate the yeti/ repos
 
