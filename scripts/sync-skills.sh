@@ -46,8 +46,11 @@ for repo in $(jq -r '.repos | keys[]' "$CONFIG"); do
     dst="${skills_root}/${skill}"
     mkdir -p "$dst"
     rsync -a --delete "$src/" "$dst/"
-    printf 'Managed by frostyard/core — edit there, not here (ADR-0026).\nSource: https://github.com/frostyard/core/tree/main/.agents/skills/%s\nSynced from: frostyard/core@%s\n' \
-      "$skill" "$SRC_SHA" > "$dst/.synced-from-core"
+    # No commit SHA in the marker: a SHA would make every core commit dirty
+    # every consumer (marker-only diff PRs). Provenance detail lives in the
+    # sync commit message instead.
+    printf 'Managed by frostyard/core — edit there, not here (ADR-0026).\nSource: https://github.com/frostyard/core/tree/main/.agents/skills/%s\n' \
+      "$skill" > "$dst/.synced-from-core"
   done
 
   # Run the per-repo git/PR work in a subshell whose exit status we read

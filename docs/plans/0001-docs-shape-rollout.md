@@ -20,12 +20,21 @@ updex is the completed reference (updex#256, #257 merged).
 
 ## Phase 2 — Merge sync PRs, migrate the yeti/ repos
 
-- Merge each repo's sync PR (installs `frostyard-repo-docs` +
-  `frostyard-go-repo` per `.github/skills-sync.json`).
-- Run the [frostyard-repo-docs](../../.agents/skills/frostyard-repo-docs/SKILL.md)
-  migration (step 0) in snosi, chairlift, pilothouse, repogen — then clix,
-  std, intuneme (also carry `yeti/`). Branch each PR off `main`; the org
-  squash-merges, so never stack.
+- [x] Merge each repo's sync PR (installs `frostyard-repo-docs` +
+  `frostyard-go-repo` per `.github/skills-sync.json`) — all six merged
+  2026-08-11/12, including the round-2 markdown-fix syncs.
+- [x] Run the [frostyard-repo-docs](../../.agents/skills/frostyard-repo-docs/SKILL.md)
+  migration (step 0) in snosi, chairlift, pilothouse, repogen — merged as
+  repogen#27, pilothouse#189, chairlift#198, snosi#697 (the last also adds
+  `.agents/**` + `docs/**` to the build `paths-ignore`; root cause of the
+  sync-triggered image builds was the non-markdown `.synced-from-core`
+  marker escaping the `**/*.md` ignore).
+- [ ] Then clix, std, intuneme (also carry `yeti/`; now in
+  `.github/skills-sync.json`). Branch each PR off `main`; the org
+  squash-merges, so never stack. Their migrations must also create
+  `docs/org-adrs.md` (they predate the back-link round).
+- [ ] Follow-up: pilothouse `docs/design/overview.md` is 4,935 lines —
+  run the skill's maintenance pass to split it toward the 200–500 cap.
 - Migration-time per-repo notes: chairlift's
   `internal/installcheck/documentation_test.go` pins literal `yeti/` paths;
   chairlift/pilothouse have `.agents → docs/agents` symlinks; repogen's

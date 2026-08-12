@@ -6,6 +6,9 @@
     "chairlift": ["frostyard-go-repo"],
     "pilothouse": ["frostyard-go-repo"],
     "lab": [],
-    "repogen": ["frostyard-go-repo"]
+    "repogen": ["frostyard-go-repo"],
+    "clix": ["frostyard-go-repo"],
+    "std": ["frostyard-go-repo"],
+    "intuneme": ["frostyard-go-repo"]
   }
 }
