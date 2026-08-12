@@ -47,3 +47,23 @@ docs/plans/                   when — phased plans + TEMPLATE.md
 
 Symlinks require Linux/macOS (or `core.symlinks=true` on Windows); GitHub's
 web renderer shows symlinks as their target path, which is cosmetic only.
+
+## Contributing
+
+Make shared-material changes in this repository, not in a consuming project's
+copy. Start from a fresh branch off `main`; do not stack a branch on another
+PR branch.
+
+1. Edit canonical paths only. `AGENTS.md` is the source for the instruction
+   aliases (including `CONTRIBUTING.md`), and `.agents/skills/` is the source
+   for the `.claude/skills` alias.
+2. Put docs in the appropriate `docs/` category, start new docs from that
+   category's `TEMPLATE.md`, add them to `docs/README.md`, and maintain the
+   required cross-links. Update skills, templates, and assets at their
+   canonical paths.
+3. Run `node scripts/check-docs.mjs` before opening a documentation change.
+   When changing the docs-site scaffold, also run `npm ci && npm test` from
+   `.agents/skills/frostyard-docs-site/scaffold/`.
+4. Open a PR from the branch, declare its risk tier, and complete the
+   applicable housekeeping items in the PR template. Core squash-merges PRs;
+   do not merge your own change.
