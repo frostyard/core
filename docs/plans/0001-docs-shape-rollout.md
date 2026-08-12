@@ -53,14 +53,19 @@ updex is the completed reference (updex#256, #257 merged).
 
 ## Phase 3 — Repo-local ADRs from the sweep
 
-- Write the 2026-08-11 sweep's repo-local ADR-worthy findings into each
-  repo's new `docs/adr/` (e.g. chairlift `PREFIX=/usr` and config
-  fail-closed; snosi var-outcomes maps and publication guards; pilothouse
-  broker wire surface and capability model; repogen InRelease-for-unsigned
-  and pool sharding; lab digest-CAS poller and console-marker protocol).
+- [x] Write the 2026-08-11 sweep's repo-local ADR-worthy findings into each
+  repo's `docs/adr/` — all six PRs written 2026-08-12, every claim
+  re-verified against code before recording (several sweep claims were
+  corrected or reframed by the evidence): updex#261 (9 ADRs),
+  repogen#30 (11), lab#111 (10, plus lab's docs scaffold — it had been
+  skipped in Phase 2's migration list since it carried no yeti/),
+  chairlift#201 (10), pilothouse#194 (11), snosi#700 (12).
+- Also in this phase: pilothouse#193 split its 4,935-line design overview
+  into 10 subsystem docs (overview now 498 lines, within the skill's cap).
 - **Done when:** each of the six swept repos has at least its top sweep
   findings recorded as numbered ADRs, indexed, and cross-linked to the
-  core ADRs in `docs/org-adrs.md`.
+  core ADRs in `docs/org-adrs.md`. *(Pending: owner merges of the PRs
+  above.)*
 
 ## Phase 4 — Supply-chain cleanup
 
