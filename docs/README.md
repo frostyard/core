@@ -38,6 +38,7 @@ Docs are split by the question they answer:
 - [0023 — External downloads are version-pinned and checksum-verified](adr/0023-verified-pinned-downloads.md)
 - [0024 — Rename the AI-facing docs directory from yeti/ to cairn/](adr/0024-rename-ai-docs-directory-to-cairn.md) *(superseded by 0025)*
 - [0025 — One docs/ tree per repository, in core's four-category shape](adr/0025-consolidate-repository-docs-into-docs.md)
+- [0026 — Distribute core agent skills to repos via sync PRs from core](adr/0026-distribute-core-skills-via-sync-prs.md)
 
 ### Design
 

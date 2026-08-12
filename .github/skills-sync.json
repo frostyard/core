@@ -1,0 +1,11 @@
+{
+  "defaults": ["frostyard-repo-docs"],
+  "repos": {
+    "snosi": [],
+    "updex": ["frostyard-go-repo"],
+    "chairlift": ["frostyard-go-repo"],
+    "pilothouse": ["frostyard-go-repo"],
+    "lab": [],
+    "repogen": ["frostyard-go-repo"]
+  }
+}
