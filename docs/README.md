@@ -41,14 +41,16 @@ Docs are split by the question they answer:
 - [0026 — Distribute core agent skills to repos via sync PRs from core](adr/0026-distribute-core-skills-via-sync-prs.md)
 - [0027 — Retire fisherman; firn is the frostyard bootc installer](adr/0027-retire-fisherman-superseded-by-firn.md)
 - [0028 — Retire snosi-install; firn is the frostyard A/B installer](adr/0028-retire-snosi-install-superseded-by-firn.md)
+- [0029 — ACMM conformance via canonical aliases](adr/0029-acmm-conformance-via-canonical-aliases.md)
 
 ### Design
 
-*(none yet)*
+- [Quality loop](design/quality-loop.md)
 
 ### Specs
 
-*(none yet)*
+- [PR review rubric](specs/pr-review-rubric.md)
+- [PR acceptance metric](specs/pr-acceptance-metric.md)
 
 ### Plans
 
@@ -65,3 +67,6 @@ Docs are split by the question they answer:
   documentation rules in [AGENTS.md](../AGENTS.md) (CLAUDE.md/GEMINI.md are
   symlinks to it, ADR-0002).
 - Adding a doc means adding it to the index above.
+- Conformance alias symlinks (`docs/quality.md`, `docs/metrics.md`,
+  `docs/review-rubric.md` — [ADR-0029](adr/0029-acmm-conformance-via-canonical-aliases.md))
+  are not docs and are not indexed — edit their canonical targets.

@@ -1,0 +1,1 @@
+{"date": "2026-08-11", "scope": "skills-sync", "correction": "Non-markdown sync artifacts (.synced-from-core) escape **/*.md paths-ignore filters and trigger full image builds; ignore .agents/** and docs/** as trees, not by extension glob", "evidence": "snosi#697; docs/plans/0001-docs-shape-rollout.md Phase 2", "promoted_to": "docs/plans/0001-docs-shape-rollout.md"}
