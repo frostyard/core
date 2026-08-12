@@ -31,10 +31,11 @@ Start from .agents/skills/TEMPLATE/SKILL.md. -->
   [.agents/skills/frostyard-go-repo/SKILL.md](.agents/skills/frostyard-go-repo/SKILL.md)
   — SDK-first layout, clix CLI, Makefile check gate, GoReleaser Pro + svu
   releases (extracted from updex).
-- **Creating or updating a repo's architecture/reference docs, or retiring
-  a legacy `yeti/`/`cairn/` tree** →
+- **Scaffolding or updating a repo's docs/ tree, or retiring a legacy
+  `yeti/`/`cairn/` tree** →
   [.agents/skills/frostyard-repo-docs/SKILL.md](.agents/skills/frostyard-repo-docs/SKILL.md)
-  — one `docs/` tree per repo, agent-maintained
+  — core's four-category shape (adr/design/specs/plans) in every repo,
+  agent-maintained
   ([ADR-0025](docs/adr/0025-consolidate-repository-docs-into-docs.md);
   replaces the retired yeti doc-maintainer).
 

@@ -37,7 +37,7 @@ Docs are split by the question they answer:
 - [0022 — make ci is the canonical gate; TestI* is reserved](adr/0022-make-ci-gate-and-test-naming-filter.md)
 - [0023 — External downloads are version-pinned and checksum-verified](adr/0023-verified-pinned-downloads.md)
 - [0024 — Rename the AI-facing docs directory from yeti/ to cairn/](adr/0024-rename-ai-docs-directory-to-cairn.md) *(superseded by 0025)*
-- [0025 — One docs/ tree per repository; retire the separate AI-docs directory](adr/0025-consolidate-repository-docs-into-docs.md)
+- [0025 — One docs/ tree per repository, in core's four-category shape](adr/0025-consolidate-repository-docs-into-docs.md)
 
 ### Design
 
