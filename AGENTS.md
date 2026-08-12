@@ -23,6 +23,12 @@ them rather than improvising, whichever agent you are:
 Add a skill whenever you find yourself re-explaining a multi-step procedure.
 Start from .agents/skills/TEMPLATE/SKILL.md. -->
 
+- **Bringing a repo to Hive ACMM conformance (open `acmm` issues,
+  fleet-management prerequisites)** →
+  [.agents/skills/frostyard-acmm-conformance/SKILL.md](.agents/skills/frostyard-acmm-conformance/SKILL.md)
+  — canonical aliases per
+  [ADR-0029](docs/adr/0029-acmm-conformance-via-canonical-aliases.md), real
+  trees for directory criteria, docs-integrity gate.
 - **Designing any Frostyard-branded interface, page, mock, or asset** →
   [.agents/skills/frostyard-design/SKILL.md](.agents/skills/frostyard-design/SKILL.md)
   — brand law, tokens, guidelines, components, UI kits, hero art.
