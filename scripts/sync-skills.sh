@@ -35,7 +35,7 @@ for repo in $(jq -r '.repos | keys[]' "$CONFIG"); do
   # docs/agents — resolve to the physical dir so git pathspecs match the
   # files, not the symlink.
   skills_root=$(realpath -m "${dir}/.agents")/skills
-  rel_root=$(realpath --relative-to="$dir" "$skills_root")
+  rel_root=$(realpath -m --relative-to="$dir" "$skills_root")
 
   for skill in "${skills[@]}"; do
     src=".agents/skills/${skill}"
@@ -50,7 +50,12 @@ for repo in $(jq -r '.repos | keys[]' "$CONFIG"); do
       "$skill" "$SRC_SHA" > "$dst/.synced-from-core"
   done
 
+  # Run the per-repo git/PR work in a subshell whose exit status we read
+  # AFTER it finishes — `( ... ) || fail=1` would put the subshell in a
+  # tested context, where bash suspends `set -e` and failures fall through.
+  set +e
   (
+    set -e
     cd "$dir"
     git add -A "$rel_root"
     if git diff --cached --quiet; then
@@ -73,7 +78,13 @@ for repo in $(jq -r '.repos | keys[]' "$CONFIG"); do
         --body "$(printf 'Automated skill sync from [frostyard/core](https://github.com/frostyard/core) @ %s per [ADR-0026](https://github.com/frostyard/core/blob/main/docs/adr/0026-distribute-core-skills-via-sync-prs.md).\n\nSynced skills: %s\n\nThese directories are managed in core — edit them there, not here. Local edits are overwritten by the next sync.\n\nRisk tier: 1 — documentation/skills only, no code or workflow changes.' "$SRC_SHA" "${skills[*]}")"
     fi
     echo "== ${repo}: synced"
-  ) || fail=1
+  )
+  rc=$?
+  set -e
+  if [ "$rc" -ne 0 ]; then
+    echo "::error::sync failed for frostyard/${repo}"
+    fail=1
+  fi
 done
 
 exit "$fail"
