@@ -1,6 +1,9 @@
 # Frostyard docs-site skill + scaffold — implementation plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **Historical implementation record (2026-07-19).** The delivered, maintained
+> procedure is [frostyard-docs-site](../../../frostyard-docs-site/SKILL.md).
+> This plan is retained as provenance only; do not execute its checklist or
+> reuse its environment-specific paths.
 
 **Goal:** A `skills/frostyard-docs-site/` skill in this design-system repo whose `scaffold/` payload is a complete Astro docs site (Frostyard docs-shell design, Markdown/MDX content, Pagefind search, Cloudflare Workers deploy) that the skill applies to any project repo as `site/`.
 
