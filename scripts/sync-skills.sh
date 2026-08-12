@@ -31,13 +31,19 @@ for repo in $(jq -r '.repos | keys[]' "$CONFIG"); do
     continue
   fi
 
+  # Some repos (chairlift, pilothouse) have .agents as a symlink to
+  # docs/agents — resolve to the physical dir so git pathspecs match the
+  # files, not the symlink.
+  skills_root=$(realpath -m "${dir}/.agents")/skills
+  rel_root=$(realpath --relative-to="$dir" "$skills_root")
+
   for skill in "${skills[@]}"; do
     src=".agents/skills/${skill}"
     if [ ! -d "$src" ]; then
       echo "::error::skills-sync.json names unknown skill '${skill}'"
       exit 1
     fi
-    dst="${dir}/.agents/skills/${skill}"
+    dst="${skills_root}/${skill}"
     mkdir -p "$dst"
     rsync -a --delete "$src/" "$dst/"
     printf 'Managed by frostyard/core — edit there, not here (ADR-0026).\nSource: https://github.com/frostyard/core/tree/main/.agents/skills/%s\nSynced from: frostyard/core@%s\n' \
@@ -46,7 +52,7 @@ for repo in $(jq -r '.repos | keys[]' "$CONFIG"); do
 
   (
     cd "$dir"
-    git add -A .agents/skills
+    git add -A "$rel_root"
     if git diff --cached --quiet; then
       echo "== ${repo}: up to date"
       exit 0
@@ -55,10 +61,17 @@ for repo in $(jq -r '.repos | keys[]' "$CONFIG"); do
     git -c user.name="$GIT_NAME" -c user.email="$GIT_EMAIL" \
       commit -q -m "chore: sync agent skills from frostyard/core@${SRC_SHA}"
     git push -qf origin "$BRANCH"
-    gh pr create --repo "frostyard/${repo}" --head "$BRANCH" \
-      --title "chore: sync agent skills from frostyard/core" \
-      --body "$(printf 'Automated skill sync from [frostyard/core](https://github.com/frostyard/core) @ %s per [ADR-0026](https://github.com/frostyard/core/blob/main/docs/adr/0026-distribute-core-skills-via-sync-prs.md).\n\nSynced skills: %s\n\nThese directories are managed in core — edit them there, not here. Local edits are overwritten by the next sync.\n\nRisk tier: 1 — documentation/skills only, no code or workflow changes.' "$SRC_SHA" "${skills[*]}")" \
-      || echo "== ${repo}: PR already open — branch force-updated"
+    # Check-then-create, with no fallback masking: a create failure (e.g.
+    # token missing pull-requests:write) must fail the run loudly.
+    existing=$(gh pr list --repo "frostyard/${repo}" --head "$BRANCH" --state open \
+      --json number --jq '.[].number')
+    if [ -n "$existing" ]; then
+      echo "== ${repo}: PR #${existing} already open — branch force-updated"
+    else
+      gh pr create --repo "frostyard/${repo}" --head "$BRANCH" \
+        --title "chore: sync agent skills from frostyard/core" \
+        --body "$(printf 'Automated skill sync from [frostyard/core](https://github.com/frostyard/core) @ %s per [ADR-0026](https://github.com/frostyard/core/blob/main/docs/adr/0026-distribute-core-skills-via-sync-prs.md).\n\nSynced skills: %s\n\nThese directories are managed in core — edit them there, not here. Local edits are overwritten by the next sync.\n\nRisk tier: 1 — documentation/skills only, no code or workflow changes.' "$SRC_SHA" "${skills[*]}")"
+    fi
     echo "== ${repo}: synced"
   ) || fail=1
 done
