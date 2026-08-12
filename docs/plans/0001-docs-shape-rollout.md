@@ -29,10 +29,13 @@ updex is the completed reference (updex#256, #257 merged).
   `.agents/**` + `docs/**` to the build `paths-ignore`; root cause of the
   sync-triggered image builds was the non-markdown `.synced-from-core`
   marker escaping the `**/*.md` ignore).
-- [ ] Then clix, std, intuneme (also carry `yeti/`; now in
-  `.github/skills-sync.json`). Branch each PR off `main`; the org
-  squash-merges, so never stack. Their migrations must also create
-  `docs/org-adrs.md` (they predate the back-link round).
+- [x] Then clix, std, intuneme (also carry `yeti/`; now in
+  `.github/skills-sync.json`) — clix#25 and std#14 merged (both also fixed
+  their agent surface: they had only a real CLAUDE.md, no AGENTS.md or
+  symlinks); intuneme#184 open, awaiting owner review. Each created its
+  `docs/org-adrs.md`. Found during intuneme's migration: its snosi release
+  dispatch never fires on tag runs
+  ([core#20](https://github.com/frostyard/core/issues/20)).
 - [ ] Follow-up: pilothouse `docs/design/overview.md` is 4,935 lines —
   run the skill's maintenance pass to split it toward the 200–500 cap.
 - Migration-time per-repo notes: chairlift's
