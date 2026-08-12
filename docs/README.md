@@ -36,6 +36,7 @@ Docs are split by the question they answer:
 - [0021 — SHA-pinned actions and least-privilege CI workflows](adr/0021-sha-pinned-actions-and-least-privilege-ci.md)
 - [0022 — make ci is the canonical gate; TestI* is reserved](adr/0022-make-ci-gate-and-test-naming-filter.md)
 - [0023 — External downloads are version-pinned and checksum-verified](adr/0023-verified-pinned-downloads.md)
+- [0024 — Rename the AI-facing docs directory from yeti/ to cairn/](adr/0024-rename-ai-docs-directory-to-cairn.md)
 
 ### Design
 

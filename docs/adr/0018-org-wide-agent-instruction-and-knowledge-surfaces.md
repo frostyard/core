@@ -64,3 +64,5 @@ Fleet-wide, every repo carries:
   [lab](https://github.com/frostyard/lab); the millify skill wires these.
 - Builds on: [ADR-0002](0002-agent-portable-instruction-surface.md)
 - Related: [ADR-0019](0019-governance-as-code-and-risk-tiers.md)
+- Amended by: [ADR-0024](0024-rename-ai-docs-directory-to-cairn.md) — the
+  AI-docs directory is renamed `yeti/` → `cairn/`
