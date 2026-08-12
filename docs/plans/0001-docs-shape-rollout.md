@@ -1,0 +1,77 @@
+# Plan: Org docs-shape and skills rollout
+
+One paragraph: takes every frostyard repo from implicit conventions to the
+recorded state — core's four-category `docs/` shape
+([ADR-0025](../adr/0025-consolidate-repository-docs-into-docs.md)) with
+org ADR back-links, core-managed skills installed by sync
+([ADR-0026](../adr/0026-distribute-core-skills-via-sync-prs.md)), and the
+2026-08-11 org sweep's repo-local findings written down as repo-local ADRs.
+updex is the completed reference (updex#256, #257 merged).
+
+## Phase 1 — Unblock the skills sync (tiny)
+
+- Add **Pull requests: Read and write** to `ORG_PAT`
+  ([core#15](https://github.com/frostyard/core/issues/15)), then dispatch
+  `sync-skills.yml`. Sync branches are already pushed in all six repos.
+- **Done when:** `chore/sync-core-skills` PRs are open in snosi, updex,
+  chairlift, pilothouse, lab, and repogen, and the sync run is green.
+
+## Phase 2 — Merge sync PRs, migrate the yeti/ repos
+
+- Merge each repo's sync PR (installs `frostyard-repo-docs` +
+  `frostyard-go-repo` per `.github/skills-sync.json`).
+- Run the [frostyard-repo-docs](../../.agents/skills/frostyard-repo-docs/SKILL.md)
+  migration (step 0) in snosi, chairlift, pilothouse, repogen — then clix,
+  std, intuneme (also carry `yeti/`). Branch each PR off `main`; the org
+  squash-merges, so never stack.
+- Migration-time per-repo notes: chairlift's
+  `internal/installcheck/documentation_test.go` pins literal `yeti/` paths;
+  chairlift/pilothouse have `.agents → docs/agents` symlinks; repogen's
+  `gh` defaults to the upstream fork parent (`--repo frostyard/repogen`
+  always) — record that in repogen's agent instructions during its PR;
+  updex's `.github/copilot-instructions.md` is a real file, not a symlink —
+  decide merge-or-exception and apply the same call in other repos.
+- **Done when:** no frostyard repo contains a `yeti/` or `cairn/`
+  directory, and each migrated repo's `docs/README.md` indexes the four
+  categories.
+
+## Phase 3 — Repo-local ADRs from the sweep
+
+- Write the 2026-08-11 sweep's repo-local ADR-worthy findings into each
+  repo's new `docs/adr/` (e.g. chairlift `PREFIX=/usr` and config
+  fail-closed; snosi var-outcomes maps and publication guards; pilothouse
+  broker wire surface and capability model; repogen InRelease-for-unsigned
+  and pool sharding; lab digest-CAS poller and console-marker protocol).
+- **Done when:** each of the six swept repos has at least its top sweep
+  findings recorded as numbered ADRs, indexed, and cross-linked to the
+  core ADRs in `docs/org-adrs.md`.
+
+## Phase 4 — Supply-chain cleanup
+
+- Work [core#16](https://github.com/frostyard/core/issues/16) (secret-bearing
+  `publish-to-r2@main`), [#17](https://github.com/frostyard/core/issues/17)
+  (mutable-branch refs), then [#18](https://github.com/frostyard/core/issues/18)
+  (org-wide SHA pinning, ⚠-marked repos first).
+- **Done when:** #16 and #17 are closed and #18's ⚠-marked repos are pinned
+  with enforcement tests where a harness exists.
+
+## Later / ideas
+
+- Remaining drift issues [core#1–#14](https://github.com/frostyard/core/issues)
+  not already covered above (risk-tier harmonization #13, dev-release
+  concurrency #10, mkdocs taxonomy #14, updex/repogen config drift).
+- Extend `skills-sync.json` to more repos as they onboard.
+- Archive the retired `yeti` repo (noted in #18).
+
+## Open questions
+
+- **Where does the ORG_PAT contract live?** Resolve with core#15 — likely a
+  core design doc; record as an ADR only if the token model itself changes.
+  By Phase 1.
+
+## References
+
+- Implements: [ADR-0025](../adr/0025-consolidate-repository-docs-into-docs.md),
+  [ADR-0026](../adr/0026-distribute-core-skills-via-sync-prs.md); tracks
+  [ADR-0021](../adr/0021-sha-pinned-actions-and-least-privilege-ci.md)
+  adoption (Phase 4).

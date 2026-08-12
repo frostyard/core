@@ -50,7 +50,7 @@ Docs are split by the question they answer:
 
 ### Plans
 
-*(none yet)*
+- [Org docs-shape and skills rollout](plans/0001-docs-shape-rollout.md)
 
 ## Conventions
 

@@ -39,6 +39,15 @@ Start from .agents/skills/TEMPLATE/SKILL.md. -->
   ([ADR-0025](docs/adr/0025-consolidate-repository-docs-into-docs.md);
   replaces the retired yeti doc-maintainer).
 
+## Working conventions (org-wide)
+
+- The org **squash-merges PRs**: branch every PR off `main`, never stack a
+  branch on another PR's branch — after the base squash-merges, the stacked
+  PR conflicts and needs `git rebase --onto origin/main <old-base-tip>`.
+- Current org-wide work is sequenced in
+  [docs/plans/0001-docs-shape-rollout.md](docs/plans/0001-docs-shape-rollout.md);
+  update it as phases land.
+
 ## Code conventions (live — the code exists)
 
 <!-- The most important section. Rules here must describe the code AS IT IS,
