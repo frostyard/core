@@ -18,7 +18,7 @@ updex is the completed reference (updex#256, #257 merged).
   ✅ snosi#695, updex#258, chairlift#197, pilothouse#188, lab#107,
   repogen#26; run 31556216685 green.
 
-## Phase 2 — Merge sync PRs, migrate the yeti/ repos
+## Phase 2 — Merge sync PRs, migrate the yeti/ repos ✅ 2026-08-12
 
 - [x] Merge each repo's sync PR (installs `frostyard-repo-docs` +
   `frostyard-go-repo` per `.github/skills-sync.json`) — all six merged
@@ -47,7 +47,9 @@ updex is the completed reference (updex#256, #257 merged).
   decide merge-or-exception and apply the same call in other repos.
 - **Done when:** no frostyard repo contains a `yeti/` or `cairn/`
   directory, and each migrated repo's `docs/README.md` indexes the four
-  categories.
+  categories. ✅ verified 2026-08-12 across all nine synced repos
+  (intuneme#184 was the last merge). The pilothouse overview split remains
+  as a follow-up item above.
 
 ## Phase 3 — Repo-local ADRs from the sweep
 
