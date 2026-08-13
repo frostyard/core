@@ -6,7 +6,8 @@ recorded state — core's four-category `docs/` shape
 org ADR back-links, core-managed skills installed by sync
 ([ADR-0026](../adr/0026-distribute-core-skills-via-sync-prs.md)), and the
 2026-08-11 org sweep's repo-local findings written down as repo-local ADRs.
-updex is the completed reference (updex#256, #257 merged).
+updex is the completed reference (updex#256, #257 merged). The running
+mechanism is described in [design/skills-sync.md](../design/skills-sync.md).
 
 ## Phase 1 — Unblock the skills sync (tiny) ✅ 2026-08-11
 

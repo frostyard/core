@@ -48,6 +48,7 @@ Docs are split by the question they answer:
 ### Design
 
 - [Quality loop](design/quality-loop.md)
+- [Skills sync](design/skills-sync.md)
 
 ### Specs
 
