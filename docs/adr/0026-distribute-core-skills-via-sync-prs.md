@@ -67,6 +67,8 @@ recurse them.
 
 ## References
 
+- Operational design:
+  [Skills sync operations](../design/skills-sync-operations.md)
 - Shapes: [.github/workflows/sync-skills.yml](../../.github/workflows/sync-skills.yml),
   [scripts/sync-skills.sh](../../scripts/sync-skills.sh),
   [.github/skills-sync.json](../../.github/skills-sync.json)

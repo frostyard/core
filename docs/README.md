@@ -4,7 +4,7 @@ Docs are split by the question they answer:
 
 | Directory | Question | Contents |
 | --- | --- | --- |
-| [adr/](adr/) | **Why** did we choose this? | Architecture Decision Records — immutable once accepted; superseded, never edited |
+| [adr/](adr/) | **Why** did we choose this? | Architecture Decision Records — semantically immutable once accepted; link-only maintenance follows [ADR-0033](adr/0033-link-maintenance-in-immutable-adrs.md) |
 | [design/](design/) | **How** does it fit together? | Living documents describing the current architecture |
 | [specs/](specs/) | **What exactly** is the contract? | Precise, testable interface definitions |
 | [plans/](plans/) | **When/in what order** do we build? | Roadmaps and phase plans; updated as work lands |
@@ -45,11 +45,12 @@ Docs are split by the question they answer:
 - [0030 — Shipped systemd units never use RequiredBy= enablement](adr/0030-no-requiredby-enablement-in-shipped-units.md)
 - [0031 — Retire Dakota's secure bootc installer; firn owns the path](adr/0031-retire-dakota-secure-bootc-installer.md)
 - [0032 — Treat incremental sysext indexes as exhaustive](adr/0032-incremental-sysext-indexes-are-exhaustive.md)
-
+- [0033 — Permit link-only maintenance in immutable ADRs](adr/0033-link-maintenance-in-immutable-adrs.md)
 
 ### Design
 
 - [Quality loop](design/quality-loop.md)
+- [Skills sync operations](design/skills-sync-operations.md)
 
 ### Specs
 
@@ -66,6 +67,9 @@ Docs are split by the question they answer:
 - **New docs start from their category's `TEMPLATE.md`** (in each directory).
 - New decision → new ADR with the next number; if it reverses an old one, mark
   the old one `Superseded by NNNN` rather than editing it.
+- Link-only repairs to Accepted or Superseded ADRs follow
+  [ADR-0033](adr/0033-link-maintenance-in-immutable-adrs.md); semantic changes
+  always require a new ADR.
 - Design docs are updated in place to always reflect reality.
 - Specs change only alongside the code that implements them.
 - Cross-links between categories are mandatory in both directions — see the

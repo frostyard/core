@@ -107,8 +107,10 @@ This repo hosts org-wide shared material only:
 Docs live in `docs/` in four categories. **Every new doc starts from its
 category's `TEMPLATE.md`** and follows its structure:
 
-- `docs/adr/` — why we decided. Immutable once Accepted; reversals are new
-  ADRs that mark the old one Superseded.
+- `docs/adr/` — why we decided. Semantically immutable once Accepted;
+  [link-only maintenance](docs/adr/0033-link-maintenance-in-immutable-adrs.md)
+  preserves navigability, while reversals are new ADRs that mark the old one
+  Superseded.
 - `docs/design/` — how it fits together. Living; updated in place to match
   reality.
 - `docs/specs/` — exact contracts. Change only alongside implementing code.

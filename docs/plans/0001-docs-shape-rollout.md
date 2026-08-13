@@ -4,7 +4,8 @@ One paragraph: takes every frostyard repo from implicit conventions to the
 recorded state — core's four-category `docs/` shape
 ([ADR-0025](../adr/0025-consolidate-repository-docs-into-docs.md)) with
 org ADR back-links, core-managed skills installed by sync
-([ADR-0026](../adr/0026-distribute-core-skills-via-sync-prs.md)), and the
+([operations](../design/skills-sync-operations.md),
+[ADR-0026](../adr/0026-distribute-core-skills-via-sync-prs.md)), and the
 2026-08-11 org sweep's repo-local findings written down as repo-local ADRs.
 updex is the completed reference (updex#256, #257 merged).
 
@@ -93,3 +94,5 @@ updex is the completed reference (updex#256, #257 merged).
   [ADR-0026](../adr/0026-distribute-core-skills-via-sync-prs.md); tracks
   [ADR-0021](../adr/0021-sha-pinned-actions-and-least-privilege-ci.md)
   adoption (Phase 4).
+- Operates:
+  [Skills sync operations](../design/skills-sync-operations.md)
