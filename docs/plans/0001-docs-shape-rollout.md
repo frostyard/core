@@ -36,8 +36,6 @@ updex is the completed reference (updex#256, #257 merged).
   `docs/org-adrs.md`. Found during intuneme's migration: its snosi release
   dispatch never fires on tag runs
   ([core#20](https://github.com/frostyard/core/issues/20)).
-- [ ] Follow-up: pilothouse `docs/design/overview.md` is 4,935 lines —
-  run the skill's maintenance pass to split it toward the 200–500 cap.
 - Migration-time per-repo notes: chairlift's
   `internal/installcheck/documentation_test.go` pins literal `yeti/` paths;
   chairlift/pilothouse have `.agents → docs/agents` symlinks; repogen's
@@ -48,8 +46,7 @@ updex is the completed reference (updex#256, #257 merged).
 - **Done when:** no frostyard repo contains a `yeti/` or `cairn/`
   directory, and each migrated repo's `docs/README.md` indexes the four
   categories. ✅ verified 2026-08-12 across all nine synced repos
-  (intuneme#184 was the last merge). The pilothouse overview split remains
-  as a follow-up item above.
+  (intuneme#184 was the last merge).
 
 ## Phase 3 — Repo-local ADRs from the sweep ✅ 2026-08-12
 
