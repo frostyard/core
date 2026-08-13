@@ -140,6 +140,7 @@ error that exits immediately.
   [ADR-0026](../adr/0026-distribute-core-skills-via-sync-prs.md),
   [ADR-0019](../adr/0019-governance-as-code-and-risk-tiers.md),
   [ADR-0021](../adr/0021-sha-pinned-actions-and-least-privilege-ci.md)
+- Contributor guide: [Shared skills](shared-skills.md)
 - Executable contracts:
   [skills-sync.json](../../.github/skills-sync.json),
   [sync-skills.yml](../../.github/workflows/sync-skills.yml),
