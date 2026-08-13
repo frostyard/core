@@ -2,8 +2,9 @@
 
 <!--
 Filename: NNNN-kebab-case-title.md (next free number).
-ADRs are immutable once Accepted. To reverse one, write a new ADR and set the
-old one's Status to "Superseded by NNNN".
+ADRs are semantically immutable once Accepted. ADR-0033 permits link-only
+maintenance; to reverse a decision, write a new ADR and set the old one's
+Status to "Superseded by NNNN".
 -->
 
 - **Status:** Proposed | Accepted | Superseded by [NNNN](NNNN-title.md)
