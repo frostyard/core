@@ -20,7 +20,7 @@ Docs are split by the question they answer:
 - [0005 — Transport discrimination by marker file and /run update-state contract](adr/0005-native-ab-marker-and-update-state-files.md)
 - [0006 — OS artifact versions are 14-digit UTC timestamps](adr/0006-os-artifact-versions-are-utc-timestamps.md)
 - [0007 — The Frostyard sysext filename pattern and derived versions](adr/0007-frostyard-sysext-filename-pattern.md)
-- [0008 — Sysext distribution layout and update contract](adr/0008-sysext-distribution-and-update-contract.md)
+- [0008 — Sysext distribution layout and update contract](adr/0008-sysext-distribution-and-update-contract.md) *(index truncation resolved by [0032](adr/0032-incremental-sysext-indexes-are-exhaustive.md))*
 - [0009 — repository.frostyard.org is the single artifact origin](adr/0009-single-artifact-origin-repository-frostyard-org.md)
 - [0010 — Publish packages through the shared repogen action](adr/0010-publish-packages-via-repogen-to-r2.md)
 - [0011 — Distro packages are named frostyard-&lt;tool&gt;](adr/0011-frostyard-prefixed-package-names.md)
@@ -44,6 +44,7 @@ Docs are split by the question they answer:
 - [0029 — ACMM conformance via canonical aliases](adr/0029-acmm-conformance-via-canonical-aliases.md)
 - [0030 — Shipped systemd units never use RequiredBy= enablement](adr/0030-no-requiredby-enablement-in-shipped-units.md)
 - [0031 — Retire Dakota's secure bootc installer; firn owns the path](adr/0031-retire-dakota-secure-bootc-installer.md)
+- [0032 — Treat incremental sysext indexes as exhaustive](adr/0032-incremental-sysext-indexes-are-exhaustive.md)
 - [0033 — Permit link-only maintenance in immutable ADRs](adr/0033-link-maintenance-in-immutable-adrs.md)
 
 ### Design
