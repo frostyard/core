@@ -94,6 +94,10 @@ must distinguish inactivity from an intentional maintenance posture.
 
 ## Later / ideas
 
+- Standardize rolling GoReleaser snapshot concurrency across the Go
+  repository portfolio under
+  [ADR-0034](../adr/0034-cancel-stale-rolling-dev-releases.md), beginning with
+  chairlift and pilothouse ([core#10](https://github.com/frostyard/core/issues/10)).
 - Publish a generated organization dashboard after the lifecycle map and
   metric definitions are stable.
 - Add external adoption indicators only where a repository has a user-facing
@@ -116,7 +120,8 @@ must distinguish inactivity from an intentional maintenance posture.
 - Tracks: [core#56](https://github.com/frostyard/core/issues/56)
 - Builds on:
   [ADR-0025](../adr/0025-consolidate-repository-docs-into-docs.md),
-  [ADR-0026](../adr/0026-distribute-core-skills-via-sync-prs.md)
+  [ADR-0026](../adr/0026-distribute-core-skills-via-sync-prs.md),
+  [ADR-0034](../adr/0034-cancel-stale-rolling-dev-releases.md)
 - Coordinates with:
   [Plan 0001 — Org docs-shape and skills rollout](0001-docs-shape-rollout.md)
 - Uses:

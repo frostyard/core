@@ -46,6 +46,7 @@ Docs are split by the question they answer:
 - [0031 — Retire Dakota's secure bootc installer; firn owns the path](adr/0031-retire-dakota-secure-bootc-installer.md)
 - [0032 — Treat incremental sysext indexes as exhaustive](adr/0032-incremental-sysext-indexes-are-exhaustive.md)
 - [0033 — Permit link-only maintenance in immutable ADRs](adr/0033-link-maintenance-in-immutable-adrs.md)
+- [0034 — Cancel stale rolling dev releases](adr/0034-cancel-stale-rolling-dev-releases.md)
 
 ### Design
 
