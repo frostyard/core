@@ -58,6 +58,7 @@ a scheduled service.
 - Current successor:
   [frostyard-repo-docs skill](../../.agents/skills/frostyard-repo-docs/SKILL.md)
   ([ADR-0025](0025-consolidate-repository-docs-into-docs.md))
+- Link maintenance: [ADR-0033](0033-link-maintenance-in-immutable-adrs.md)
 - Builds on: [ADR-0018](0018-org-wide-agent-instruction-and-knowledge-surfaces.md) (amends its directory name)
 - Source: retired yeti [doc-maintainer job](https://github.com/frostyard/yeti/blob/main/src/jobs/doc-maintainer.ts)
   and [policy prompt](https://github.com/frostyard/yeti/blob/main/src/policies/doc-maintainer.md)
