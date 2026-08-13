@@ -61,6 +61,7 @@ Docs are split by the question they answer:
 
 - [Org docs-shape and skills rollout](plans/0001-docs-shape-rollout.md)
 - [Organization portfolio stewardship](plans/0002-org-portfolio-roadmap.md)
+- [Firn skills sync onboarding](plans/0003-onboard-firn-to-skills-sync.md)
 
 ## Conventions
 

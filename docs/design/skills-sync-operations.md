@@ -50,10 +50,11 @@ skills, but edits within a managed skill are replaced on the next sync.
   script does not accept another owner or an arbitrary clone URL.
 
 Only keys present in `repos` are consumers. The live file is authoritative;
-it currently includes `chairlift`, `clix`, `intuneme`, `lab`, `pilothouse`,
-`repogen`, `snosi`, `std`, and `updex`. A regular `.agents/` directory and a
-`.agents` symlink are both supported: the script resolves the physical target
-before writing or staging files.
+it includes `chairlift`, `clix`, `firn`, `intuneme`, `lab`, `pilothouse`,
+`repogen`, `snosi`, `std`, and `updex`. Firn receives the
+`frostyard-go-repo` extra in addition to the default skills. A regular
+`.agents/` directory and a `.agents` symlink are both supported: the script
+resolves the physical target before writing or staging files.
 
 ### Merge and ownership contract
 
@@ -144,4 +145,5 @@ error that exits immediately.
   [sync-skills.yml](../../.github/workflows/sync-skills.yml),
   [sync-skills.sh](../../scripts/sync-skills.sh)
 - Built in:
-  [Plan 0001, Phases 1-2](../plans/0001-docs-shape-rollout.md)
+  [Plan 0001, Phases 1-2](../plans/0001-docs-shape-rollout.md) and
+  [Plan 0003](../plans/0003-onboard-firn-to-skills-sync.md)
