@@ -67,7 +67,8 @@ that guidance as part of the rollout tracked in the
 
 - Shapes: the
   [frostyard-go-repo skill](../../.agents/skills/frostyard-go-repo/SKILL.md)
-  and [org portfolio roadmap](../plans/0002-org-portfolio-roadmap.md)
+  and [org portfolio roadmap](../plans/0002-org-portfolio-roadmap.md); implemented
+  by the [dev release concurrency rollout](../plans/0004-dev-release-concurrency-rollout.md)
 - Builds on:
   [ADR-0012](0012-svu-versioning-and-rolling-dev-prerelease.md)
 - Tracks: [core issue #10](https://github.com/frostyard/core/issues/10)
