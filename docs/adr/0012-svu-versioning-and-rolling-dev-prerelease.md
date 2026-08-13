@@ -29,8 +29,8 @@ constraints on snapshot versions (must begin with a digit).
   via a named concurrency group. Two implementations exist —
   `cancel-in-progress: true` (updex, avoids HTTP 422 collisions) and
   `cancel-in-progress: false` (chairlift/pilothouse, queues instead) — the
-  invariant is "no two concurrent uploads"; harmonizing on one setting is
-  open work.
+  invariant is "no two concurrent uploads"; [ADR-0034](0034-cancel-stale-rolling-dev-releases.md)
+  resolves the harmonization work.
 - Where Debian snapshot packages are built, version templates start with a
   literal `0.0.0-` because `.ShortCommit` is hex and a Debian version must
   begin with a digit (~3 in 8 commits would otherwise fail).
@@ -59,3 +59,4 @@ constraints on snapshot versions (must begin with a digit).
   [pilothouse `scripts/bump.sh`](https://github.com/frostyard/pilothouse/blob/main/scripts/bump.sh),
   the [frostyard-go-repo skill](../../.agents/skills/frostyard-go-repo/SKILL.md)
 - Builds on: [ADR-0011](0011-frostyard-prefixed-package-names.md)
+- Refined by: [ADR-0034](0034-cancel-stale-rolling-dev-releases.md)
