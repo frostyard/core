@@ -21,7 +21,7 @@ a scheduled service.
   durable not-yet-folded lessons live in `cairn/learnings/`.
 - New repos use `cairn/` from the start. Existing `yeti/` directories are a
   **legacy alias**: migrated to `cairn/` opportunistically by the
-  [frostyard-cairn skill](../../.agents/skills/frostyard-cairn/SKILL.md)
+  [historical frostyard-cairn skill](https://github.com/frostyard/core/blob/871364655963a898a8cfc2670e51b5e4815a1315/.agents/skills/frostyard-cairn/SKILL.md)
   the next time it touches a repo, in a dedicated rename commit that also
   updates every reference (instruction files, coverage ignores, workflow
   `paths-ignore`, `.mill.toml` context docs, doc-consistency tests).
@@ -53,7 +53,11 @@ a scheduled service.
 
 ## References
 
-- Shapes: [frostyard-cairn skill](../../.agents/skills/frostyard-cairn/SKILL.md)
+- Historical shape:
+  [frostyard-cairn skill](https://github.com/frostyard/core/blob/871364655963a898a8cfc2670e51b5e4815a1315/.agents/skills/frostyard-cairn/SKILL.md)
+- Current successor:
+  [frostyard-repo-docs skill](../../.agents/skills/frostyard-repo-docs/SKILL.md)
+  ([ADR-0025](0025-consolidate-repository-docs-into-docs.md))
 - Builds on: [ADR-0018](0018-org-wide-agent-instruction-and-knowledge-surfaces.md) (amends its directory name)
 - Source: retired yeti [doc-maintainer job](https://github.com/frostyard/yeti/blob/main/src/jobs/doc-maintainer.ts)
   and [policy prompt](https://github.com/frostyard/yeti/blob/main/src/policies/doc-maintainer.md)
