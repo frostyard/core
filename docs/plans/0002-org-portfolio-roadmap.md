@@ -92,12 +92,18 @@ must distinguish inactivity from an intentional maintenance posture.
 - **Done when:** one quarterly review has updated the portfolio map, recorded
   decisions and owners, and published the next set of measurable outcomes.
 
+## Dev release concurrency rollout
+
+- Apply
+  [ADR-0034](../adr/0034-cancel-stale-rolling-dev-releases.md) to chairlift
+  and pilothouse through independent pull requests based on each repository's
+  `main` branch ([core#10](https://github.com/frostyard/core/issues/10)).
+- **Done when:** chairlift and pilothouse both enforce the literal
+  `goreleaser-nightly` group with `cancel-in-progress: true` in CI and their
+  pull requests are merged.
+
 ## Later / ideas
 
-- Standardize rolling GoReleaser snapshot concurrency across the Go
-  repository portfolio under
-  [ADR-0034](../adr/0034-cancel-stale-rolling-dev-releases.md), beginning with
-  chairlift and pilothouse ([core#10](https://github.com/frostyard/core/issues/10)).
 - Publish a generated organization dashboard after the lifecycle map and
   metric definitions are stable.
 - Add external adoption indicators only where a repository has a user-facing

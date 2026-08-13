@@ -1,6 +1,6 @@
 # 0034 — Cancel stale rolling dev releases
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-08-12
 
 ## Context
