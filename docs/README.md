@@ -44,6 +44,7 @@ Docs are split by the question they answer:
 - [0029 — ACMM conformance via canonical aliases](adr/0029-acmm-conformance-via-canonical-aliases.md)
 - [0030 — Shipped systemd units never use RequiredBy= enablement](adr/0030-no-requiredby-enablement-in-shipped-units.md)
 - [0032 — Treat incremental sysext indexes as exhaustive](adr/0032-incremental-sysext-indexes-are-exhaustive.md)
+- [0031 — Retire Dakota's secure bootc installer; firn owns the path](adr/0031-retire-dakota-secure-bootc-installer.md)
 
 ### Design
 
