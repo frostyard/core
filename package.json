@@ -1,0 +1,19 @@
+{
+  "name": "@frostyard/core-validation",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "check": "npm run check:docs && npm run check:organization && npm test",
+    "check:docs": "node scripts/check-docs.mjs",
+    "check:organization": "node scripts/check-organization.mjs",
+    "test": "node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "ajv": "8.20.0",
+    "jsonc-parser": "3.3.1"
+  }
+}

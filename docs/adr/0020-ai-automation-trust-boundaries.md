@@ -57,3 +57,7 @@ itself can carry injected instructions.
   ai-fix workflows in updex/pilothouse
 - Builds on: [ADR-0019](0019-governance-as-code-and-risk-tiers.md)
 - Related: [ADR-0021](0021-sha-pinned-actions-and-least-privilege-ci.md)
+- Extended by:
+  [ADR-0035](0035-author-organization-authority-as-strict-json.md), which
+  publishes strict organization authority without storing provider credentials
+  or worker execution state

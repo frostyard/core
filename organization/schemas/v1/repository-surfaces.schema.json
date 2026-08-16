@@ -1,0 +1,125 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://frostyard.org/schemas/organization/v1/repository-surfaces.schema.json",
+  "title": "Frostyard repository surface contract v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "contract", "surfaces"],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version"],
+      "properties": {
+        "id": {
+          "const": "repository-surfaces"
+        },
+        "version": {
+          "const": 1
+        }
+      }
+    },
+    "surfaces": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": {
+        "oneOf": [
+          {
+            "$ref": "#/$defs/agentInstructions"
+          },
+          {
+            "$ref": "#/$defs/agentGovernance"
+          },
+          {
+            "$ref": "#/$defs/agentSkills"
+          },
+          {
+            "$ref": "#/$defs/documentationIndex"
+          }
+        ]
+      }
+    }
+  },
+  "$defs": {
+    "agentInstructions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "path", "artifact_type", "media_type"],
+      "properties": {
+        "id": {
+          "const": "agent-instructions"
+        },
+        "path": {
+          "const": "AGENTS.md"
+        },
+        "artifact_type": {
+          "const": "file"
+        },
+        "media_type": {
+          "const": "text/markdown"
+        }
+      }
+    },
+    "agentGovernance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "path", "artifact_type", "media_type", "schema_path"],
+      "properties": {
+        "id": {
+          "const": "agent-governance"
+        },
+        "path": {
+          "const": "policies/agent-governance.json"
+        },
+        "artifact_type": {
+          "const": "file"
+        },
+        "media_type": {
+          "const": "application/json"
+        },
+        "schema_path": {
+          "const": "organization/schemas/v1/repository-agent-governance.schema.json"
+        }
+      }
+    },
+    "agentSkills": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "path", "artifact_type"],
+      "properties": {
+        "id": {
+          "const": "agent-skills"
+        },
+        "path": {
+          "const": ".agents/skills"
+        },
+        "artifact_type": {
+          "const": "directory"
+        }
+      }
+    },
+    "documentationIndex": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "path", "artifact_type", "media_type"],
+      "properties": {
+        "id": {
+          "const": "documentation-index"
+        },
+        "path": {
+          "const": "docs/README.md"
+        },
+        "artifact_type": {
+          "const": "file"
+        },
+        "media_type": {
+          "const": "text/markdown"
+        }
+      }
+    }
+  }
+}

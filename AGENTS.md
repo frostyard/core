@@ -2,9 +2,9 @@
 
 The org-wide hub for the [frostyard](https://github.com/frostyard)
 organization: shared agent skills, document and repo templates, org-level
-issues and discussions, and common assets. It contains no application code —
-other frostyard repos reference or copy what lives here. Start at
-[docs/README.md](docs/README.md).
+authority, issues and discussions, and common assets. It contains no product
+application code — other frostyard repos reference or copy what lives here.
+Start at [docs/README.md](docs/README.md).
 
 This file (`AGENTS.md`) is the CANONICAL agent instructions — `CLAUDE.md`,
 `GEMINI.md`, `CONTRIBUTING.md`, `.cursorrules`, and
@@ -74,13 +74,18 @@ every structural rule. Rules that remove a degree of freedom are the
 valuable ones: every choice an agent doesn't have to make is a failure mode
 removed. -->
 
-- CI gate: [.github/workflows/ci.yml](.github/workflows/ci.yml) runs
-  `node scripts/check-docs.mjs` (every doc indexed, every relative link
-  resolving, every symlink intact — thresholds in
+- CI gate: [.github/workflows/ci.yml](.github/workflows/ci.yml) runs `npm ci &&
+  npm run check` at the root (strict organization authority via
+  `scripts/check-organization.mjs`; every doc indexed, every relative link
+  resolving, every symlink intact via `scripts/check-docs.mjs`; thresholds in
   `.coverage-thresholds.json`, `never_relax`) and the docs-site scaffold
   e2e suite (`npm ci && npm test` in
   `.agents/skills/frostyard-docs-site/scaffold/`). Run both locally before
   pushing.
+- Author repository declarations and canonical surface contracts only under
+  [`organization/`](organization/README.md); validate live records and their
+  conformance fixtures with `npm run check:organization`
+  ([ADR-0035](docs/adr/0035-author-organization-authority-as-strict-json.md)).
 - Conformance alias symlinks are listed in
   [ADR-0029](docs/adr/0029-acmm-conformance-via-canonical-aliases.md) —
   edit their canonical targets, never the aliases.
@@ -97,10 +102,13 @@ This repo hosts org-wide shared material only:
 
 - **In scope:** agent skills (`.agents/skills/`), document/repo templates
   (`templates/`), shared assets like logos and badges (`assets/`), org-level
-  docs (`docs/`), and org-wide issues and discussions on GitHub.
+  docs (`docs/`), machine-readable organization authority (`organization/`),
+  repository-support validation (`scripts/` and `test/`), and org-wide issues
+  and discussions on GitHub.
 - **Out of scope:** application code, secrets or credentials, personal data,
-  and anything specific to a single frostyard repo — that belongs in the repo
-  it serves.
+  worker execution state, and repository-specific implementation or policy
+  instances. Organization enrollment declarations may identify one repository;
+  code and local policy remain in the repository they serve.
 
 ## Documentation rules (enforced)
 

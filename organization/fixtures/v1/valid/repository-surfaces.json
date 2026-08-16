@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "contract": {
+    "id": "repository-surfaces",
+    "version": 1
+  },
+  "surfaces": [
+    {
+      "id": "agent-instructions",
+      "path": "AGENTS.md",
+      "artifact_type": "file",
+      "media_type": "text/markdown"
+    },
+    {
+      "id": "agent-governance",
+      "path": "policies/agent-governance.json",
+      "artifact_type": "file",
+      "media_type": "application/json",
+      "schema_path": "organization/schemas/v1/repository-agent-governance.schema.json"
+    },
+    {
+      "id": "agent-skills",
+      "path": ".agents/skills",
+      "artifact_type": "directory"
+    },
+    {
+      "id": "documentation-index",
+      "path": "docs/README.md",
+      "artifact_type": "file",
+      "media_type": "text/markdown"
+    }
+  ]
+}

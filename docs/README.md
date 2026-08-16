@@ -47,17 +47,20 @@ Docs are split by the question they answer:
 - [0032 — Treat incremental sysext indexes as exhaustive](adr/0032-incremental-sysext-indexes-are-exhaustive.md)
 - [0033 — Permit link-only maintenance in immutable ADRs](adr/0033-link-maintenance-in-immutable-adrs.md)
 - [0034 — Cancel stale rolling dev releases](adr/0034-cancel-stale-rolling-dev-releases.md)
+- [0035 — Author organization authority as strict JSON](adr/0035-author-organization-authority-as-strict-json.md)
 
 ### Design
 
 - [Quality loop](design/quality-loop.md)
 - [Shared skills](design/shared-skills.md)
 - [Skills sync operations](design/skills-sync-operations.md)
+- [Organization authority](design/organization-authority.md)
 
 ### Specs
 
 - [PR review rubric](specs/pr-review-rubric.md)
 - [PR acceptance metric](specs/pr-acceptance-metric.md)
+- [Organization repository enrollment](specs/organization-repository-enrollment.md)
 
 ### Plans
 
@@ -65,6 +68,7 @@ Docs are split by the question they answer:
 - [Organization portfolio stewardship](plans/0002-org-portfolio-roadmap.md)
 - [Firn skills sync onboarding](plans/0003-onboard-firn-to-skills-sync.md)
 - [Dev release concurrency rollout](plans/0004-dev-release-concurrency-rollout.md)
+- [Organization authority rollout](plans/0005-organization-authority-rollout.md)
 
 ## Conventions
 
