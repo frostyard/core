@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "repository": {
+    "owner": "frostyard",
+    "name": "core",
+    "repository_id": "1331309458"
+  },
+  "accountable_owners": [
+    {
+      "kind": "github-user",
+      "login": "bketelsen"
+    }
+  ],
+  "fleet_state": "disabled",
+  "maintenance_programs": ["quality", "ci", "security", "architecture"],
+  "action_ceiling": [
+    "read",
+    "write",
+    "run-tests",
+    "open-issue",
+    "open-pr",
+    "create-followup"
+  ],
+  "surface_contract_version": 1
+}

@@ -59,3 +59,7 @@ shared vocabulary for how much scrutiny a change deserves.
   risk-tier docs in each repo
 - Builds on: [ADR-0018](0018-org-wide-agent-instruction-and-knowledge-surfaces.md)
 - Related: [ADR-0020](0020-ai-automation-trust-boundaries.md)
+- Extended by:
+  [ADR-0035](0035-author-organization-authority-as-strict-json.md), which keeps
+  repository policy instances local while core publishes their canonical
+  schema and the organization enrollment authority

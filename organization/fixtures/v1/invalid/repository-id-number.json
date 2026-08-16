@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "repository": {
+    "owner": "frostyard",
+    "name": "example",
+    "repository_id": 123456789
+  },
+  "accountable_owners": [{ "kind": "github-user", "login": "bketelsen" }],
+  "fleet_state": "disabled",
+  "maintenance_programs": [],
+  "action_ceiling": [],
+  "surface_contract_version": 1
+}

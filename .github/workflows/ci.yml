@@ -1,6 +1,5 @@
-# Core CI (ADR-0021: SHA-pinned, least-privilege): the docs-integrity gate
-# (.coverage-thresholds.json via scripts/check-docs.mjs, ADR-0029) and the
-# docs-site scaffold e2e suite (core#41).
+# Core CI (ADR-0021: SHA-pinned, least-privilege): organization authority and
+# docs integrity at the repository root, plus the docs-site scaffold e2e suite.
 name: CI
 
 on:
@@ -27,7 +26,10 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "22"
-      - run: node scripts/check-docs.mjs
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - run: npm ci
+      - run: npm run check
 
   scaffold-e2e:
     runs-on: ubuntu-latest

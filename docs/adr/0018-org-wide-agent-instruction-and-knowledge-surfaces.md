@@ -64,6 +64,10 @@ Fleet-wide, every repo carries:
   [lab](https://github.com/frostyard/lab); the millify skill wires these.
 - Builds on: [ADR-0002](0002-agent-portable-instruction-surface.md)
 - Related: [ADR-0019](0019-governance-as-code-and-risk-tiers.md)
+- Extended by:
+  [ADR-0035](0035-author-organization-authority-as-strict-json.md), which adds
+  the versioned organization authority and canonical repository-surface
+  contract without replacing repository-local instances
 - Amended by: [ADR-0024](0024-rename-ai-docs-directory-to-cairn.md)
   (superseded), then [ADR-0025](0025-consolidate-repository-docs-into-docs.md) —
   the separate AI-docs tree is folded into `docs/`, and `.memory/` becomes

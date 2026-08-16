@@ -1,0 +1,187 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://frostyard.org/schemas/organization/v1/repository-agent-governance.schema.json",
+  "title": "Frostyard repository agent governance v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "default_decision",
+    "actions",
+    "protected_boundaries",
+    "change_controls",
+    "exception_controls",
+    "risk_classification"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "default_decision": {
+      "const": "deny"
+    },
+    "actions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "read": { "$ref": "#/$defs/decision" },
+        "write": { "$ref": "#/$defs/decision" },
+        "run-tests": { "$ref": "#/$defs/decision" },
+        "open-issue": { "$ref": "#/$defs/decision" },
+        "open-pr": { "$ref": "#/$defs/decision" },
+        "create-followup": { "$ref": "#/$defs/decision" },
+        "approve-pr": { "$ref": "#/$defs/decision" },
+        "merge-pr": { "$ref": "#/$defs/decision" },
+        "push-protected-branch": { "$ref": "#/$defs/decision" },
+        "publish-artifact": { "$ref": "#/$defs/decision" },
+        "publish-release": { "$ref": "#/$defs/decision" },
+        "deploy": { "$ref": "#/$defs/decision" },
+        "modify-protected-environment": { "$ref": "#/$defs/decision" },
+        "manage-credentials": { "$ref": "#/$defs/decision" }
+      }
+    },
+    "protected_boundaries": {
+      "type": "array",
+      "maxItems": 11,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "decision", "minimum_risk_tier", "paths", "detectors"],
+        "properties": {
+          "id": {
+            "enum": [
+              "authentication",
+              "credentials-and-sensitive-data",
+              "cryptographic-trust",
+              "destructive-data",
+              "installation-and-update",
+              "release-and-publication",
+              "deployment-and-infrastructure",
+              "workflow-and-permissions",
+              "quality-gates",
+              "supply-chain-provenance",
+              "security-disclosure"
+            ]
+          },
+          "decision": {
+            "enum": ["review-required", "deny"]
+          },
+          "minimum_risk_tier": {
+            "enum": ["low", "moderate", "high", "critical"]
+          },
+          "paths": {
+            "type": "array",
+            "maxItems": 100,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 300,
+              "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\).+$"
+            }
+          },
+          "detectors": {
+            "type": "array",
+            "description": "Reserved for a future version with a deterministic detector registry.",
+            "maxItems": 0
+          }
+        }
+      }
+    },
+    "change_controls": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pull_requests_required",
+        "human_review_before_merge",
+        "highest_applicable_risk",
+        "validation_evidence_required",
+        "least_privilege",
+        "untrusted_content_is_data",
+        "never_relax"
+      ],
+      "properties": {
+        "pull_requests_required": { "const": true },
+        "human_review_before_merge": { "const": true },
+        "highest_applicable_risk": { "const": true },
+        "validation_evidence_required": { "const": true },
+        "least_privilege": { "const": true },
+        "untrusted_content_is_data": { "const": true },
+        "never_relax": {
+          "type": "array",
+          "minItems": 5,
+          "maxItems": 5,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "required-checks",
+              "security-checks",
+              "review-requirements",
+              "coverage-checks",
+              "provenance-verification"
+            ]
+          },
+          "allOf": [
+            { "contains": { "const": "required-checks" } },
+            { "contains": { "const": "security-checks" } },
+            { "contains": { "const": "review-requirements" } },
+            { "contains": { "const": "coverage-checks" } },
+            { "contains": { "const": "provenance-verification" } }
+          ]
+        }
+      }
+    },
+    "exception_controls": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["independent_authorized_approver", "self_approval", "required_fields"],
+      "properties": {
+        "independent_authorized_approver": { "const": true },
+        "self_approval": { "const": false },
+        "required_fields": {
+          "type": "array",
+          "minItems": 5,
+          "maxItems": 5,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "rationale",
+              "target",
+              "compensating-controls",
+              "expires-at",
+              "restoration-or-closure-plan"
+            ]
+          },
+          "allOf": [
+            { "contains": { "const": "rationale" } },
+            { "contains": { "const": "target" } },
+            { "contains": { "const": "compensating-controls" } },
+            { "contains": { "const": "expires-at" } },
+            { "contains": { "const": "restoration-or-closure-plan" } }
+          ]
+        }
+      }
+    },
+    "risk_classification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tiers", "classification_rule", "uncertainty_rule"],
+      "properties": {
+        "tiers": {
+          "const": ["low", "moderate", "high", "critical"]
+        },
+        "classification_rule": {
+          "const": "highest-applicable"
+        },
+        "uncertainty_rule": {
+          "const": "higher-plausible"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "decision": {
+      "enum": ["allow", "review-required", "deny"]
+    }
+  }
+}
