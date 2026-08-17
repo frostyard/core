@@ -14,6 +14,7 @@ try {
   const result = await validateOrganization(repoRoot);
   console.log(
     `organization authority valid: ${result.repositoryCount} declarations, ` +
+      `${result.verificationProfileCount} verification profiles, ` +
       `${result.validFixtureCount} valid fixtures, ` +
       `${result.invalidFixtureCount} rejection fixtures`,
   );

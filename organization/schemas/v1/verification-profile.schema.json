@@ -1,0 +1,203 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://frostyard.org/schemas/organization/v1/verification-profile.schema.json",
+  "title": "Frostyard verification profile v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "profile",
+    "description",
+    "evidence_mode",
+    "mechanism",
+    "parameter_schema"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2147483647
+        }
+      }
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024,
+      "pattern": "^[^\\r\\n]+$"
+    },
+    "evidence_mode": {
+      "enum": ["deterministic", "observational", "human-attested"]
+    },
+    "mechanism": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "evaluator"],
+          "properties": {
+            "kind": {
+              "const": "deterministic-evaluator"
+            },
+            "evaluator": {
+              "$ref": "#/$defs/versionedMechanism"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "source_adapter", "evaluator"],
+          "properties": {
+            "kind": {
+              "const": "observational-evaluator"
+            },
+            "source_adapter": {
+              "$ref": "#/$defs/versionedMechanism"
+            },
+            "evaluator": {
+              "$ref": "#/$defs/versionedMechanism"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "attestation_policy"],
+          "properties": {
+            "kind": {
+              "const": "attestation-policy"
+            },
+            "attestation_policy": {
+              "$ref": "#/$defs/versionedMechanism"
+            }
+          }
+        }
+      ]
+    },
+    "parameter_schema": {
+      "type": "object",
+      "required": ["$schema", "$id", "type", "additionalProperties"],
+      "properties": {
+        "$schema": {
+          "const": "https://json-schema.org/draft/2020-12/schema"
+        },
+        "$id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "type": {
+          "const": "object"
+        },
+        "additionalProperties": {
+          "const": false
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "evidence_mode": {
+            "const": "deterministic"
+          }
+        },
+        "required": ["evidence_mode"]
+      },
+      "then": {
+        "properties": {
+          "mechanism": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "const": "deterministic-evaluator"
+              }
+            },
+            "required": ["kind"]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "evidence_mode": {
+            "const": "observational"
+          }
+        },
+        "required": ["evidence_mode"]
+      },
+      "then": {
+        "properties": {
+          "mechanism": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "const": "observational-evaluator"
+              }
+            },
+            "required": ["kind"]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "evidence_mode": {
+            "const": "human-attested"
+          }
+        },
+        "required": ["evidence_mode"]
+      },
+      "then": {
+        "properties": {
+          "mechanism": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "const": "attestation-policy"
+              }
+            },
+            "required": ["kind"]
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "versionedMechanism": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2147483647
+        }
+      }
+    }
+  }
+}

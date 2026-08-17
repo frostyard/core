@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "profile": {
+    "id": "mode-mismatch",
+    "version": 1
+  },
+  "description": "This fixture mismatches its declared mode and mechanism.",
+  "evidence_mode": "deterministic",
+  "mechanism": {
+    "kind": "attestation-policy",
+    "attestation_policy": {
+      "id": "maintainer-attestation",
+      "version": 1
+    }
+  },
+  "parameter_schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://frostyard.org/schemas/organization/verification-profiles/mode-mismatch/v1-parameters.schema.json",
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
+  }
+}
