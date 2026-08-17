@@ -22,7 +22,7 @@ const repoRoot = path.resolve(
 test("the live organization tree and fixture corpus validate", async () => {
   const result = await validateOrganization(repoRoot);
   assert.deepEqual(result, {
-    repositoryCount: 1,
+    repositoryCount: 2,
     verificationProfileCount: 0,
     goalCount: 0,
     validFixtureCount: 5,
