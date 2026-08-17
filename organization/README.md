@@ -10,6 +10,8 @@ The implemented version-one slice contains:
 - `contracts/repository-surfaces/v1.json` — canonical repository surfaces;
 - `contracts/verification-profiles/<id>/v<version>.json` — immutable success-
   measure verification contracts;
+- `goals/<id>.json` — reviewed organization outcomes that can influence future
+  discovery and admission without granting authority;
 - `schemas/v1/` — immutable JSON Schema Draft 2020-12 contracts; and
 - `fixtures/v1/` — positive and rejection conformance examples.
 
@@ -27,3 +29,6 @@ repository-local policy instances here. Retain a repository declaration with
 Exact fields and invariants are documented in the
 [repository enrollment spec](../docs/specs/organization-repository-enrollment.md)
 and [verification-profile spec](../docs/specs/organization-verification-profiles.md).
+Goal fields and cross-record rules are in the
+[organization Goal spec](../docs/specs/organization-goals.md). The current tree
+contains Goal fixtures but no live Goal.

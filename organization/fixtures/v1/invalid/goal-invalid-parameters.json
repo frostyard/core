@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "kind": "goal",
+  "metadata": {
+    "id": "improve-ci-reliability-2026-q4",
+    "status": "active",
+    "owners": [{"kind": "github-user", "id": "github.com:37492", "login": "bketelsen"}],
+    "applies_to": {"repository_selection": "all-enrolled"}
+  },
+  "spec": {
+    "starts_on": "2026-10-01",
+    "ends_on": "2026-12-31",
+    "priority": "normal",
+    "outcome": "Required checks remain reliable.",
+    "success_measures": [
+      {
+        "id": "required-checks-stay-reliable",
+        "required": true,
+        "evidence_mode": "observational",
+        "subject": {"kind": "github-repository", "id": "github.com:123456789"},
+        "observation_window": {"starts_at": "2026-10-01T00:00:00.000Z", "ends_at": "2026-10-31T23:59:59.999Z"},
+        "verification_profile": {"id": "required-check-reliability", "version": 1},
+        "parameters": {"minimum_rate": 1.5}
+      }
+    ],
+    "encouraged_work": ["Improve check reliability."],
+    "excluded_work": ["Do not weaken checks."]
+  }
+}

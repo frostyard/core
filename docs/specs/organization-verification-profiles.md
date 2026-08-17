@@ -107,3 +107,4 @@ Each binding contains only a kebab-case `id` and positive integer `version`.
 - Rationale:
   [ADR-0036](../adr/0036-publish-versioned-verification-profiles.md)
 - Context: [organization authority](../design/organization-authority.md)
+- Consumer contract: [organization goals](organization-goals.md)
