@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "profile": {
+    "id": "required-check-reliability",
+    "version": 1
+  },
+  "description": "Evaluate required-check conclusions over a declared repository and time window.",
+  "evidence_mode": "observational",
+  "mechanism": {
+    "kind": "observational-evaluator",
+    "source_adapter": {
+      "id": "github-check-runs",
+      "version": 1
+    },
+    "evaluator": {
+      "id": "conclusive-run-rate",
+      "version": 1
+    }
+  },
+  "parameter_schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://frostyard.org/schemas/organization/verification-profiles/required-check-reliability/v1-parameters.schema.json",
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["minimum_rate"],
+    "properties": {
+      "minimum_rate": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1
+      }
+    }
+  }
+}

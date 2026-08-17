@@ -20,6 +20,11 @@ the authority records and validation consumed by Fluent.
 
 ## Phase 2 — Organization context records
 
+- Publish versioned
+  [verification profiles](../specs/organization-verification-profiles.md) before
+  accepting goals or initiatives with executable success measures. Profiles
+  bind evidence modes to closed consumer mechanisms; they are contracts, not a
+  sixth organization record kind.
 - Specify and implement versioned goal, policy, knowledge, criteria-set, and
   exception records in the
   [organization authority design](../design/organization-authority.md).
@@ -66,6 +71,8 @@ the authority records and validation consumed by Fluent.
 ## References
 
 - Implements: [organization authority](../design/organization-authority.md),
-  [repository enrollment](../specs/organization-repository-enrollment.md)
+  [repository enrollment](../specs/organization-repository-enrollment.md), and
+  [verification profiles](../specs/organization-verification-profiles.md)
 - Rationale:
-  [ADR-0035](../adr/0035-author-organization-authority-as-strict-json.md)
+  [ADR-0035](../adr/0035-author-organization-authority-as-strict-json.md) and
+  [ADR-0036](../adr/0036-publish-versioned-verification-profiles.md)

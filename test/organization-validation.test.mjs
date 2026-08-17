@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import {
   OrganizationValidationError,
   assertRepositoryInvariants,
+  assertVerificationProfileInvariants,
   readStrictJson,
   validateOrganization,
 } from "../scripts/lib/organization-validation.mjs";
@@ -21,8 +22,9 @@ test("the live organization tree and fixture corpus validate", async () => {
   const result = await validateOrganization(repoRoot);
   assert.deepEqual(result, {
     repositoryCount: 1,
-    validFixtureCount: 3,
-    invalidFixtureCount: 8,
+    verificationProfileCount: 0,
+    validFixtureCount: 4,
+    invalidFixtureCount: 10,
   });
 });
 
@@ -65,6 +67,33 @@ test("repository declaration identity must match its canonical path", () => {
   );
 });
 
+test("verification profile identity must match its canonical path", () => {
+  const profile = verificationProfile();
+  assert.throws(
+    () =>
+      assertVerificationProfileInvariants(
+        profile,
+        "organization/contracts/verification-profiles/other-profile/v1.json",
+      ),
+    /identity does not match its path/,
+  );
+});
+
+test("verification profile parameter schemas cannot delegate authority", () => {
+  const profile = verificationProfile();
+  profile.parameter_schema.properties = {
+    result: { $dynamicRef: "https://example.com/result.schema.json" },
+  };
+  assert.throws(
+    () =>
+      assertVerificationProfileInvariants(
+        profile,
+        "organization/contracts/verification-profiles/test-profile/v1.json",
+      ),
+    /crosses its document boundary/,
+  );
+});
+
 test("organization authority rejects symlinks instead of following them", async () => {
   const temp = await mkdtemp(path.join(os.tmpdir(), "core-org-link-"));
   await mkdir(path.join(temp, "organization"));
@@ -79,3 +108,16 @@ test("organization authority rejects symlinks instead of following them", async 
       error.message.includes("symlinks are forbidden"),
   );
 });
+
+function verificationProfile() {
+  return {
+    profile: { id: "test-profile", version: 1 },
+    parameter_schema: {
+      $schema: "https://json-schema.org/draft/2020-12/schema",
+      $id: "https://frostyard.org/schemas/organization/verification-profiles/test-profile/v1-parameters.schema.json",
+      type: "object",
+      additionalProperties: false,
+      properties: {},
+    },
+  };
+}

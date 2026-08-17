@@ -1,17 +1,19 @@
 # Organization authority
 
 Living document. Rationale:
-[ADR-0035](../adr/0035-author-organization-authority-as-strict-json.md).
-Contracts:
-[repository enrollment](../specs/organization-repository-enrollment.md).
+[ADR-0035](../adr/0035-author-organization-authority-as-strict-json.md) and
+[ADR-0036](../adr/0036-publish-versioned-verification-profiles.md).
+Contracts: [repository enrollment](../specs/organization-repository-enrollment.md)
+and [verification profiles](../specs/organization-verification-profiles.md).
 
 ## Overview
 
 The `organization/` tree is core's machine-readable organization authority.
 Humans change it through core pull requests; a deterministic validator proves
 that one complete Git revision conforms; Fluent can then import that revision
-as an atomic authority snapshot. The first implemented slice covers repository
-declarations and the canonical repository-surface contract.
+as an atomic authority snapshot. The implemented foundation covers repository
+declarations, the canonical repository-surface contract, and reusable
+verification-profile contracts for future executable success measures.
 
 ```text
 core pull request
@@ -34,6 +36,11 @@ repository declarations. `organization/contracts/repository-surfaces/v1.json`
 publishes stable surface IDs and their single canonical paths. Fixtures under
 `organization/fixtures/v1/` exercise the same parser and schemas as live data.
 
+Immutable verification profiles live at
+`organization/contracts/verification-profiles/<id>/v<version>.json`. Each
+binds one evidence mode to closed, versioned mechanism identifiers and embeds
+the strict parameter schema that future goal and initiative measures use.
+
 The validator first walks the tree without following symlinks. It accepts only
 the known version-one layout, decodes bytes as fatal UTF-8, rejects duplicate
 object keys before `JSON.parse`, validates every document against its exact
@@ -42,6 +49,8 @@ schema, and applies cross-document rules that JSON Schema cannot express:
 - a declaration's owner and repository match its path;
 - accountable owner subjects and protected-boundary IDs are unique;
 - every surface contract's referenced schema path exists; and
+- every verification profile identity matches its path, embeds a closed local
+  parameter schema, and stays within its size bound; and
 - every valid fixture passes while every invalid fixture is rejected.
 
 The representative `frostyard/core` declaration is deliberately `disabled`.
@@ -69,15 +78,18 @@ Schema version one is treated as immutable after acceptance. Add a versioned
 schema and contract plus compatible validator support before changing a field,
 path, or meaning. Keep disabled declarations rather than deleting them.
 
-The first slice intentionally does not define goals, policies, knowledge,
-criteria-set, or exception record formats. Their rollout is tracked separately
-so an unimplemented design is not mistaken for a live authoring contract.
+The implemented foundation intentionally does not define goal, policy,
+knowledge, criteria-set, or exception record formats. A verification profile
+is reusable contract infrastructure, not an accepted goal format. Those record
+formats remain tracked separately so an unimplemented design is not mistaken
+for a live authoring contract.
 
 ## References
 
 - Rationale:
   [ADR-0035](../adr/0035-author-organization-authority-as-strict-json.md)
 - Contracts:
-  [repository enrollment](../specs/organization-repository-enrollment.md)
+  [repository enrollment](../specs/organization-repository-enrollment.md) and
+  [verification profiles](../specs/organization-verification-profiles.md)
 - Built in:
-  [organization authority rollout — Phase 1](../plans/0005-organization-authority-rollout.md#phase-1--repository-enrollment-foundation-complete)
+  [organization authority rollout — Phases 1–2](../plans/0005-organization-authority-rollout.md)

@@ -10,6 +10,8 @@ const SCHEMA_PATHS = Object.freeze({
   surfaces: "organization/schemas/v1/repository-surfaces.schema.json",
   governance:
     "organization/schemas/v1/repository-agent-governance.schema.json",
+  verificationProfile:
+    "organization/schemas/v1/verification-profile.schema.json",
 });
 const SURFACE_CONTRACT_PATH =
   "organization/contracts/repository-surfaces/v1.json";
@@ -20,8 +22,11 @@ const STATIC_FILES = new Set([
 ]);
 const REPOSITORY_PATH =
   /^organization\/repositories\/([^/]+)\/([^/]+)\.json$/;
+const VERIFICATION_PROFILE_PATH =
+  /^organization\/contracts\/verification-profiles\/([a-z0-9]+(?:-[a-z0-9]+)*)\/v([1-9][0-9]*)\.json$/;
 const FIXTURE_PATH =
-  /^organization\/fixtures\/v1\/(valid|invalid)\/(repository-agent-governance|repository-surfaces|repository)(?:-[a-z0-9-]+)?\.json$/;
+  /^organization\/fixtures\/v1\/(valid|invalid)\/(repository-agent-governance|repository-surfaces|repository|verification-profile)(?:-[a-z0-9-]+)?\.json$/;
+const MAX_VERIFICATION_PROFILE_BYTES = 65_536;
 
 export class OrganizationValidationError extends Error {
   constructor(message, details = []) {
@@ -129,6 +134,7 @@ function assertRecognizedPath(relativePath) {
   if (
     STATIC_FILES.has(relativePath) ||
     REPOSITORY_PATH.test(relativePath) ||
+    VERIFICATION_PROFILE_PATH.test(relativePath) ||
     FIXTURE_PATH.test(relativePath)
   ) {
     return;
@@ -220,6 +226,77 @@ export function assertGovernanceInvariants(data, relativePath) {
   }
 }
 
+function nestedSchemaBoundaryErrors(value, trail = []) {
+  const errors = [];
+  if (Array.isArray(value)) {
+    for (const [index, item] of value.entries()) {
+      errors.push(...nestedSchemaBoundaryErrors(item, [...trail, index]));
+    }
+    return errors;
+  }
+  if (value === null || typeof value !== "object") return errors;
+  for (const [key, item] of Object.entries(value)) {
+    const nextTrail = [...trail, key];
+    if (
+      ["$ref", "$dynamicRef", "$recursiveRef"].includes(key) &&
+      (typeof item !== "string" || !item.startsWith("#"))
+    ) {
+      errors.push(
+        `${nextTrail.join(".")}: only document-local ${key} values are allowed`,
+      );
+    }
+    if (trail.length > 0 && ["$id", "$schema"].includes(key)) {
+      errors.push(
+        `${nextTrail.join(".")}: nested schema identities and dialects are forbidden`,
+      );
+    }
+    errors.push(...nestedSchemaBoundaryErrors(item, nextTrail));
+  }
+  return errors;
+}
+
+export function assertVerificationProfileInvariants(data, relativePath) {
+  const pathMatch = VERIFICATION_PROFILE_PATH.exec(relativePath);
+  if (
+    pathMatch &&
+    (data.profile.id !== pathMatch[1] ||
+      data.profile.version !== Number(pathMatch[2]))
+  ) {
+    throw new OrganizationValidationError(
+      `${relativePath}: verification profile identity does not match its path`,
+    );
+  }
+  const expectedParameterSchemaId =
+    `https://frostyard.org/schemas/organization/verification-profiles/` +
+    `${data.profile.id}/v${data.profile.version}-parameters.schema.json`;
+  if (
+    data.parameter_schema.$schema !==
+      "https://json-schema.org/draft/2020-12/schema" ||
+    data.parameter_schema.$id !== expectedParameterSchemaId ||
+    data.parameter_schema.type !== "object" ||
+    data.parameter_schema.additionalProperties !== false
+  ) {
+    throw new OrganizationValidationError(
+      `${relativePath}: parameter schema must be a closed Draft 2020-12 object with its canonical $id`,
+    );
+  }
+  const boundaryErrors = nestedSchemaBoundaryErrors(data.parameter_schema);
+  if (boundaryErrors.length > 0) {
+    throw new OrganizationValidationError(
+      `${relativePath}: parameter schema crosses its document boundary`,
+      boundaryErrors,
+    );
+  }
+  try {
+    new Ajv2020({ allErrors: true, strict: true }).compile(data.parameter_schema);
+  } catch (error) {
+    throw new OrganizationValidationError(
+      `${relativePath}: parameter schema is not a valid strict Draft 2020-12 schema`,
+      [error.message],
+    );
+  }
+}
+
 async function createValidators(repoRoot) {
   const schemas = {};
   for (const [kind, relativePath] of Object.entries(SCHEMA_PATHS)) {
@@ -233,6 +310,7 @@ async function createValidators(repoRoot) {
     repository: ajv.compile(schemas.repository),
     surfaces: ajv.compile(schemas.surfaces),
     governance: ajv.compile(schemas.governance),
+    verificationProfile: ajv.compile(schemas.verificationProfile),
   };
 }
 
@@ -245,7 +323,9 @@ function fixtureKind(relativePath) {
       ? "repository"
       : name === "repository-surfaces"
         ? "surfaces"
-        : "governance";
+        : name === "verification-profile"
+          ? "verificationProfile"
+          : "governance";
   return { expectation, kind };
 }
 
@@ -256,17 +336,26 @@ async function validateOne(
   validators,
   availablePaths,
 ) {
-  const data = await readStrictJson(
-    path.join(repoRoot, relativePath),
-    relativePath,
-  );
+  const absolutePath = path.join(repoRoot, relativePath);
+  const bytes = await readFile(absolutePath);
+  if (
+    kind === "verificationProfile" &&
+    bytes.byteLength > MAX_VERIFICATION_PROFILE_BYTES
+  ) {
+    throw new OrganizationValidationError(
+      `${relativePath}: verification profile exceeds ${MAX_VERIFICATION_PROFILE_BYTES} bytes`,
+    );
+  }
+  const data = await readStrictJson(absolutePath, relativePath);
   assertValid(validators[kind], data, relativePath);
   if (kind === "repository") {
     assertRepositoryInvariants(data, relativePath);
   } else if (kind === "surfaces") {
     assertSurfaceInvariants(data, relativePath, availablePaths);
-  } else {
+  } else if (kind === "governance") {
     assertGovernanceInvariants(data, relativePath);
+  } else {
+    assertVerificationProfileInvariants(data, relativePath);
   }
   return data;
 }
@@ -308,8 +397,32 @@ export async function validateOrganization(repoRoot) {
     availablePaths,
   );
 
+  let verificationProfileCount = 0;
+  const verificationProfiles = new Set();
+  for (const relativePath of relativePaths.filter((item) =>
+    VERIFICATION_PROFILE_PATH.test(item),
+  )) {
+    const data = await validateOne(
+      repoRoot,
+      relativePath,
+      "verificationProfile",
+      validators,
+      availablePaths,
+    );
+    const key = `${data.profile.id}:v${data.profile.version}`;
+    if (verificationProfiles.has(key)) {
+      throw new OrganizationValidationError(
+        `${relativePath}: duplicate verification profile ${key}`,
+      );
+    }
+    verificationProfiles.add(key);
+    verificationProfileCount += 1;
+  }
+
   let validFixtureCount = 0;
   let invalidFixtureCount = 0;
+  let validVerificationProfileFixtureCount = 0;
+  let invalidVerificationProfileFixtureCount = 0;
   for (const relativePath of relativePaths.filter((item) =>
     FIXTURE_PATH.test(item),
   )) {
@@ -323,6 +436,9 @@ export async function validateOrganization(repoRoot) {
         availablePaths,
       );
       validFixtureCount += 1;
+      if (fixture.kind === "verificationProfile") {
+        validVerificationProfileFixtureCount += 1;
+      }
       continue;
     }
     try {
@@ -336,6 +452,9 @@ export async function validateOrganization(repoRoot) {
     } catch (error) {
       if (!(error instanceof OrganizationValidationError)) throw error;
       invalidFixtureCount += 1;
+      if (fixture.kind === "verificationProfile") {
+        invalidVerificationProfileFixtureCount += 1;
+      }
       continue;
     }
     throw new OrganizationValidationError(
@@ -348,9 +467,18 @@ export async function validateOrganization(repoRoot) {
       "organization fixture corpus must contain valid and invalid examples",
     );
   }
+  if (
+    validVerificationProfileFixtureCount === 0 ||
+    invalidVerificationProfileFixtureCount === 0
+  ) {
+    throw new OrganizationValidationError(
+      "verification profile contract requires valid and invalid fixtures",
+    );
+  }
 
   return {
     repositoryCount,
+    verificationProfileCount,
     validFixtureCount,
     invalidFixtureCount,
   };

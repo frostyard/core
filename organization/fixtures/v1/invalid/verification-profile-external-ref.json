@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "profile": {
+    "id": "external-reference",
+    "version": 1
+  },
+  "description": "This fixture tries to delegate parameter authority to a remote schema.",
+  "evidence_mode": "deterministic",
+  "mechanism": {
+    "kind": "deterministic-evaluator",
+    "evaluator": {
+      "id": "external-reference",
+      "version": 1
+    }
+  },
+  "parameter_schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://frostyard.org/schemas/organization/verification-profiles/external-reference/v1-parameters.schema.json",
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "unsafe": {
+        "$ref": "https://example.com/remote.schema.json"
+      }
+    }
+  }
+}
