@@ -6,12 +6,14 @@ import { parseTree, getNodeValue, printParseErrorCode } from "jsonc-parser";
 
 const ORGANIZATION_ROOT = "organization";
 const SCHEMA_PATHS = Object.freeze({
+  envelope: "organization/schemas/v1/envelope.schema.json",
   repository: "organization/schemas/v1/repository.schema.json",
   surfaces: "organization/schemas/v1/repository-surfaces.schema.json",
   governance:
     "organization/schemas/v1/repository-agent-governance.schema.json",
   verificationProfile:
     "organization/schemas/v1/verification-profile.schema.json",
+  goal: "organization/schemas/v1/goal.schema.json",
 });
 const SURFACE_CONTRACT_PATH =
   "organization/contracts/repository-surfaces/v1.json";
@@ -24,9 +26,12 @@ const REPOSITORY_PATH =
   /^organization\/repositories\/([^/]+)\/([^/]+)\.json$/;
 const VERIFICATION_PROFILE_PATH =
   /^organization\/contracts\/verification-profiles\/([a-z0-9]+(?:-[a-z0-9]+)*)\/v([1-9][0-9]*)\.json$/;
+const GOAL_PATH =
+  /^organization\/goals\/([a-z0-9]+(?:-[a-z0-9]+)*)\.json$/;
 const FIXTURE_PATH =
-  /^organization\/fixtures\/v1\/(valid|invalid)\/(repository-agent-governance|repository-surfaces|repository|verification-profile)(?:-[a-z0-9-]+)?\.json$/;
+  /^organization\/fixtures\/v1\/(valid|invalid)\/(repository-agent-governance|repository-surfaces|repository|verification-profile|goal)(?:-[a-z0-9-]+)?\.json$/;
 const MAX_VERIFICATION_PROFILE_BYTES = 65_536;
+const MAX_GOAL_BYTES = 65_536;
 
 export class OrganizationValidationError extends Error {
   constructor(message, details = []) {
@@ -135,6 +140,7 @@ function assertRecognizedPath(relativePath) {
     STATIC_FILES.has(relativePath) ||
     REPOSITORY_PATH.test(relativePath) ||
     VERIFICATION_PROFILE_PATH.test(relativePath) ||
+    GOAL_PATH.test(relativePath) ||
     FIXTURE_PATH.test(relativePath)
   ) {
     return;
@@ -297,6 +303,147 @@ export function assertVerificationProfileInvariants(data, relativePath) {
   }
 }
 
+function canonicalRepositoryId(repositoryId) {
+  return `github.com:${repositoryId}`;
+}
+
+function verificationProfileKey(profile) {
+  return `${profile.id}:v${profile.version}`;
+}
+
+function assertRealDate(value, relativePath, field) {
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) {
+    throw new OrganizationValidationError(
+      `${relativePath}: ${field} is not a real UTC calendar date`,
+    );
+  }
+}
+
+function assertRealInstant(value, relativePath, field) {
+  const date = new Date(value);
+  if (Number.isNaN(date.valueOf()) || date.toISOString() !== value) {
+    throw new OrganizationValidationError(
+      `${relativePath}: ${field} is not a canonical UTC millisecond instant`,
+    );
+  }
+}
+
+export function assertGoalInvariants(
+  data,
+  relativePath,
+  repositoryIds,
+  verificationProfiles,
+) {
+  const pathMatch = GOAL_PATH.exec(relativePath);
+  if (pathMatch && data.metadata.id !== pathMatch[1]) {
+    throw new OrganizationValidationError(
+      `${relativePath}: Goal identity does not match its path`,
+    );
+  }
+
+  const owners = new Set();
+  for (const owner of data.metadata.owners) {
+    if (owners.has(owner.id)) {
+      throw new OrganizationValidationError(
+        `${relativePath}: duplicate Goal owner ${owner.id}`,
+      );
+    }
+    owners.add(owner.id);
+  }
+
+  if (data.metadata.applies_to.repository_selection === "selected") {
+    for (const repositoryId of data.metadata.applies_to.repository_ids) {
+      if (!repositoryIds.has(repositoryId)) {
+        throw new OrganizationValidationError(
+          `${relativePath}: applicable repository is not declared: ${repositoryId}`,
+        );
+      }
+    }
+  }
+
+  assertRealDate(data.spec.starts_on, relativePath, "spec.starts_on");
+  assertRealDate(data.spec.ends_on, relativePath, "spec.ends_on");
+  if (data.spec.starts_on > data.spec.ends_on) {
+    throw new OrganizationValidationError(
+      `${relativePath}: Goal start date is after its end date`,
+    );
+  }
+
+  const measureIds = new Set();
+  let requiredMeasureCount = 0;
+  for (const measure of data.spec.success_measures) {
+    if (measureIds.has(measure.id)) {
+      throw new OrganizationValidationError(
+        `${relativePath}: duplicate success measure ${measure.id}`,
+      );
+    }
+    measureIds.add(measure.id);
+    if (measure.required) requiredMeasureCount += 1;
+
+    if (!repositoryIds.has(measure.subject.id)) {
+      throw new OrganizationValidationError(
+        `${relativePath}: success-measure subject is not declared: ${measure.subject.id}`,
+      );
+    }
+    assertRealInstant(
+      measure.observation_window.starts_at,
+      relativePath,
+      `success measure ${measure.id} observation_window.starts_at`,
+    );
+    assertRealInstant(
+      measure.observation_window.ends_at,
+      relativePath,
+      `success measure ${measure.id} observation_window.ends_at`,
+    );
+    if (
+      measure.observation_window.starts_at >=
+      measure.observation_window.ends_at
+    ) {
+      throw new OrganizationValidationError(
+        `${relativePath}: success measure ${measure.id} observation window is empty or reversed`,
+      );
+    }
+
+    const profileKey = verificationProfileKey(measure.verification_profile);
+    const profile = verificationProfiles.get(profileKey);
+    if (!profile) {
+      throw new OrganizationValidationError(
+        `${relativePath}: unknown verification profile ${profileKey}`,
+      );
+    }
+    if (measure.evidence_mode !== profile.evidence_mode) {
+      throw new OrganizationValidationError(
+        `${relativePath}: success measure ${measure.id} evidence mode does not match ${profileKey}`,
+      );
+    }
+    const validateParameters = new Ajv2020({
+      allErrors: true,
+      strict: true,
+    }).compile(profile.parameter_schema);
+    if (!validateParameters(measure.parameters)) {
+      const details = (validateParameters.errors ?? []).map(
+        (error) =>
+          `${relativePath}/spec/success_measures/${measure.id}/parameters${error.instancePath || "/"} ${error.message ?? "is invalid"}`,
+      );
+      throw new OrganizationValidationError(
+        `${relativePath}: success measure ${measure.id} parameters do not satisfy ${profileKey}`,
+        details,
+      );
+    }
+  }
+  if (requiredMeasureCount === 0) {
+    throw new OrganizationValidationError(
+      `${relativePath}: Goal must contain at least one required success measure`,
+    );
+  }
+}
+
 async function createValidators(repoRoot) {
   const schemas = {};
   for (const [kind, relativePath] of Object.entries(SCHEMA_PATHS)) {
@@ -306,11 +453,13 @@ async function createValidators(repoRoot) {
     );
   }
   const ajv = new Ajv2020({ allErrors: true, strict: true });
+  ajv.addSchema(schemas.envelope);
   return {
     repository: ajv.compile(schemas.repository),
     surfaces: ajv.compile(schemas.surfaces),
     governance: ajv.compile(schemas.governance),
     verificationProfile: ajv.compile(schemas.verificationProfile),
+    goal: ajv.compile(schemas.goal),
   };
 }
 
@@ -325,6 +474,8 @@ function fixtureKind(relativePath) {
         ? "surfaces"
         : name === "verification-profile"
           ? "verificationProfile"
+          : name === "goal"
+            ? "goal"
           : "governance";
   return { expectation, kind };
 }
@@ -335,6 +486,7 @@ async function validateOne(
   kind,
   validators,
   availablePaths,
+  context = {},
 ) {
   const absolutePath = path.join(repoRoot, relativePath);
   const bytes = await readFile(absolutePath);
@@ -346,6 +498,11 @@ async function validateOne(
       `${relativePath}: verification profile exceeds ${MAX_VERIFICATION_PROFILE_BYTES} bytes`,
     );
   }
+  if (kind === "goal" && bytes.byteLength > MAX_GOAL_BYTES) {
+    throw new OrganizationValidationError(
+      `${relativePath}: Goal exceeds ${MAX_GOAL_BYTES} bytes`,
+    );
+  }
   const data = await readStrictJson(absolutePath, relativePath);
   assertValid(validators[kind], data, relativePath);
   if (kind === "repository") {
@@ -354,8 +511,15 @@ async function validateOne(
     assertSurfaceInvariants(data, relativePath, availablePaths);
   } else if (kind === "governance") {
     assertGovernanceInvariants(data, relativePath);
-  } else {
+  } else if (kind === "verificationProfile") {
     assertVerificationProfileInvariants(data, relativePath);
+  } else {
+    assertGoalInvariants(
+      data,
+      relativePath,
+      context.repositoryIds,
+      context.verificationProfiles,
+    );
   }
   return data;
 }
@@ -388,6 +552,9 @@ export async function validateOrganization(repoRoot) {
     repositoryIds.set(data.repository.repository_id, relativePath);
     repositoryCount += 1;
   }
+  const liveRepositoryIds = new Set(
+    [...repositoryIds.keys()].map(canonicalRepositoryId),
+  );
 
   await validateOne(
     repoRoot,
@@ -398,7 +565,7 @@ export async function validateOrganization(repoRoot) {
   );
 
   let verificationProfileCount = 0;
-  const verificationProfiles = new Set();
+  const verificationProfiles = new Map();
   for (const relativePath of relativePaths.filter((item) =>
     VERIFICATION_PROFILE_PATH.test(item),
   )) {
@@ -415,14 +582,69 @@ export async function validateOrganization(repoRoot) {
         `${relativePath}: duplicate verification profile ${key}`,
       );
     }
-    verificationProfiles.add(key);
+    verificationProfiles.set(key, data);
     verificationProfileCount += 1;
+  }
+
+  let goalCount = 0;
+  const goalIds = new Set();
+  for (const relativePath of relativePaths.filter((item) =>
+    GOAL_PATH.test(item),
+  )) {
+    const data = await validateOne(
+      repoRoot,
+      relativePath,
+      "goal",
+      validators,
+      availablePaths,
+      {
+        repositoryIds: liveRepositoryIds,
+        verificationProfiles,
+      },
+    );
+    if (goalIds.has(data.metadata.id)) {
+      throw new OrganizationValidationError(
+        `${relativePath}: duplicate Goal ${data.metadata.id}`,
+      );
+    }
+    goalIds.add(data.metadata.id);
+    goalCount += 1;
+  }
+
+  const validFixturePaths = relativePaths.filter(
+    (item) => FIXTURE_PATH.exec(item)?.[1] === "valid",
+  );
+  const fixtureRepositoryIds = new Set();
+  for (const relativePath of validFixturePaths) {
+    if (fixtureKind(relativePath).kind !== "repository") continue;
+    const data = await validateOne(
+      repoRoot,
+      relativePath,
+      "repository",
+      validators,
+      availablePaths,
+    );
+    fixtureRepositoryIds.add(canonicalRepositoryId(data.repository.repository_id));
+  }
+  const fixtureVerificationProfiles = new Map();
+  for (const relativePath of validFixturePaths) {
+    if (fixtureKind(relativePath).kind !== "verificationProfile") continue;
+    const data = await validateOne(
+      repoRoot,
+      relativePath,
+      "verificationProfile",
+      validators,
+      availablePaths,
+    );
+    fixtureVerificationProfiles.set(verificationProfileKey(data.profile), data);
   }
 
   let validFixtureCount = 0;
   let invalidFixtureCount = 0;
   let validVerificationProfileFixtureCount = 0;
   let invalidVerificationProfileFixtureCount = 0;
+  let validGoalFixtureCount = 0;
+  let invalidGoalFixtureCount = 0;
   for (const relativePath of relativePaths.filter((item) =>
     FIXTURE_PATH.test(item),
   )) {
@@ -434,10 +656,18 @@ export async function validateOrganization(repoRoot) {
         fixture.kind,
         validators,
         availablePaths,
+        fixture.kind === "goal"
+          ? {
+              repositoryIds: fixtureRepositoryIds,
+              verificationProfiles: fixtureVerificationProfiles,
+            }
+          : undefined,
       );
       validFixtureCount += 1;
       if (fixture.kind === "verificationProfile") {
         validVerificationProfileFixtureCount += 1;
+      } else if (fixture.kind === "goal") {
+        validGoalFixtureCount += 1;
       }
       continue;
     }
@@ -448,12 +678,20 @@ export async function validateOrganization(repoRoot) {
         fixture.kind,
         validators,
         availablePaths,
+        fixture.kind === "goal"
+          ? {
+              repositoryIds: fixtureRepositoryIds,
+              verificationProfiles: fixtureVerificationProfiles,
+            }
+          : undefined,
       );
     } catch (error) {
       if (!(error instanceof OrganizationValidationError)) throw error;
       invalidFixtureCount += 1;
       if (fixture.kind === "verificationProfile") {
         invalidVerificationProfileFixtureCount += 1;
+      } else if (fixture.kind === "goal") {
+        invalidGoalFixtureCount += 1;
       }
       continue;
     }
@@ -475,10 +713,16 @@ export async function validateOrganization(repoRoot) {
       "verification profile contract requires valid and invalid fixtures",
     );
   }
+  if (validGoalFixtureCount === 0 || invalidGoalFixtureCount === 0) {
+    throw new OrganizationValidationError(
+      "Goal contract requires valid and invalid fixtures",
+    );
+  }
 
   return {
     repositoryCount,
     verificationProfileCount,
+    goalCount,
     validFixtureCount,
     invalidFixtureCount,
   };

@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 
 import {
   OrganizationValidationError,
+  assertGoalInvariants,
   assertRepositoryInvariants,
   assertVerificationProfileInvariants,
   readStrictJson,
@@ -23,8 +24,9 @@ test("the live organization tree and fixture corpus validate", async () => {
   assert.deepEqual(result, {
     repositoryCount: 1,
     verificationProfileCount: 0,
-    validFixtureCount: 4,
-    invalidFixtureCount: 10,
+    goalCount: 0,
+    validFixtureCount: 5,
+    invalidFixtureCount: 14,
   });
 });
 
@@ -94,6 +96,35 @@ test("verification profile parameter schemas cannot delegate authority", () => {
   );
 });
 
+test("Goal identity must match its canonical path", async () => {
+  const goal = await validGoal();
+  assert.throws(
+    () =>
+      assertGoalInvariants(
+        goal,
+        "organization/goals/another-goal.json",
+        new Set(["github.com:123456789"]),
+        new Map([["required-check-reliability:v1", verificationProfile()]]),
+      ),
+    /identity does not match its path/,
+  );
+});
+
+test("Goal dates are real UTC calendar dates", async () => {
+  const goal = await validGoal();
+  goal.spec.starts_on = "2026-02-30";
+  assert.throws(
+    () =>
+      assertGoalInvariants(
+        goal,
+        "organization/goals/improve-ci-reliability-2026-q4.json",
+        new Set(["github.com:123456789"]),
+        new Map([["required-check-reliability:v1", verificationProfile()]]),
+      ),
+    /not a real UTC calendar date/,
+  );
+});
+
 test("organization authority rejects symlinks instead of following them", async () => {
   const temp = await mkdtemp(path.join(os.tmpdir(), "core-org-link-"));
   await mkdir(path.join(temp, "organization"));
@@ -111,6 +142,7 @@ test("organization authority rejects symlinks instead of following them", async 
 
 function verificationProfile() {
   return {
+    evidence_mode: "observational",
     profile: { id: "test-profile", version: 1 },
     parameter_schema: {
       $schema: "https://json-schema.org/draft/2020-12/schema",
@@ -120,4 +152,11 @@ function verificationProfile() {
       properties: {},
     },
   };
+}
+
+async function validGoal() {
+  return readStrictJson(
+    path.join(repoRoot, "organization/fixtures/v1/valid/goal.json"),
+    "organization/fixtures/v1/valid/goal.json",
+  );
 }

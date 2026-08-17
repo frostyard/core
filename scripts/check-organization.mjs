@@ -15,6 +15,7 @@ try {
   console.log(
     `organization authority valid: ${result.repositoryCount} declarations, ` +
       `${result.verificationProfileCount} verification profiles, ` +
+      `${result.goalCount} Goals, ` +
       `${result.validFixtureCount} valid fixtures, ` +
       `${result.invalidFixtureCount} rejection fixtures`,
   );

@@ -22,11 +22,15 @@ the authority records and validation consumed by Fluent.
 
 - Publish versioned
   [verification profiles](../specs/organization-verification-profiles.md) before
-  accepting goals or initiatives with executable success measures. Profiles
+  accepting [Goals](../specs/organization-goals.md) or initiatives with
+  executable success measures. Profiles
   bind evidence modes to closed consumer mechanisms; they are contracts, not a
   sixth organization record kind.
-- Specify and implement versioned goal, policy, knowledge, criteria-set, and
-  exception records in the
+- Specify and implement the version-one Goal record with typed ownership,
+  applicability, lifecycle, executable success measures, and fixture-only
+  examples.
+- Specify and implement versioned policy, knowledge, criteria-set, and exception
+  records in the
   [organization authority design](../design/organization-authority.md).
 - Add cross-record reference validation and representative records only after
   each format has an accepted decision.
@@ -72,7 +76,9 @@ the authority records and validation consumed by Fluent.
 
 - Implements: [organization authority](../design/organization-authority.md),
   [repository enrollment](../specs/organization-repository-enrollment.md), and
-  [verification profiles](../specs/organization-verification-profiles.md)
+  [verification profiles](../specs/organization-verification-profiles.md), and
+  [organization goals](../specs/organization-goals.md)
 - Rationale:
   [ADR-0035](../adr/0035-author-organization-authority-as-strict-json.md) and
-  [ADR-0036](../adr/0036-publish-versioned-verification-profiles.md)
+  [ADR-0036](../adr/0036-publish-versioned-verification-profiles.md), and
+  [ADR-0037](../adr/0037-publish-executable-organization-goals.md)

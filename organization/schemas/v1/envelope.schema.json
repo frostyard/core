@@ -1,0 +1,138 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://frostyard.org/schemas/organization/v1/envelope.schema.json",
+  "title": "Frostyard organization record envelope v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "kind", "metadata", "spec"],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "kind": {
+      "enum": ["goal", "policy", "knowledge", "criteria-set", "exception"]
+    },
+    "metadata": {
+      "$ref": "#/$defs/metadata"
+    },
+    "spec": {
+      "type": "object"
+    }
+  },
+  "$defs": {
+    "kebabId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100,
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "githubRepositoryId": {
+      "type": "string",
+      "pattern": "^github\\.com:[1-9][0-9]{0,19}$"
+    },
+    "owner": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "id", "login"],
+          "properties": {
+            "kind": {
+              "const": "github-user"
+            },
+            "id": {
+              "type": "string",
+              "pattern": "^github\\.com:[1-9][0-9]{0,19}$"
+            },
+            "login": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 39,
+              "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "id", "slug"],
+          "properties": {
+            "kind": {
+              "const": "github-team"
+            },
+            "id": {
+              "type": "string",
+              "pattern": "^github\\.com:[1-9][0-9]{0,19}:team:[1-9][0-9]{0,19}$"
+            },
+            "slug": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100,
+              "pattern": "^[a-z0-9](?:[a-z0-9-]{0,99})$"
+            }
+          }
+        }
+      ]
+    },
+    "applicability": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["repository_selection"],
+          "properties": {
+            "repository_selection": {
+              "const": "all-enrolled"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["repository_selection", "repository_ids"],
+          "properties": {
+            "repository_selection": {
+              "const": "selected"
+            },
+            "repository_ids": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 100,
+              "uniqueItems": true,
+              "items": {
+                "$ref": "#/$defs/githubRepositoryId"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "status", "owners", "applies_to"],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/kebabId"
+        },
+        "status": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40,
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "owners": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 20,
+          "items": {
+            "$ref": "#/$defs/owner"
+          }
+        },
+        "applies_to": {
+          "$ref": "#/$defs/applicability"
+        }
+      }
+    }
+  }
+}

@@ -77,6 +77,7 @@ code or schema dependencies named by a profile.
 
 - Shapes: [organization authority design](../design/organization-authority.md),
   [organization verification profiles](../specs/organization-verification-profiles.md),
+  [organization goals](../specs/organization-goals.md),
   and [organization authority rollout](../plans/0005-organization-authority-rollout.md)
 - Builds on: [ADR-0020](0020-ai-automation-trust-boundaries.md) and
   [ADR-0035](0035-author-organization-authority-as-strict-json.md)
