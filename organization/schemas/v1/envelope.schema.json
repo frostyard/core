@@ -6,18 +6,10 @@
   "additionalProperties": false,
   "required": ["schema_version", "kind", "metadata", "spec"],
   "properties": {
-    "schema_version": {
-      "const": 1
-    },
-    "kind": {
-      "enum": ["goal", "policy", "knowledge", "criteria-set", "exception"]
-    },
-    "metadata": {
-      "$ref": "#/$defs/metadata"
-    },
-    "spec": {
-      "type": "object"
-    }
+    "schema_version": { "const": 1 },
+    "kind": { "enum": ["goal", "policy", "knowledge", "criteria-set", "exception"] },
+    "metadata": { "$ref": "#/$defs/metadata" },
+    "spec": { "type": "object" }
   },
   "$defs": {
     "kebabId": {
@@ -37,13 +29,8 @@
           "additionalProperties": false,
           "required": ["kind", "id", "login"],
           "properties": {
-            "kind": {
-              "const": "github-user"
-            },
-            "id": {
-              "type": "string",
-              "pattern": "^github\\.com:[1-9][0-9]{0,19}$"
-            },
+            "kind": { "const": "github-user" },
+            "id": { "type": "string", "pattern": "^github\\.com:[1-9][0-9]{0,19}$" },
             "login": {
               "type": "string",
               "minLength": 1,
@@ -57,9 +44,7 @@
           "additionalProperties": false,
           "required": ["kind", "id", "slug"],
           "properties": {
-            "kind": {
-              "const": "github-team"
-            },
+            "kind": { "const": "github-team" },
             "id": {
               "type": "string",
               "pattern": "^github\\.com:[1-9][0-9]{0,19}:team:[1-9][0-9]{0,19}$"
@@ -80,28 +65,20 @@
           "type": "object",
           "additionalProperties": false,
           "required": ["repository_selection"],
-          "properties": {
-            "repository_selection": {
-              "const": "all-enrolled"
-            }
-          }
+          "properties": { "repository_selection": { "const": "all-enrolled" } }
         },
         {
           "type": "object",
           "additionalProperties": false,
           "required": ["repository_selection", "repository_ids"],
           "properties": {
-            "repository_selection": {
-              "const": "selected"
-            },
+            "repository_selection": { "const": "selected" },
             "repository_ids": {
               "type": "array",
               "minItems": 1,
               "maxItems": 100,
               "uniqueItems": true,
-              "items": {
-                "$ref": "#/$defs/githubRepositoryId"
-              }
+              "items": { "$ref": "#/$defs/githubRepositoryId" }
             }
           }
         }
@@ -112,9 +89,7 @@
       "additionalProperties": false,
       "required": ["id", "status", "owners", "applies_to"],
       "properties": {
-        "id": {
-          "$ref": "#/$defs/kebabId"
-        },
+        "id": { "$ref": "#/$defs/kebabId" },
         "status": {
           "type": "string",
           "minLength": 1,
@@ -125,13 +100,9 @@
           "type": "array",
           "minItems": 1,
           "maxItems": 20,
-          "items": {
-            "$ref": "#/$defs/owner"
-          }
+          "items": { "$ref": "#/$defs/owner" }
         },
-        "applies_to": {
-          "$ref": "#/$defs/applicability"
-        }
+        "applies_to": { "$ref": "#/$defs/applicability" }
       }
     }
   }

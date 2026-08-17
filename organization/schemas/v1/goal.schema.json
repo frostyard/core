@@ -3,30 +3,20 @@
   "$id": "https://frostyard.org/schemas/organization/v1/goal.schema.json",
   "title": "Frostyard organization Goal v1",
   "allOf": [
-    {
-      "$ref": "https://frostyard.org/schemas/organization/v1/envelope.schema.json"
-    },
+    { "$ref": "https://frostyard.org/schemas/organization/v1/envelope.schema.json" },
     {
       "type": "object",
       "required": ["schema_version", "kind", "metadata", "spec"],
       "properties": {
-        "schema_version": {
-          "const": 1
-        },
-        "kind": {
-          "const": "goal"
-        },
+        "schema_version": { "const": 1 },
+        "kind": { "const": "goal" },
         "metadata": {
           "allOf": [
-            {
-              "$ref": "https://frostyard.org/schemas/organization/v1/envelope.schema.json#/$defs/metadata"
-            },
+            { "$ref": "https://frostyard.org/schemas/organization/v1/envelope.schema.json#/$defs/metadata" },
             {
               "type": "object",
               "properties": {
-                "status": {
-                  "enum": ["planned", "active", "paused", "completed", "cancelled"]
-                }
+                "status": { "enum": ["planned", "active", "paused", "completed", "cancelled"] }
               }
             }
           ]
@@ -44,32 +34,18 @@
             "excluded_work"
           ],
           "properties": {
-            "starts_on": {
-              "$ref": "#/$defs/date"
-            },
-            "ends_on": {
-              "$ref": "#/$defs/date"
-            },
-            "priority": {
-              "enum": ["high", "normal", "low"]
-            },
-            "outcome": {
-              "$ref": "#/$defs/boundedLine"
-            },
+            "starts_on": { "$ref": "#/$defs/date" },
+            "ends_on": { "$ref": "#/$defs/date" },
+            "priority": { "enum": ["high", "normal", "low"] },
+            "outcome": { "$ref": "#/$defs/boundedLine" },
             "success_measures": {
               "type": "array",
               "minItems": 1,
               "maxItems": 20,
-              "items": {
-                "$ref": "#/$defs/successMeasure"
-              }
+              "items": { "$ref": "#/$defs/successMeasure" }
             },
-            "encouraged_work": {
-              "$ref": "#/$defs/workList"
-            },
-            "excluded_work": {
-              "$ref": "#/$defs/workList"
-            }
+            "encouraged_work": { "$ref": "#/$defs/workList" },
+            "excluded_work": { "$ref": "#/$defs/workList" }
           }
         }
       }
@@ -95,9 +71,7 @@
       "minItems": 1,
       "maxItems": 20,
       "uniqueItems": true,
-      "items": {
-        "$ref": "#/$defs/boundedLine"
-      }
+      "items": { "$ref": "#/$defs/boundedLine" }
     },
     "successMeasure": {
       "type": "object",
@@ -112,23 +86,15 @@
         "parameters"
       ],
       "properties": {
-        "id": {
-          "$ref": "https://frostyard.org/schemas/organization/v1/envelope.schema.json#/$defs/kebabId"
-        },
-        "required": {
-          "type": "boolean"
-        },
-        "evidence_mode": {
-          "enum": ["deterministic", "observational", "human-attested"]
-        },
+        "id": { "$ref": "https://frostyard.org/schemas/organization/v1/envelope.schema.json#/$defs/kebabId" },
+        "required": { "type": "boolean" },
+        "evidence_mode": { "enum": ["deterministic", "observational", "human-attested"] },
         "subject": {
           "type": "object",
           "additionalProperties": false,
           "required": ["kind", "id"],
           "properties": {
-            "kind": {
-              "const": "github-repository"
-            },
+            "kind": { "const": "github-repository" },
             "id": {
               "$ref": "https://frostyard.org/schemas/organization/v1/envelope.schema.json#/$defs/githubRepositoryId"
             }
@@ -139,12 +105,8 @@
           "additionalProperties": false,
           "required": ["starts_at", "ends_at"],
           "properties": {
-            "starts_at": {
-              "$ref": "#/$defs/instant"
-            },
-            "ends_at": {
-              "$ref": "#/$defs/instant"
-            }
+            "starts_at": { "$ref": "#/$defs/instant" },
+            "ends_at": { "$ref": "#/$defs/instant" }
           }
         },
         "verification_profile": {
@@ -152,19 +114,11 @@
           "additionalProperties": false,
           "required": ["id", "version"],
           "properties": {
-            "id": {
-              "$ref": "https://frostyard.org/schemas/organization/v1/envelope.schema.json#/$defs/kebabId"
-            },
-            "version": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 2147483647
-            }
+            "id": { "$ref": "https://frostyard.org/schemas/organization/v1/envelope.schema.json#/$defs/kebabId" },
+            "version": { "type": "integer", "minimum": 1, "maximum": 2147483647 }
           }
         },
-        "parameters": {
-          "type": "object"
-        }
+        "parameters": { "type": "object" }
       }
     }
   }
