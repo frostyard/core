@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "repository": {
+    "owner": "frostyard",
+    "name": "fluent",
+    "repository_id": "1334681570"
+  },
+  "accountable_owners": [
+    {
+      "kind": "github-user",
+      "login": "bketelsen"
+    }
+  ],
+  "fleet_state": "enabled",
+  "maintenance_programs": [
+    "quality",
+    "ci",
+    "architecture"
+  ],
+  "action_ceiling": [
+    "read",
+    "write",
+    "run-tests",
+    "open-issue",
+    "open-pr",
+    "create-followup"
+  ],
+  "surface_contract_version": 1
+}
