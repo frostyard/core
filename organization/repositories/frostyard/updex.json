@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "repository": {
+    "owner": "frostyard",
+    "name": "updex",
+    "repository_id": "1134651716"
+  },
+  "accountable_owners": [
+    {
+      "kind": "github-user",
+      "login": "bketelsen"
+    }
+  ],
+  "fleet_state": "enabled",
+  "maintenance_programs": [
+    "quality",
+    "ci"
+  ],
+  "action_ceiling": [
+    "read",
+    "write",
+    "run-tests",
+    "open-issue",
+    "open-pr",
+    "create-followup"
+  ],
+  "surface_contract_version": 1
+}
