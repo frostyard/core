@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "repository": {
+    "owner": "frostyard",
+    "name": "example-programs",
+    "repository_id": "123456790"
+  },
+  "accountable_owners": [
+    {
+      "kind": "github-user",
+      "login": "bketelsen"
+    }
+  ],
+  "fleet_state": "enabled",
+  "maintenance_programs": [
+    "quality",
+    "ci",
+    "security",
+    "architecture",
+    "conformance",
+    "triage",
+    "dependencies",
+    "docs",
+    "release"
+  ],
+  "action_ceiling": [
+    "read",
+    "write",
+    "run-tests",
+    "open-pr"
+  ],
+  "surface_contract_version": 1
+}

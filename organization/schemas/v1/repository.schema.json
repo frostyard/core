@@ -86,10 +86,20 @@
     },
     "maintenance_programs": {
       "type": "array",
-      "maxItems": 4,
+      "maxItems": 9,
       "uniqueItems": true,
       "items": {
-        "enum": ["quality", "ci", "security", "architecture"]
+        "enum": [
+          "quality",
+          "ci",
+          "security",
+          "architecture",
+          "conformance",
+          "triage",
+          "dependencies",
+          "docs",
+          "release"
+        ]
       }
     },
     "action_ceiling": {

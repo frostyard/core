@@ -46,7 +46,7 @@ A repository declaration exists only at
 | `repository.repository_id` | string | yes | non-zero decimal immutable GitHub repository ID |
 | `accountable_owners` | array | yes | one or more unique typed GitHub subjects |
 | `fleet_state` | string | yes | `enabled`, `paused`, or `disabled` |
-| `maintenance_programs` | array | yes | unique subset of `quality`, `ci`, `security`, `architecture`; non-empty when enabled |
+| `maintenance_programs` | array | yes | unique subset of `quality`, `ci`, `security`, `architecture`, `conformance`, `triage`, `dependencies`, `docs`, `release` (widened within v1 by [ADR-0039](../adr/0039-widen-maintenance-programs-within-schema-v1.md)); non-empty when enabled |
 | `action_ceiling` | array | yes | unique subset of the six Fluent v1 actions; non-empty when enabled |
 | `surface_contract_version` | integer | yes | exactly `1` in this contract |
 
@@ -106,5 +106,7 @@ surface IDs and canonical repository paths:
 ## References
 
 - Rationale:
-  [ADR-0035](../adr/0035-author-organization-authority-as-strict-json.md)
+  [ADR-0035](../adr/0035-author-organization-authority-as-strict-json.md),
+  [ADR-0039](../adr/0039-widen-maintenance-programs-within-schema-v1.md)
+  (compatible enum widening within a schema version)
 - Context: [organization authority](../design/organization-authority.md)

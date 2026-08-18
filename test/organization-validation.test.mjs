@@ -25,7 +25,7 @@ test("the live organization tree and fixture corpus validate", async () => {
     repositoryCount: 3,
     verificationProfileCount: 0,
     goalCount: 0,
-    validFixtureCount: 5,
+    validFixtureCount: 6,
     invalidFixtureCount: 14,
   });
 });
