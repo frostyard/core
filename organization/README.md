@@ -8,6 +8,8 @@ The implemented version-one slice contains:
 
 - `repositories/<owner>/<repository>.json` — repository declarations;
 - `contracts/repository-surfaces/v1.json` — canonical repository surfaces;
+- `contracts/repository-settings/v1.json` — the GitHub repository settings
+  every enrolled repository must match (ADR-0040);
 - `contracts/verification-profiles/<id>/v<version>.json` — immutable success-
   measure verification contracts;
 - `goals/<id>.json` — reviewed organization outcomes that can influence future

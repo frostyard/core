@@ -14,13 +14,17 @@ const SCHEMA_PATHS = Object.freeze({
   verificationProfile:
     "organization/schemas/v1/verification-profile.schema.json",
   goal: "organization/schemas/v1/goal.schema.json",
+  settings: "organization/schemas/v1/repository-settings.schema.json",
 });
 const SURFACE_CONTRACT_PATH =
   "organization/contracts/repository-surfaces/v1.json";
+const SETTINGS_CONTRACT_PATH =
+  "organization/contracts/repository-settings/v1.json";
 const STATIC_FILES = new Set([
   "organization/README.md",
   ...Object.values(SCHEMA_PATHS),
   SURFACE_CONTRACT_PATH,
+  SETTINGS_CONTRACT_PATH,
 ]);
 const REPOSITORY_PATH =
   /^organization\/repositories\/([^/]+)\/([^/]+)\.json$/;
@@ -29,7 +33,7 @@ const VERIFICATION_PROFILE_PATH =
 const GOAL_PATH =
   /^organization\/goals\/([a-z0-9]+(?:-[a-z0-9]+)*)\.json$/;
 const FIXTURE_PATH =
-  /^organization\/fixtures\/v1\/(valid|invalid)\/(repository-agent-governance|repository-surfaces|repository|verification-profile|goal)(?:-[a-z0-9-]+)?\.json$/;
+  /^organization\/fixtures\/v1\/(valid|invalid)\/(repository-agent-governance|repository-surfaces|repository-settings|repository|verification-profile|goal)(?:-[a-z0-9-]+)?\.json$/;
 const MAX_VERIFICATION_PROFILE_BYTES = 65_536;
 const MAX_GOAL_BYTES = 65_536;
 
@@ -216,6 +220,24 @@ export function assertSurfaceInvariants(data, relativePath, availablePaths) {
   if (expected.size > 0) {
     throw new OrganizationValidationError(
       `${relativePath}: missing surfaces: ${[...expected].join(", ")}`,
+    );
+  }
+}
+
+export function assertSettingsInvariants(data, relativePath) {
+  // The settings contract may only tighten: a required-checks ruleset that
+  // does not require pull requests, or a tag ruleset that neither blocks
+  // deletion nor restricts creation, protects nothing.
+  const rules = data.default_branch_ruleset;
+  if (rules.require_status_checks && !rules.require_pull_request) {
+    throw new OrganizationValidationError(
+      `${relativePath}: required status checks need require_pull_request`,
+    );
+  }
+  const tags = data.tag_ruleset;
+  if (!tags.block_deletions && !tags.restrict_creation) {
+    throw new OrganizationValidationError(
+      `${relativePath}: tag ruleset must block deletion or restrict creation`,
     );
   }
 }
@@ -460,6 +482,7 @@ async function createValidators(repoRoot) {
     governance: ajv.compile(schemas.governance),
     verificationProfile: ajv.compile(schemas.verificationProfile),
     goal: ajv.compile(schemas.goal),
+    settings: ajv.compile(schemas.settings),
   };
 }
 
@@ -472,6 +495,8 @@ function fixtureKind(relativePath) {
       ? "repository"
       : name === "repository-surfaces"
         ? "surfaces"
+        : name === "repository-settings"
+          ? "settings"
         : name === "verification-profile"
           ? "verificationProfile"
           : name === "goal"
@@ -513,6 +538,8 @@ async function validateOne(
     assertGovernanceInvariants(data, relativePath);
   } else if (kind === "verificationProfile") {
     assertVerificationProfileInvariants(data, relativePath);
+  } else if (kind === "settings") {
+    assertSettingsInvariants(data, relativePath);
   } else {
     assertGoalInvariants(
       data,
@@ -560,6 +587,13 @@ export async function validateOrganization(repoRoot) {
     repoRoot,
     SURFACE_CONTRACT_PATH,
     "surfaces",
+    validators,
+    availablePaths,
+  );
+  await validateOne(
+    repoRoot,
+    SETTINGS_CONTRACT_PATH,
+    "settings",
     validators,
     availablePaths,
   );
