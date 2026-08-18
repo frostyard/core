@@ -16,7 +16,9 @@
     "quality",
     "ci",
     "security",
-    "architecture"
+    "architecture",
+    "conformance",
+    "triage"
   ],
   "action_ceiling": [
     "read",
