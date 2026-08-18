@@ -1,7 +1,7 @@
 # Spec: Organization repository enrollment
 
 This contract governs core-authored repository declarations and the versioned
-repository-surface catalog consumed by core validation and Fluent snapshot
+repository-surface catalog consumed by core validation and Snowcat snapshot
 import. The JSON Schemas in `organization/schemas/v1/` are the executable
 contract; this document names the cross-document invariants.
 
@@ -47,7 +47,7 @@ A repository declaration exists only at
 | `accountable_owners` | array | yes | one or more unique typed GitHub subjects |
 | `fleet_state` | string | yes | `enabled`, `paused`, or `disabled` |
 | `maintenance_programs` | array | yes | unique subset of `quality`, `ci`, `security`, `architecture`, `conformance`, `triage`, `dependencies`, `docs`, `release` (widened within v1 by [ADR-0039](../adr/0039-widen-maintenance-programs-within-schema-v1.md)); non-empty when enabled |
-| `action_ceiling` | array | yes | unique subset of the six Fluent v1 actions; non-empty when enabled |
+| `action_ceiling` | array | yes | unique subset of the six Snowcat v1 actions; non-empty when enabled |
 | `surface_contract_version` | integer | yes | exactly `1` in this contract |
 
 An accountable owner is either `{"kind":"github-user","login":"…"}` or
@@ -85,7 +85,7 @@ organization-wide: every enrolled repository is expected to match every value.
 
 The contract names no per-repository values (visibility, discussions, code
 scanning, the exact required-check contexts); those are observed by the
-consumer, not required, until a later version. Fluent reads the contract and
+consumer, not required, until a later version. Snowcat reads the contract and
 proposes drift; `scripts/apply-repo-settings.sh <owner/repo> [--apply]
 [--required-checks "<ctx>,…"]` applies it — dry-run by default, idempotent,
 never deleting a ruleset it did not create, and never writing a license or
@@ -130,7 +130,7 @@ tag ruleset it creates lets repository admins bypass, so a maintainer's
 
 | Artifact | Derivation |
 | --- | --- |
-| Fluent authority snapshot | Atomic import of one validated core Git revision |
+| Snowcat authority snapshot | Atomic import of one validated core Git revision |
 | Runtime repository enrollment | Reconciliation of an enabled declaration, immutable repository ID, and required canonical surfaces |
 | Repository hold | Failed identity or surface reconciliation without invalidating unrelated snapshot records |
 

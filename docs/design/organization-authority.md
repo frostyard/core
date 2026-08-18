@@ -12,7 +12,7 @@ and [verification profiles](../specs/organization-verification-profiles.md), and
 
 The `organization/` tree is core's machine-readable organization authority.
 Humans change it through core pull requests; a deterministic validator proves
-that one complete Git revision conforms; Fluent can then import that revision
+that one complete Git revision conforms; Snowcat (the coordination service, named Fluent until 2026-08-18 — its ADR-0064) can then import that revision
 as an atomic authority snapshot. The implemented foundation covers repository
 declarations, the canonical repository-surface contract, reusable
 verification-profile contracts, and executable Goal records.
@@ -24,7 +24,7 @@ core pull request
 strict organization/ tree -- npm run check:organization --> valid Git revision
       |                                                          |
       |                                                          v
-      +-----------------------------------------------> Fluent snapshot import
+      +-----------------------------------------------> Snowcat snapshot import
                                                                  |
                                                                  v
                                                       runtime enrollment state
@@ -68,10 +68,10 @@ The representative `frostyard/core` declaration is deliberately `disabled`.
 It exercises the live registry without authorizing runtime participation. A
 future change to `enabled` is a distinct reviewed organization decision.
 
-The authority tree and Fluent runtime state are intentionally separate. A
+The authority tree and Snowcat runtime state are intentionally separate. A
 merged declaration is an input to a later import, not evidence that the
 snapshot was activated or the repository became available for work. Runtime
-holds, suspensions, leases, and work history remain Fluent state.
+holds, suspensions, leases, and work history remain Snowcat state.
 
 Repository-local governance remains at the canonical path named by the surface
 contract. Core owns its schema and common vocabulary, while each repository

@@ -1,7 +1,7 @@
 # Spec: Organization verification profiles
 
 This contract governs the immutable verification-profile definitions published
-by Core and consumed by Fluent when it validates and executes success measures.
+by Core and consumed by Snowcat when it validates and executes success measures.
 The JSON Schema in `organization/schemas/v1/verification-profile.schema.json`
 is the executable document contract; this spec pins its path and cross-field
 invariants.
@@ -84,7 +84,7 @@ Each binding contains only a kebab-case `id` and positive integer `version`.
 - Core MUST retain an accepted profile version unchanged. A changed parameter
   or mechanism contract MUST use a new positive version.
 - Core validation MUST NOT claim that a profile is executable by a consumer.
-  Fluent MUST independently recognize every named binding before activating a
+  Snowcat MUST independently recognize every named binding before activating a
   snapshot containing a success measure that references the profile.
 - A success measure referencing a profile MUST separately declare its exact
   subject and absolute observation window, and its parameters MUST validate
@@ -98,9 +98,9 @@ Each binding contains only a kebab-case `id` and positive integer `version`.
 
 | Artifact | Derivation |
 | --- | --- |
-| Fluent verification registry requirement | Exact mode-specific mechanism IDs and versions named by an activated profile |
+| Snowcat verification registry requirement | Exact mode-specific mechanism IDs and versions named by an activated profile |
 | Success-measure parameter validator | The retained profile's embedded `parameter_schema` |
-| Verification evidence | Subject, window, profile identity, parameters, mechanism versions, source facts, and result retained by Fluent |
+| Verification evidence | Subject, window, profile identity, parameters, mechanism versions, source facts, and result retained by Snowcat |
 
 ## References
 
