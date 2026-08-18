@@ -15,7 +15,9 @@
   "maintenance_programs": [
     "quality",
     "ci",
-    "architecture"
+    "architecture",
+    "conformance",
+    "triage"
   ],
   "action_ceiling": [
     "read",
