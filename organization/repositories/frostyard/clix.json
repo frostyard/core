@@ -2,8 +2,8 @@
   "schema_version": 1,
   "repository": {
     "owner": "frostyard",
-    "name": "fluent",
-    "repository_id": "1334681570"
+    "name": "clix",
+    "repository_id": "1172846628"
   },
   "accountable_owners": [
     {
@@ -15,9 +15,6 @@
   "maintenance_programs": [
     "quality",
     "ci",
-    "architecture",
-    "conformance",
-    "triage",
     "dependencies",
     "docs"
   ],
