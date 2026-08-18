@@ -1,6 +1,6 @@
 # 0022 — make ci is the canonical gate; TestI* is a reserved test-name prefix
 
-- **Status:** Accepted
+- **Status:** Superseded by [0038](0038-scope-the-test-name-filter-to-chairlift.md)
 - **Date:** 2026-08-11
 
 ## Context
