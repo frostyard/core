@@ -52,6 +52,7 @@ Docs are split by the question they answer:
 - [0037 — Publish executable organization goals](adr/0037-publish-executable-organization-goals.md)
 - [0038 — make ci stays canonical; the TestI/Integration name filter is chairlift-only](adr/0038-scope-the-test-name-filter-to-chairlift.md)
 - [0039 — Widen `maintenance_programs` within repository schema v1](adr/0039-widen-maintenance-programs-within-schema-v1.md)
+- [0040 — Publish the repository settings contract](adr/0040-publish-the-repository-settings-contract.md)
 
 ### Design
 

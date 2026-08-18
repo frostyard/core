@@ -65,6 +65,29 @@ surface IDs and canonical repository paths:
 | `agent-skills` | `.agents/skills` | `directory` | none |
 | `documentation-index` | `docs/README.md` | `file` | none |
 
+### Repository settings contract
+
+The version-one repository settings contract lives only at
+`organization/contracts/repository-settings/v1.json`, validated by
+`organization/schemas/v1/repository-settings.schema.json`
+([ADR-0040](../adr/0040-publish-the-repository-settings-contract.md)). It is
+organization-wide: every enrolled repository is expected to match every value.
+
+| Section | What it fixes |
+| --- | --- |
+| `repository` | delete branch on merge, suggest updating branches, no auto-merge, allowed merge methods, merge/squash commit title and message defaults, wiki/projects/issues, web sign-off |
+| `actions` | default workflow token permissions, whether workflows may approve pull requests |
+| `security` | Dependabot alerts and security updates, secret scanning and push protection, private vulnerability reporting |
+| `default_branch_ruleset` | active, no bypass, pull request required with the approval count, conversation resolution, strict required status checks, no deletion or force push, no merge queue, no classic protection |
+| `tag_ruleset` | tag pattern, no deletion or force update, creation restricted |
+| `metadata` | license and description required, topics that must be present |
+| `labels` | labels the fleet depends on |
+
+The contract names no per-repository values (visibility, discussions, code
+scanning, the exact required-check contexts); those are observed by the
+consumer, not required, until a later version. Fluent reads the contract and
+proposes drift; `scripts/apply-repo-settings.sh <owner/repo>` applies it.
+
 ## Rules
 
 - Every JSON document MUST be UTF-8, MUST reject duplicate keys, and MUST
@@ -94,6 +117,9 @@ surface IDs and canonical repository paths:
   platform, organization, enrollment, root-work, or delegated ceiling.
 - `npm run check:organization` MUST validate live records and both valid and
   invalid conformance fixtures using the same parser and schemas.
+- The repository settings contract MUST require a pull request whenever it
+  requires status checks, and its tag ruleset MUST block deletion or restrict
+  creation; a change that relaxes any value is a new ADR, not an edit.
 
 ## Derived artifacts
 
@@ -108,5 +134,7 @@ surface IDs and canonical repository paths:
 - Rationale:
   [ADR-0035](../adr/0035-author-organization-authority-as-strict-json.md),
   [ADR-0039](../adr/0039-widen-maintenance-programs-within-schema-v1.md)
-  (compatible enum widening within a schema version)
+  (compatible enum widening within a schema version),
+  [ADR-0040](../adr/0040-publish-the-repository-settings-contract.md)
+  (repository settings contract)
 - Context: [organization authority](../design/organization-authority.md)

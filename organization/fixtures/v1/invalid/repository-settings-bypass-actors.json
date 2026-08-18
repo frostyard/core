@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "contract": {
+    "id": "repository-settings",
+    "version": 1
+  },
+  "repository": {
+    "delete_branch_on_merge": true,
+    "allow_update_branch": true,
+    "allow_auto_merge": false,
+    "allow_merge_commit": true,
+    "allow_squash_merge": true,
+    "allow_rebase_merge": true,
+    "merge_commit_title": "MERGE_MESSAGE",
+    "merge_commit_message": "PR_TITLE",
+    "squash_merge_commit_title": "PR_TITLE",
+    "squash_merge_commit_message": "COMMIT_MESSAGES",
+    "has_wiki": false,
+    "has_projects": false,
+    "has_issues": true,
+    "web_commit_signoff_required": false
+  },
+  "actions": {
+    "default_workflow_permissions": "read",
+    "can_approve_pull_request_reviews": false
+  },
+  "security": {
+    "vulnerability_alerts": true,
+    "dependabot_security_updates": true,
+    "secret_scanning": true,
+    "secret_scanning_push_protection": true,
+    "private_vulnerability_reporting": true
+  },
+  "default_branch_ruleset": {
+    "enforcement": "active",
+    "bypass_actors": "admins",
+    "require_pull_request": true,
+    "required_approving_review_count": 0,
+    "require_conversation_resolution": true,
+    "require_status_checks": true,
+    "strict_required_status_checks": true,
+    "block_deletions": true,
+    "block_force_pushes": true,
+    "merge_queue": false,
+    "classic_branch_protection": "absent"
+  },
+  "tag_ruleset": {
+    "pattern": "v*",
+    "enforcement": "active",
+    "block_deletions": true,
+    "block_force_pushes": true,
+    "restrict_creation": true
+  },
+  "metadata": {
+    "license_required": true,
+    "description_required": true,
+    "topics_include": [
+      "frostyard"
+    ]
+  },
+  "labels": {
+    "required": [
+      "fluent"
+    ]
+  }
+}
