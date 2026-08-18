@@ -1,7 +1,7 @@
 # Spec: Organization goals
 
 This contract governs version-one Goal records published by Core and consumed
-by Fluent. The executable schemas are
+by Snowcat. The executable schemas are
 `organization/schemas/v1/envelope.schema.json` and
 `organization/schemas/v1/goal.schema.json`; this spec pins their canonical
 path, cross-record rules, and runtime interpretation.
@@ -112,7 +112,7 @@ Applicability has exactly one of these shapes:
   only to future discovery and admission.
 - Goal measurements MUST NOT change Goal lifecycle. Only an accepted Core
   revision may do so.
-- Across activated snapshots, Fluent MUST reject deletion, a change of stable
+- Across activated snapshots, Snowcat MUST reject deletion, a change of stable
   identity, and a lifecycle transition outside the table in ADR-0037.
 - Core validates fixtures with fixture repositories and profiles. Live Goals
   resolve only against live declarations and profiles; fixtures never grant

@@ -57,6 +57,6 @@
     "topics_include": ["frostyard"]
   },
   "labels": {
-    "required": ["fluent"]
+    "required": ["snowcat"]
   }
 }

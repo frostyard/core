@@ -11,6 +11,6 @@
     "std": ["frostyard-go-repo"],
     "intuneme": ["frostyard-go-repo"],
     "firn": ["frostyard-go-repo"],
-    "fluent": ["frostyard-design"]
+    "snowcat": ["frostyard-design"]
   }
 }

@@ -60,7 +60,7 @@
   },
   "labels": {
     "required": [
-      "fluent"
+      "snowcat"
     ]
   }
 }

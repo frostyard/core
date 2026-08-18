@@ -2,7 +2,7 @@
 # Apply the repository settings contract (organization/contracts/repository-settings/v1.json,
 # ADR-0040) to one GitHub repository through the GitHub API. Human-run, idempotent,
 # dry-run by default: it prints every change it would make and makes none until
-# --apply is given. Fluent proposes drift; a person runs this.
+# --apply is given. Snowcat proposes drift; a person runs this.
 #
 #   scripts/apply-repo-settings.sh <owner/repo> [--apply]
 #       [--required-checks "<ctx>[,<ctx>...]"] [--checks-app-id <id>]
@@ -176,7 +176,7 @@ fi
 labels="$(gh api "repos/$repo/labels?per_page=100" --jq '[.[].name | ascii_downcase]')"
 for label in $(want '.labels.required[]'); do
   if ! jq -e --arg l "${label,,}" 'index($l)' <<<"$labels" >/dev/null; then
-    plan "POST repos/$repo/labels $label" -X POST "repos/$repo/labels" -f name="$label" -f color="0e8a16" -f description="Queued for the Fluent fleet"
+    plan "POST repos/$repo/labels $label" -X POST "repos/$repo/labels" -f name="$label" -f color="0e8a16" -f description="Queued for the Snowcat fleet"
   fi
 done
 

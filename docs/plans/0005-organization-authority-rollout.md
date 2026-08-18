@@ -4,7 +4,7 @@ This plan delivers core's machine-readable authority surface in independently
 reviewable slices. It complements the
 [organization portfolio roadmap](0002-org-portfolio-roadmap.md): the portfolio
 plan describes desired outcomes across repositories, while this plan delivers
-the authority records and validation consumed by Fluent.
+the authority records and validation consumed by Snowcat.
 
 ## Phase 1 — Repository enrollment foundation (complete)
 
@@ -37,14 +37,14 @@ the authority records and validation consumed by Fluent.
 - **Done when:** every accepted context kind has one canonical path, strict
   schema, positive fixture, rejection fixture, and indexed author guidance.
 
-## Phase 3 — Fluent snapshot import
+## Phase 3 — Snowcat snapshot import
 
 - Implement atomic import of the
   [repository enrollment contract](../specs/organization-repository-enrollment.md)
-  and organization context records in Fluent.
+  and organization context records in Snowcat.
 - Preserve source revision, content hashes, validation results, and activation
   history without giving core credentials or execution state.
-- **Done when:** Fluent can activate one fully valid core revision, reject an
+- **Done when:** Snowcat can activate one fully valid core revision, reject an
   invalid candidate without partial state, and show the active source revision.
 
 ## Phase 4 — Repository conformance and enrollment
