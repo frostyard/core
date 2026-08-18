@@ -86,7 +86,12 @@ organization-wide: every enrolled repository is expected to match every value.
 The contract names no per-repository values (visibility, discussions, code
 scanning, the exact required-check contexts); those are observed by the
 consumer, not required, until a later version. Fluent reads the contract and
-proposes drift; `scripts/apply-repo-settings.sh <owner/repo>` applies it.
+proposes drift; `scripts/apply-repo-settings.sh <owner/repo> [--apply]
+[--required-checks "<ctx>,…"]` applies it — dry-run by default, idempotent,
+never deleting a ruleset it did not create, and never writing a license or
+description (those are pull requests and settings the operator makes). The
+tag ruleset it creates lets repository admins bypass, so a maintainer's
+`make bump` still creates the tag and nobody else can.
 
 ## Rules
 
