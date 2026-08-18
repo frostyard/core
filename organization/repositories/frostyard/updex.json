@@ -14,7 +14,9 @@
   "fleet_state": "enabled",
   "maintenance_programs": [
     "quality",
-    "ci"
+    "ci",
+    "security",
+    "architecture"
   ],
   "action_ceiling": [
     "read",
