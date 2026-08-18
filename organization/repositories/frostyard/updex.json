@@ -18,7 +18,9 @@
     "security",
     "architecture",
     "conformance",
-    "triage"
+    "triage",
+    "dependencies",
+    "docs"
   ],
   "action_ceiling": [
     "read",
