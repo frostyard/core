@@ -5,13 +5,17 @@
 # --apply is given. Snowcat proposes drift; a person runs this.
 #
 #   scripts/apply-repo-settings.sh <owner/repo> [--apply]
-#       [--required-checks "<ctx>[,<ctx>...]"] [--checks-app-id <id>]
-#       [--no-rulesets] [--contract <path>]
+#       [--required-checks "<ctx>[,<ctx>...]"] [--required-check "<ctx>"]...
+#       [--checks-app-id <id>] [--no-rulesets] [--contract <path>]
 #
 #   --required-checks   The status-check contexts the default-branch ruleset must
-#                       require (the contract does not carry per-repository names).
-#                       Required to create/repair the default-branch ruleset unless
-#                       --no-rulesets. Example: "check (node 24),check (node 26)".
+#                       require (the contract does not carry per-repository names),
+#                       comma-separated. Required to create/repair the default-branch
+#                       ruleset unless --no-rulesets. Example: "check (node 24),check (node 26)".
+#   --required-check    One exact context, repeatable; use it for names that contain
+#                       a comma (matrix jobs such as "Build (linux, amd64)"). Combines
+#                       with --required-checks. Preflight: a name that no PR produces
+#                       makes GitHub wait forever, so compare with `gh pr checks`.
 #   --checks-app-id     GitHub App integration ID that produces the checks
 #                       (default 15368 = GitHub Actions).
 #   --no-rulesets       Skip the default-branch and tag rulesets.
@@ -25,10 +29,12 @@ set -euo pipefail
 usage() { sed -n '2,20p' "$0" >&2; exit 2; }
 
 repo="" apply=0 checks="" app_id=15368 rulesets=1 contract=""
+declare -a single_checks=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --apply) apply=1; shift ;;
     --required-checks) checks="$2"; shift 2 ;;
+    --required-check) single_checks+=("$2"); shift 2 ;;
     --checks-app-id) app_id="$2"; shift 2 ;;
     --no-rulesets) rulesets=0; shift ;;
     --contract) contract="$2"; shift 2 ;;
@@ -129,10 +135,13 @@ if [[ $rulesets -eq 1 ]]; then
   branch_id="$(jq -r '[.[] | select(.target=="branch" and .name=="frostyard: default branch")] | .[0].id // empty' <<<"$existing")"
   tag_id="$(jq -r '[.[] | select(.target=="tag" and .name=="frostyard: release tags")] | .[0].id // empty' <<<"$existing")"
 
-  if [[ -z $checks ]]; then
+  if [[ -z $checks && ${#single_checks[@]} -eq 0 ]]; then
     say "  NOTE  --required-checks not given; the default-branch ruleset needs the repository's check names — skipping the branch ruleset (tag ruleset still applied)"
   else
-    checks_json="$(jq -cn --arg s "$checks" --argjson app "$app_id" '[$s | split(",") | .[] | gsub("^\\s+|\\s+$";"") | select(length>0) | {context: ., integration_id: $app}]')"
+    # Comma-separated list plus exact single names (which may contain commas), deduplicated in order.
+    checks_json="$(jq -cn --arg s "$checks" --argjson app "$app_id" \
+      --args '[($s | split(",")), $ARGS.positional] | add | map(gsub("^\\s+|\\s+$";"")) | map(select(length>0)) | unique_by(.) | map({context: ., integration_id: $app})' \
+      -- "${single_checks[@]}")"
     branch_rules="$(jq -cn --argjson checks "$checks_json" \
       --argjson approvals "$(want .default_branch_ruleset.required_approving_review_count)" \
       --argjson threads "$(want .default_branch_ruleset.require_conversation_resolution)" \
