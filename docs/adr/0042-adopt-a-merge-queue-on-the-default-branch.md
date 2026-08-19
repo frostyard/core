@@ -1,6 +1,6 @@
 # 0042 — Adopt a merge queue on the default branch
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-08-19
 
 ## Context
