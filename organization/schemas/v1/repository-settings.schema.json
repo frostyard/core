@@ -121,7 +121,7 @@
         "strict_required_status_checks": { "type": "boolean" },
         "block_deletions": { "type": "boolean" },
         "block_force_pushes": { "type": "boolean" },
-        "merge_queue": { "const": false },
+        "merge_queue": { "type": "boolean" },
         "classic_branch_protection": { "const": "absent" }
       }
     },
