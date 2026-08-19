@@ -37,17 +37,37 @@ for (const cat of categories) {
     if (name.endsWith(".md") && name !== "TEMPLATE.md") mdFiles.push(join(root, "docs", cat, name));
   }
 }
+const skillsRoot = join(root, ".agents", "skills");
+(function collectSkillDocs(dir) {
+  for (const name of readdirSync(dir)) {
+    const path = join(dir, name);
+    const stat = lstatSync(path);
+    if (stat.isDirectory()) collectSkillDocs(path);
+    else if (name.endsWith(".md")) mdFiles.push(path);
+  }
+})(skillsRoot);
 let linksTotal = 0;
 let linksOk = 0;
 for (const file of mdFiles) {
   // Strip fenced code blocks so example links aren't checked.
   const text = readFileSync(file, "utf8").replace(/```[\s\S]*?```/g, "");
+  const isSkillDoc = file.startsWith(skillsRoot + sep);
   for (const m of text.matchAll(/\[[^\]]*\]\(([^)\s]+)\)/g)) {
     const target = m[1];
-    if (/^[a-z][a-z+.-]*:/i.test(target) || target.startsWith("#")) continue; // external or anchor
+    if (
+      /^[a-z][a-z+.-]*:/i.test(target) ||
+      target.startsWith("#") ||
+      (isSkillDoc && target.startsWith("/"))
+    ) continue; // external, anchor, or site-root path
     linksTotal++;
     const path = resolve(dirname(file), target.split("#")[0]);
-    if (existsSync(path)) linksOk++;
+    if (
+      isSkillDoc &&
+      path !== skillsRoot &&
+      !path.startsWith(skillsRoot + sep)
+    ) {
+      failures.push(`link: ${relative(root, file)} -> ${target} escapes .agents/skills`);
+    } else if (existsSync(path)) linksOk++;
     else failures.push(`link: ${relative(root, file)} -> ${target} does not resolve`);
   }
 }

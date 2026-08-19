@@ -1,7 +1,7 @@
 # Frostyard docs-site skill + scaffold — implementation plan
 
 > **Historical implementation record (2026-07-19).** The delivered, maintained
-> procedure is [frostyard-docs-site](../../../frostyard-docs-site/SKILL.md).
+> procedure is [frostyard-docs-site](../../../../frostyard-docs-site/SKILL.md).
 > This plan is retained as provenance only; do not execute its checklist or
 > reuse its environment-specific paths.
 
