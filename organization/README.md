@@ -34,3 +34,5 @@ and [verification-profile spec](../docs/specs/organization-verification-profiles
 Goal fields and cross-record rules are in the
 [organization Goal spec](../docs/specs/organization-goals.md). The current tree
 contains Goal fixtures but no live Goal.
+
+`default_branch_ruleset.merge_queue` is `true` since [ADR-0042](../docs/adr/0042-adopt-a-merge-queue-on-the-default-branch.md): `scripts/apply-repo-settings.sh` adds the `merge_queue` rule (squash, ALLGREEN, ≤5 built/merged, 60-minute check timeout) and `scripts/rollout-merge-queue.sh <owner/repo>... [--apply]` applies it across repositories, skipping any whose pull-request workflows do not also run on `merge_group`.

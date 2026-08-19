@@ -41,7 +41,7 @@
     "strict_required_status_checks": true,
     "block_deletions": true,
     "block_force_pushes": true,
-    "merge_queue": false,
+    "merge_queue": true,
     "classic_branch_protection": "absent"
   },
   "tag_ruleset": {

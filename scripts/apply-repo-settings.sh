@@ -143,13 +143,19 @@ if [[ $rulesets -eq 1 ]]; then
     checks_json="$(jq -cn --arg s "$checks" --argjson app "$app_id" \
       --args '[($s | split(",")), $ARGS.positional] | add | map(gsub("^\\s+|\\s+$";"")) | map(select(length>0)) | unique_by(.) | map({context: ., integration_id: $app})' \
       -- "${single_checks[@]}")"
+    # Merge queue (ADR-0042): when the contract wants one, the ruleset carries the
+    # merge_queue rule with the organization's fixed parameters — squash, ALLGREEN,
+    # at most 5 built/merged per group, no minimum wait, 60-minute check timeout.
+    # Required checks must also run on `merge_group` events in each repository's CI.
     branch_rules="$(jq -cn --argjson checks "$checks_json" \
       --argjson approvals "$(want .default_branch_ruleset.required_approving_review_count)" \
       --argjson threads "$(want .default_branch_ruleset.require_conversation_resolution)" \
-      --argjson strict "$(want .default_branch_ruleset.strict_required_status_checks)" '
+      --argjson strict "$(want .default_branch_ruleset.strict_required_status_checks)" \
+      --argjson queue "$(want .default_branch_ruleset.merge_queue)" '
       [ {type:"deletion"}, {type:"non_fast_forward"},
         {type:"pull_request", parameters:{required_approving_review_count:$approvals, dismiss_stale_reviews_on_push:false, require_code_owner_review:false, require_last_push_approval:false, required_review_thread_resolution:$threads}},
-        {type:"required_status_checks", parameters:{strict_required_status_checks_policy:$strict, do_not_enforce_on_create:false, required_status_checks:$checks}} ]')"
+        {type:"required_status_checks", parameters:{strict_required_status_checks_policy:$strict, do_not_enforce_on_create:false, required_status_checks:$checks}} ]
+      + (if $queue then [ {type:"merge_queue", parameters:{merge_method:"SQUASH", grouping_strategy:"ALLGREEN", max_entries_to_build:5, min_entries_to_merge:1, max_entries_to_merge:5, min_entries_to_merge_wait_minutes:0, check_response_timeout_minutes:60}} ] else [] end)')"
     branch_body="$(jq -cn --argjson rules "$branch_rules" '{name:"frostyard: default branch", target:"branch", enforcement:"active", bypass_actors:[], conditions:{ref_name:{include:["~DEFAULT_BRANCH"], exclude:[]}}, rules:$rules}')"
     if [[ -z $branch_id ]]; then
       plan "POST repos/$repo/rulesets (default branch: PR required, $(jq length <<<"$checks_json") required checks, no deletion/force push)" -X POST "repos/$repo/rulesets" --input - <<<"$branch_body"

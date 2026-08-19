@@ -6,6 +6,9 @@ on:
   push:
     branches: [main]
   pull_request: {}
+  # Merge queue (ADR-0042): the required checks must also run on the queue's
+  # temporary branches, or every queue entry waits out the check timeout.
+  merge_group: {}
   workflow_dispatch: {}
 
 permissions: {}
