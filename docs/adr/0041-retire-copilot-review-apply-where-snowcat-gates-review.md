@@ -1,6 +1,6 @@
 # 0041 — Retire copilot-review-apply where Snowcat gates review
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-08-19
 
 ## Context
