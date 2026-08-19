@@ -116,7 +116,8 @@ if [[ $(jq -r .default_workflow_permissions <<<"$wf") != "$w_perm" || $(jq -r .c
 fi
 
 # ---- 4. Vulnerability alerts, private vulnerability reporting --------------
-alerts_status="$(gh api -i "repos/$repo/vulnerability-alerts" 2>/dev/null | head -1 | awk '{print $2}')"
+# 204 = enabled, 404 = disabled; gh exits non-zero on the 404, which is an answer here, not a failure.
+alerts_status="$({ gh api -i "repos/$repo/vulnerability-alerts" 2>/dev/null || true; } | head -1 | awk '{print $2}')"
 if [[ $(want .security.vulnerability_alerts) == true && $alerts_status != 204 ]]; then
   plan "PUT repos/$repo/vulnerability-alerts" -X PUT "repos/$repo/vulnerability-alerts"
 elif [[ $(want .security.vulnerability_alerts) == false && $alerts_status == 204 ]]; then
