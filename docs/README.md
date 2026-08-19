@@ -54,6 +54,7 @@ Docs are split by the question they answer:
 - [0039 — Widen `maintenance_programs` within repository schema v1](adr/0039-widen-maintenance-programs-within-schema-v1.md)
 - [0040 — Publish the repository settings contract](adr/0040-publish-the-repository-settings-contract.md)
 - [0041 — Retire copilot-review-apply where Snowcat gates review](adr/0041-retire-copilot-review-apply-where-snowcat-gates-review.md)
+- [0042 — Adopt a merge queue on the default branch](adr/0042-adopt-a-merge-queue-on-the-default-branch.md)
 
 ### Design
 
