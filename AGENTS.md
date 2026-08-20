@@ -47,6 +47,12 @@ Start from .agents/skills/TEMPLATE/SKILL.md. -->
   ([ADR-0040](docs/adr/0040-publish-the-repository-settings-contract.md),
   [ADR-0042](docs/adr/0042-adopt-a-merge-queue-on-the-default-branch.md),
   [enrollment spec](docs/specs/organization-repository-enrollment.md)).
+- **Planning a multi-step or multi-repo project into sequenced
+  Snowcat-importable issues** →
+  [.agents/skills/frostyard-plan-project/SKILL.md](.agents/skills/frostyard-plan-project/SKILL.md)
+  — socratic interview first, umbrella issue + `depends-on:` slice issues,
+  evidence-shaped criteria, release slices at version boundaries, human
+  approval before any issue is created (snowcat ADR-0066).
 - **Scaffolding or updating a repo's docs/ tree, or retiring a legacy
   `yeti/`/`cairn/` tree** →
   [.agents/skills/frostyard-repo-docs/SKILL.md](.agents/skills/frostyard-repo-docs/SKILL.md)
