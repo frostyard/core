@@ -39,6 +39,14 @@ Start from .agents/skills/TEMPLATE/SKILL.md. -->
   [.agents/skills/frostyard-go-repo/SKILL.md](.agents/skills/frostyard-go-repo/SKILL.md)
   — SDK-first layout, clix CLI, Makefile check gate, GoReleaser Pro + svu
   releases (extracted from updex).
+- **Onboarding an existing repository into the fleet (core declaration,
+  canonical surfaces, settings + merge queue, Snowcat enrollment and queue
+  opt-in, proven work loop)** →
+  [.agents/skills/frostyard-onboard-repo/SKILL.md](.agents/skills/frostyard-onboard-repo/SKILL.md)
+  — agent drafts and probes, operator runs every state-changing command
+  ([ADR-0040](docs/adr/0040-publish-the-repository-settings-contract.md),
+  [ADR-0042](docs/adr/0042-adopt-a-merge-queue-on-the-default-branch.md),
+  [enrollment spec](docs/specs/organization-repository-enrollment.md)).
 - **Planning a multi-step or multi-repo project into sequenced
   Snowcat-importable issues** →
   [.agents/skills/frostyard-plan-project/SKILL.md](.agents/skills/frostyard-plan-project/SKILL.md)
