@@ -39,6 +39,12 @@ Start from .agents/skills/TEMPLATE/SKILL.md. -->
   [.agents/skills/frostyard-go-repo/SKILL.md](.agents/skills/frostyard-go-repo/SKILL.md)
   — SDK-first layout, clix CLI, Makefile check gate, GoReleaser Pro + svu
   releases (extracted from updex).
+- **Planning a multi-step or multi-repo project into sequenced
+  Snowcat-importable issues** →
+  [.agents/skills/frostyard-plan-project/SKILL.md](.agents/skills/frostyard-plan-project/SKILL.md)
+  — socratic interview first, umbrella issue + `depends-on:` slice issues,
+  evidence-shaped criteria, release slices at version boundaries, human
+  approval before any issue is created (snowcat ADR-0066).
 - **Scaffolding or updating a repo's docs/ tree, or retiring a legacy
   `yeti/`/`cairn/` tree** →
   [.agents/skills/frostyard-repo-docs/SKILL.md](.agents/skills/frostyard-repo-docs/SKILL.md)
