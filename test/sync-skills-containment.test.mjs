@@ -46,6 +46,25 @@ test("rejects an escaping existing managed-skill destination symlink without tou
   assert.deepEqual(await readdir(outside), ["sentinel"]);
 });
 
+test("rejects a later escaping destination without mutating an earlier valid one", async () => {
+  const { dir, coreRoot, outside } = await createFixture();
+  await mkdir(path.join(coreRoot, ".agents/skills/second"), { recursive: true });
+  await writeFile(path.join(coreRoot, ".agents/skills/second/SKILL.md"), "# Second\n");
+  await writeFile(path.join(outside, "sentinel"), "untouched\n");
+  await mkdir(path.join(dir, ".agents/skills"), { recursive: true });
+  await symlink(outside, path.join(dir, ".agents/skills/second"), "dir");
+
+  await assert.rejects(
+    runSyncRepo(dir, coreRoot, ["example", "second"]),
+    (error) =>
+      error.stderr.includes(
+        "managed-skill destination 'second' escapes the cloned repository root",
+      ),
+  );
+  assert.deepEqual(await readdir(outside), ["sentinel"]);
+  await assert.rejects(readdir(path.join(dir, ".agents/skills/example")));
+});
+
 test("syncs a skill into a normal .agents directory", async () => {
   const { dir, coreRoot } = await createFixture();
 

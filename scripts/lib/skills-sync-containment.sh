@@ -49,11 +49,19 @@ skills_sync_sync_repo() {
   skills_root=$(realpath -m "${dir}/.agents")/skills
   skills_sync_require_contained "$dir" "$skills_root" ".agents/skills root" || return 1
 
-  local skill src dst
+  # Validate every destination before any mutation: with multiple skills, an
+  # earlier valid destination must not be mkdir/rsync/marker-written before a
+  # later escaping one is caught (fail-closed, no-mutation guarantee above).
+  local skill dst
+  for skill in "$@"; do
+    dst="${skills_root}/${skill}"
+    skills_sync_require_contained "$dir" "$dst" "managed-skill destination '${skill}'" || return 1
+  done
+
+  local src
   for skill in "$@"; do
     src="${core_root}/.agents/skills/${skill}"
     dst="${skills_root}/${skill}"
-    skills_sync_require_contained "$dir" "$dst" "managed-skill destination '${skill}'" || return 1
     mkdir -p "$dst"
     rsync -a --delete "$src/" "$dst/"
     # No commit SHA in the marker: a SHA would make every core commit dirty
