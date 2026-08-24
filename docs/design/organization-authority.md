@@ -64,9 +64,12 @@ schema, and applies cross-document rules that JSON Schema cannot express:
   mode and parameter schema; and
 - every valid fixture passes while every invalid fixture is rejected.
 
-The representative `frostyard/core` declaration is deliberately `disabled`.
-It exercises the live registry without authorizing runtime participation. A
-future change to `enabled` is a distinct reviewed organization decision.
+The `frostyard/core` declaration was deliberately `disabled` from its first
+revision through 2026-08-24 so it exercised the live registry without
+authorizing runtime participation. It is `enabled` since 2026-08-24, a
+distinct reviewed organization decision taken when this repository gained its
+own `policies/agent-governance.json`; core's maintenance now runs through
+Snowcat under the same gate as every other fleet repository.
 
 The authority tree and Snowcat runtime state are intentionally separate. A
 merged declaration is an input to a later import, not evidence that the
