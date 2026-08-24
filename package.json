@@ -7,7 +7,8 @@
     "node": ">=22.0.0"
   },
   "scripts": {
-    "check": "npm run check:docs && npm run check:organization && npm test",
+    "check": "npm run verify",
+    "verify": "npm run check:docs && npm run check:organization && npm test",
     "check:docs": "node scripts/check-docs.mjs",
     "check:organization": "node scripts/check-organization.mjs",
     "test": "node --test test/*.test.mjs"
