@@ -45,7 +45,9 @@ PR template ──► review rubric ──► CI gates ──► corrections ─
   read-only reviewer runs), `make check` (developer, may format), and
   `make ci` (ADR-0022's gate, which calls `verify`)
   ([ADR-0043](../adr/0043-pin-repository-tools-in-mise-and-name-the-verify-gate.md));
-  the organization gate checks presence, never versions.
+  the organization gate checks presence, never versions, via
+  `scripts/check-fleet-conventions.mjs` (`npm run check:fleet`) and CI's
+  `fleet-conventions` job.
 - **Learn** — corrections land in
   [.memory/corrections.jsonl](../../.memory/README.md) (append-only,
   five-field schema, ADR-0018) and are promoted into `AGENTS.md`, docs, or
