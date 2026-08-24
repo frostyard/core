@@ -46,6 +46,18 @@ test("rejects an escaping existing managed-skill destination symlink without tou
   assert.deepEqual(await readdir(outside), ["sentinel"]);
 });
 
+test("rejects an in-clone .agents/skills symlink that resolves to the clone root itself", async () => {
+  const { dir, coreRoot } = await createFixture();
+  await mkdir(path.join(dir, ".agents"), { recursive: true });
+  await symlink("..", path.join(dir, ".agents/skills"), "dir");
+
+  await assert.rejects(
+    runSyncRepo(dir, coreRoot, ["example"]),
+    (error) => error.stderr.includes(".agents/skills root escapes the cloned repository root"),
+  );
+  assert.deepEqual(await readdir(dir), [".agents"]);
+});
+
 test("rejects a later escaping destination without mutating an earlier valid one", async () => {
   const { dir, coreRoot, outside } = await createFixture();
   await mkdir(path.join(coreRoot, ".agents/skills/second"), { recursive: true });

@@ -14,14 +14,18 @@ set -euo pipefail
 # <path> need not exist yet: realpath -m resolves any existing prefix
 # (including a symlink) and normalizes the remainder without requiring
 # it to exist. Prints ::error:: and returns 1 when the canonicalized
-# <path> is not <root> itself or strictly beneath it.
+# <path> is not strictly beneath <root> — <path> resolving to <root>
+# itself is rejected too, since both callers below (the .agents/skills
+# root and each skill's destination) must land inside the managed
+# subtree, never coincide with the clone root (e.g. an in-clone
+# `.agents/skills -> ..` symlink resolving exactly to <root>).
 skills_sync_require_contained() {
   local root="$1" path="$2" label="$3"
   local root_real path_real
   root_real=$(realpath -m -- "$root")
   path_real=$(realpath -m -- "$path")
   case "$path_real" in
-    "$root_real" | "$root_real"/*)
+    "$root_real"/*)
       return 0
       ;;
     *)
