@@ -17,7 +17,15 @@ const failures = [];
 const rate = (pass, total) => (total === 0 ? 1 : pass / total);
 
 // ---- 1. Index coverage: every doc in the four categories is indexed. ----
-const indexText = readFileSync(join(root, "docs/README.md"), "utf8");
+const indexPath = join(root, "docs/README.md");
+// Strip fenced code blocks so example links/prose aren't mistaken for real links.
+const indexText = readFileSync(indexPath, "utf8").replace(/```[\s\S]*?```/g, "");
+const indexedTargets = new Set();
+for (const m of indexText.matchAll(/\[[^\]]*\]\(([^)\s]+)\)/g)) {
+  const target = m[1];
+  if (/^[a-z][a-z+.-]*:/i.test(target) || target.startsWith("#")) continue;
+  indexedTargets.add(resolve(dirname(indexPath), target.split("#")[0]));
+}
 const categories = ["adr", "design", "specs", "plans"];
 let docsTotal = 0;
 let docsIndexed = 0;
@@ -25,7 +33,7 @@ for (const cat of categories) {
   for (const name of readdirSync(join(root, "docs", cat))) {
     if (!name.endsWith(".md") || name === "TEMPLATE.md") continue;
     docsTotal++;
-    if (indexText.includes(`${cat}/${name}`)) docsIndexed++;
+    if (indexedTargets.has(join(root, "docs", cat, name))) docsIndexed++;
     else failures.push(`index: docs/${cat}/${name} has no line in docs/README.md`);
   }
 }

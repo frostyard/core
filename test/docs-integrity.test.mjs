@@ -59,6 +59,33 @@ test("docs gate accepts cross-skill links that stay in the synced skills tree", 
   assert.match(stdout, /ok   link_integrity: 1\.000/);
 });
 
+test("docs gate rejects index coverage from a bare document path without a markdown link", async () => {
+  const root = await createFixture();
+  await writeFile(path.join(root, "docs/adr/example.md"), "# Example\n");
+  await writeFile(
+    path.join(root, "docs/README.md"),
+    "[Metric](specs/pr-acceptance-metric.md)\n\nSee adr/example.md for details.\n",
+  );
+
+  await assert.rejects(
+    runDocsGate(root),
+    (error) =>
+      error.stderr.includes("index: docs/adr/example.md has no line in docs/README.md"),
+  );
+});
+
+test("docs gate accepts index coverage from an actual relative markdown link", async () => {
+  const root = await createFixture();
+  await writeFile(path.join(root, "docs/adr/example.md"), "# Example\n");
+  await writeFile(
+    path.join(root, "docs/README.md"),
+    "[Metric](specs/pr-acceptance-metric.md)\n[Example](adr/example.md)\n",
+  );
+
+  const { stdout } = await runDocsGate(root);
+  assert.match(stdout, /ok   docs_index_coverage: 1\.000/);
+});
+
 async function createFixture() {
   const root = await mkdtemp(path.join(os.tmpdir(), "core-docs-gate-"));
   for (const dir of [
