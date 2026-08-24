@@ -11,6 +11,7 @@
     "verify": "npm run check:docs && npm run check:organization && npm test",
     "check:docs": "node scripts/check-docs.mjs",
     "check:organization": "node scripts/check-organization.mjs",
+    "check:fleet": "node scripts/check-fleet-conventions.mjs",
     "test": "node --test test/*.test.mjs"
   },
   "dependencies": {

@@ -107,6 +107,10 @@ removed. -->
   [`organization/`](organization/README.md); validate live records and their
   conformance fixtures with `npm run check:organization`
   ([ADR-0035](docs/adr/0035-author-organization-authority-as-strict-json.md)).
+  `npm run check:fleet` then checks each `fleet_state: enabled` declaration's
+  default branch over the network for `mise.toml`, `mise.lock`, and its
+  verify gate ([ADR-0043](docs/adr/0043-pin-repository-tools-in-mise-and-name-the-verify-gate.md)) —
+  presence only, run as CI's `fleet-conventions` job, not part of `check`/`verify`.
 - Conformance alias symlinks are listed in
   [ADR-0029](docs/adr/0029-acmm-conformance-via-canonical-aliases.md) —
   edit their canonical targets, never the aliases.
