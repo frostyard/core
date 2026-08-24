@@ -78,7 +78,7 @@ organization-wide: every enrolled repository is expected to match every value.
 | `repository` | delete branch on merge, suggest updating branches, no auto-merge, allowed merge methods, merge/squash commit title and message defaults, wiki/projects/issues, web sign-off |
 | `actions` | default workflow token permissions, whether workflows may approve pull requests |
 | `security` | Dependabot alerts and security updates, secret scanning and push protection, private vulnerability reporting |
-| `default_branch_ruleset` | active, no bypass, pull request required with the approval count, conversation resolution, strict required status checks, no deletion or force push, no merge queue, no classic protection |
+| `default_branch_ruleset` | active, no bypass, pull request required with the approval count, conversation resolution, strict required status checks, no deletion or force push, required merge queue, no classic protection |
 | `tag_ruleset` | tag pattern, no deletion or force update, creation restricted |
 | `metadata` | license and description required, topics that must be present |
 | `labels` | labels the fleet depends on |
@@ -141,5 +141,7 @@ tag ruleset it creates lets repository admins bypass, so a maintainer's
   [ADR-0039](../adr/0039-widen-maintenance-programs-within-schema-v1.md)
   (compatible enum widening within a schema version),
   [ADR-0040](../adr/0040-publish-the-repository-settings-contract.md)
-  (repository settings contract)
+  (repository settings contract),
+  [ADR-0042](../adr/0042-adopt-a-merge-queue-on-the-default-branch.md)
+  (required merge queue)
 - Context: [organization authority](../design/organization-authority.md)
