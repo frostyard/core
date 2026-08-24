@@ -88,6 +88,13 @@ every structural rule. Rules that remove a degree of freedom are the
 valuable ones: every choice an agent doesn't have to make is a failure mode
 removed. -->
 
+- Tools are pinned in [mise.toml](mise.toml)/[mise.lock](mise.lock)
+  (ADR-0043): `mise install` provisions the same Node release Snowcat
+  workers, CI, and developers run. `npm run verify` is the credential-free,
+  non-mutating gate a read-only reviewer can run (`check:docs`,
+  `check:organization`, `test` — nothing formats or writes); `npm run check`
+  is the same gate today and is what CI calls, since this repository has
+  nothing beyond `verify` for a developer gate to add.
 - CI gate: [.github/workflows/ci.yml](.github/workflows/ci.yml) runs `npm ci &&
   npm run check` at the root (strict organization authority via
   `scripts/check-organization.mjs`; every doc indexed, every relative link
