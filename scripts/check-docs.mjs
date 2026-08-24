@@ -18,8 +18,11 @@ const rate = (pass, total) => (total === 0 ? 1 : pass / total);
 
 // ---- 1. Index coverage: every doc in the four categories is indexed. ----
 const indexPath = join(root, "docs/README.md");
-// Strip fenced code blocks so example links/prose aren't mistaken for real links.
-const indexText = readFileSync(indexPath, "utf8").replace(/```[\s\S]*?```/g, "");
+// Strip fenced code blocks and HTML comments so example/commented-out links
+// aren't mistaken for real links.
+const indexText = readFileSync(indexPath, "utf8")
+  .replace(/```[\s\S]*?```/g, "")
+  .replace(/<!--[\s\S]*?-->/g, "");
 const indexedTargets = new Set();
 for (const m of indexText.matchAll(/\[[^\]]*\]\(([^)\s]+)\)/g)) {
   const target = m[1];

@@ -74,6 +74,21 @@ test("docs gate rejects index coverage from a bare document path without a markd
   );
 });
 
+test("docs gate rejects index coverage from a link inside an HTML comment", async () => {
+  const root = await createFixture();
+  await writeFile(path.join(root, "docs/adr/example.md"), "# Example\n");
+  await writeFile(
+    path.join(root, "docs/README.md"),
+    "[Metric](specs/pr-acceptance-metric.md)\n\n<!-- [Example](adr/example.md) -->\n",
+  );
+
+  await assert.rejects(
+    runDocsGate(root),
+    (error) =>
+      error.stderr.includes("index: docs/adr/example.md has no line in docs/README.md"),
+  );
+});
+
 test("docs gate accepts index coverage from an actual relative markdown link", async () => {
   const root = await createFixture();
   await writeFile(path.join(root, "docs/adr/example.md"), "# Example\n");
