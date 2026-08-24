@@ -18,6 +18,10 @@ GIT_EMAIL="core@frostyard.invalid"
 
 : "${GH_TOKEN:?GH_TOKEN (ORG_PAT) is not configured}"
 
+SELF_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+# shellcheck source=lib/skills-sync-containment.sh
+source "${SELF_DIR}/lib/skills-sync-containment.sh"
+
 fail=0
 for repo in $(jq -r '.repos | keys[]' "$CONFIG"); do
   mapfile -t skills < <(jq -r --arg r "$repo" '(.defaults + .repos[$r]) | unique | .[]' "$CONFIG")
@@ -31,27 +35,26 @@ for repo in $(jq -r '.repos | keys[]' "$CONFIG"); do
     continue
   fi
 
-  # Some repos (chairlift, pilothouse) have .agents as a symlink to
-  # docs/agents — resolve to the physical dir so git pathspecs match the
-  # files, not the symlink.
-  skills_root=$(realpath -m "${dir}/.agents")/skills
-  rel_root=$(realpath -m --relative-to="$dir" "$skills_root")
-
   for skill in "${skills[@]}"; do
-    src=".agents/skills/${skill}"
-    if [ ! -d "$src" ]; then
+    if [ ! -d ".agents/skills/${skill}" ]; then
       echo "::error::skills-sync.json names unknown skill '${skill}'"
       exit 1
     fi
-    dst="${skills_root}/${skill}"
-    mkdir -p "$dst"
-    rsync -a --delete "$src/" "$dst/"
-    # No commit SHA in the marker: a SHA would make every core commit dirty
-    # every consumer (marker-only diff PRs). Provenance detail lives in the
-    # sync commit message instead.
-    printf 'Managed by frostyard/core — edit there, not here (ADR-0026).\nSource: https://github.com/frostyard/core/tree/main/.agents/skills/%s\n' \
-      "$skill" > "$dst/.synced-from-core"
   done
+
+  # Some repos (chairlift, pilothouse) have .agents as a symlink to
+  # docs/agents — resolve to the physical dir so git pathspecs match the
+  # files, not the symlink. skills_sync_sync_repo rejects, before any
+  # mkdir/rsync/marker write, a resolved skills root or skill destination
+  # that escapes the clone root (e.g. an .agents symlink pointing outside
+  # $dir, or a pre-existing managed-skill destination symlink that does).
+  if ! skills_sync_sync_repo "$dir" "$PWD" "${skills[@]}"; then
+    echo "::error::sync failed for frostyard/${repo}"
+    fail=1
+    continue
+  fi
+  skills_root=$(realpath -m "${dir}/.agents")/skills
+  rel_root=$(realpath -m --relative-to="$dir" "$skills_root")
 
   # Run the per-repo git/PR work in a subshell whose exit status we read
   # AFTER it finishes — `( ... ) || fail=1` would put the subshell in a

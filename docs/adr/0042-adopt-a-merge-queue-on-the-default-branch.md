@@ -96,7 +96,8 @@ stays off: the queue entry is still a human's explicit act per pull request.
   [ADR-0035](0035-author-organization-authority-as-strict-json.md)
 - Shapes: `organization/contracts/repository-settings/v1.json`,
   `organization/schemas/v1/repository-settings.schema.json`,
-  `scripts/apply-repo-settings.sh` (changed when this ADR is Accepted)
+  `scripts/apply-repo-settings.sh` (changed when this ADR is Accepted),
+  [organization repository enrollment](../specs/organization-repository-enrollment.md)
 - Snowcat side: [Snowcat ADR-0065](https://github.com/frostyard/snowcat/blob/main/docs/adr/0065-gate-worker-pull-requests-behind-bounded-review.md),
   [Snowcat ADR-0061](https://github.com/frostyard/snowcat/blob/main/docs/adr/0061-cure-pull-requests-as-bounded-per-head-work.md),
   the [queue operations runbook](https://github.com/frostyard/snowcat/blob/main/docs/design/queue-operations.md)

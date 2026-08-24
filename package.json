@@ -8,10 +8,11 @@
   },
   "scripts": {
     "check": "npm run verify",
-    "verify": "npm run check:docs && npm run check:organization && npm test",
+    "verify": "npm run check:docs && npm run check:organization && npm run check:scripts && npm test",
     "check:docs": "node scripts/check-docs.mjs",
     "check:organization": "node scripts/check-organization.mjs",
     "check:fleet": "node scripts/check-fleet-conventions.mjs",
+    "check:scripts": "node scripts/check-scripts.mjs",
     "test": "node --test test/*.test.mjs"
   },
   "dependencies": {
