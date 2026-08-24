@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "repository": {
+    "owner": "frostyard",
+    "name": "snowcat-cockpit",
+    "repository_id": "1344981290"
+  },
+  "accountable_owners": [
+    {
+      "kind": "github-user",
+      "login": "bketelsen"
+    }
+  ],
+  "fleet_state": "enabled",
+  "maintenance_programs": [
+    "quality",
+    "ci",
+    "dependencies",
+    "docs"
+  ],
+  "action_ceiling": [
+    "read",
+    "write",
+    "run-tests",
+    "open-issue",
+    "open-pr",
+    "create-followup"
+  ],
+  "surface_contract_version": 1
+}
