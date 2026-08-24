@@ -123,6 +123,16 @@ This repo hosts org-wide shared material only:
   worker execution state, and repository-specific implementation or policy
   instances. Organization enrollment declarations may identify one repository;
   code and local policy remain in the repository they serve.
+- **This repository's own policy instance:** `policies/agent-governance.json`
+  is core's canonical agent-governance surface under its own
+  repository-surfaces contract v1; Snowcat reads it at the observed
+  default-branch head when enrolling core in the fleet. Deny by default;
+  read, write, and run-tests allowed; issues, pull requests, and follow-ups
+  review-required; review-required at high risk: workflows and the scripts
+  that mutate GitHub state, the organization authority tree, the shared
+  skills and templates every repository receives, and the validators and
+  tests that gate them. Change it only alongside the matching ADR or design
+  change.
 
 ## Documentation rules (enforced)
 
