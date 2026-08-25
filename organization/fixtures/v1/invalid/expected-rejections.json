@@ -1,0 +1,74 @@
+{
+  "goal-invalid-parameters.json": {
+    "constraint": "success-measure-parameters-satisfy-verification-profile-schema",
+    "diagnostic": "parameters do not satisfy required-check-reliability:v1"
+  },
+  "goal-no-required-measure.json": {
+    "constraint": "goal-requires-at-least-one-required-success-measure",
+    "diagnostic": "Goal must contain at least one required success measure"
+  },
+  "goal-profile-mode-mismatch.json": {
+    "constraint": "success-measure-evidence-mode-matches-verification-profile",
+    "diagnostic": "evidence mode does not match required-check-reliability:v1"
+  },
+  "goal-unknown-repository.json": {
+    "constraint": "goal-applies-to-declared-repository",
+    "diagnostic": "applicable repository is not declared: github.com:999999999"
+  },
+  "repository-additional-property.json": {
+    "constraint": "repository-schema-additional-properties-forbidden",
+    "diagnostic": "/repository must NOT have additional properties"
+  },
+  "repository-agent-governance-default-allow.json": {
+    "constraint": "agent-governance-default-decision-must-be-deny",
+    "diagnostic": "/default_decision must be equal to constant"
+  },
+  "repository-agent-governance-unknown-action.json": {
+    "constraint": "agent-governance-actions-closed-vocabulary",
+    "diagnostic": "/actions must NOT have additional properties"
+  },
+  "repository-duplicate-key.json": {
+    "constraint": "strict-json-rejects-duplicate-object-keys",
+    "diagnostic": "duplicate key \"schema_version\""
+  },
+  "repository-enabled-empty.json": {
+    "constraint": "enabled-repository-requires-nonempty-maintenance-programs",
+    "diagnostic": "/maintenance_programs must NOT have fewer than 1 items"
+  },
+  "repository-id-number.json": {
+    "constraint": "repository-id-must-be-a-string",
+    "diagnostic": "/repository/repository_id must be string"
+  },
+  "repository-settings-additional-property.json": {
+    "constraint": "repository-settings-schema-additional-properties-forbidden",
+    "diagnostic": "/repository must NOT have additional properties"
+  },
+  "repository-settings-bypass-actors.json": {
+    "constraint": "default-branch-ruleset-bypass-actors-must-be-none",
+    "diagnostic": "/default_branch_ruleset/bypass_actors must be equal to constant"
+  },
+  "repository-settings-checks-without-pull-request.json": {
+    "constraint": "required-status-checks-need-required-pull-request",
+    "diagnostic": "required status checks need require_pull_request"
+  },
+  "repository-settings-unknown-permission.json": {
+    "constraint": "default-workflow-permissions-closed-vocabulary",
+    "diagnostic": "/actions/default_workflow_permissions must be equal to one of the allowed values"
+  },
+  "repository-surfaces-wrong-path.json": {
+    "constraint": "repository-surface-path-matches-contract",
+    "diagnostic": "/surfaces/0/path must be equal to constant"
+  },
+  "repository-unknown-program.json": {
+    "constraint": "maintenance-programs-closed-vocabulary",
+    "diagnostic": "/maintenance_programs/0 must be equal to one of the allowed values"
+  },
+  "verification-profile-external-ref.json": {
+    "constraint": "verification-profile-parameter-schema-forbids-external-refs",
+    "diagnostic": "parameter schema crosses its document boundary"
+  },
+  "verification-profile-mode-mismatch.json": {
+    "constraint": "verification-profile-mechanism-kind-matches-evidence-mode",
+    "diagnostic": "/mechanism/kind must be equal to constant"
+  }
+}

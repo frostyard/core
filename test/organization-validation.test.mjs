@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 
 import {
   OrganizationValidationError,
+  assertExpectedRejection,
   assertGoalInvariants,
   assertRepositoryInvariants,
   assertVerificationProfileInvariants,
@@ -123,6 +124,70 @@ test("Goal dates are real UTC calendar dates", async () => {
       ),
     /not a real UTC calendar date/,
   );
+});
+
+test("an unrelated OrganizationValidationError does not satisfy a fixture's expected rejection diagnostic", () => {
+  const expectation = {
+    constraint: "duplicate-accountable-owner",
+    diagnostic: "duplicate accountable owner github-user:bketelsen",
+  };
+  const unrelated = new OrganizationValidationError(
+    "organization/fixtures/v1/invalid/repository-duplicate-owner.json: schema validation failed",
+    ["/accountable_owners/0 must be object"],
+  );
+  assert.throws(
+    () =>
+      assertExpectedRejection(
+        unrelated,
+        expectation,
+        "organization/fixtures/v1/invalid/repository-duplicate-owner.json",
+      ),
+    /rejected for a different diagnostic than its expected/,
+  );
+
+  const matching = new OrganizationValidationError(
+    "organization/fixtures/v1/invalid/repository-duplicate-owner.json: duplicate accountable owner github-user:bketelsen",
+  );
+  assert.doesNotThrow(() =>
+    assertExpectedRejection(
+      matching,
+      expectation,
+      "organization/fixtures/v1/invalid/repository-duplicate-owner.json",
+    ),
+  );
+});
+
+test("an invalid fixture with no expected rejection diagnostic fails closed", () => {
+  const anyError = new OrganizationValidationError("anything at all");
+  assert.throws(
+    () =>
+      assertExpectedRejection(
+        anyError,
+        undefined,
+        "organization/fixtures/v1/invalid/repository-unexpected.json",
+      ),
+    /has no expected rejection diagnostic/,
+  );
+});
+
+test("every invalid organization fixture declares an explicit expected rejection diagnostic", async () => {
+  const { readdir } = await import("node:fs/promises");
+  const invalidDir = path.join(repoRoot, "organization/fixtures/v1/invalid");
+  const fixtureNames = (await readdir(invalidDir)).filter((name) =>
+    name.endsWith(".json"),
+  );
+  const manifest = await readStrictJson(
+    path.join(invalidDir, "expected-rejections.json"),
+    "organization/fixtures/v1/invalid/expected-rejections.json",
+  );
+  for (const name of fixtureNames) {
+    if (name === "expected-rejections.json") continue;
+    assert.ok(
+      typeof manifest[name]?.diagnostic === "string" &&
+        manifest[name].diagnostic.length > 0,
+      `${name} is missing an expected rejection diagnostic`,
+    );
+  }
 });
 
 test("organization authority rejects symlinks instead of following them", async () => {
