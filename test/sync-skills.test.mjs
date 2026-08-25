@@ -16,7 +16,11 @@ const scriptPath = path.join(repoRoot, "scripts/sync-skills.sh");
 // `https://.../frostyard/<repo>.git` clone URL to a local bare fixture repo
 // (every other git subcommand passes through to the real binary), and a
 // fake `gh` records `pr list`/`pr create` invocations and answers them from
-// a fixture-controlled, no-existing-PR response.
+// a fixture-controlled, no-existing-PR response. The script clones and
+// pushes as `git -c credential.helper=<helper> <subcommand> ...`
+// (scripts/lib/skills-sync-auth.sh), so the shim locates the subcommand by
+// skipping `-c <value>` pairs rather than reading `$1`, and the push it
+// forwards lands in the same local bare repo the clone was redirected to.
 test("an up-to-date consumer performs no push or pull-request creation", async () => {
   const fixture = await createFixture();
   await seedConsumerRemote(fixture.remotesDir, "consumer", {
@@ -42,7 +46,7 @@ test("a changed managed skill follows the sync branch and pull-request path", as
   assert.match(stdout, /consumer: synced/);
   const invocations = await readLog(fixture.log);
   assert.ok(
-    invocations.some((line) => line === "git push -qf origin chore/sync-core-skills"),
+    invocations.some((line) => /^git (-c \S.* )?push -qf origin chore\/sync-core-skills$/.test(line)),
     `expected a push of chore/sync-core-skills, got: ${invocations.join("\n")}`,
   );
   assert.ok(
@@ -153,14 +157,36 @@ async function writeFakeBinaries(base) {
 set -euo pipefail
 printf 'git %s\\n' "$*" >> "\${SYNC_SKILLS_TEST_LOG}"
 real_git="\${SYNC_SKILLS_TEST_REAL_GIT}"
-if [ "\${1:-}" = "clone" ]; then
-  last=$#
-  prevlast=$((last - 1))
-  url="\${!prevlast}"
-  repo=$(printf '%s' "$url" | sed -E 's#.*/frostyard/([^/.]+)(\\.git)?$#\\1#')
-  remote="\${SYNC_SKILLS_TEST_REMOTES_DIR}/\${repo}.git"
-  args=("$@")
-  args[$((prevlast - 1))]="$remote"
+# Find the subcommand without consuming argv: the script under test runs
+# clone/push as \`git -c credential.helper=... <subcommand> ...\`, so the
+# subcommand is the first argument that is neither a flag nor a -c value.
+subcmd=""
+skip_next=0
+for arg in "$@"; do
+  if [ "$skip_next" = 1 ]; then
+    skip_next=0
+    continue
+  fi
+  case "$arg" in
+    -c) skip_next=1 ;;
+    -*) ;;
+    *) subcmd="$arg"; break ;;
+  esac
+done
+if [ "$subcmd" = "clone" ]; then
+  # Redirect the github.com URL to the local bare fixture for that repo;
+  # every other argument (flags, credential helper, destination) is kept.
+  args=()
+  for arg in "$@"; do
+    case "$arg" in
+      https://github.com/frostyard/*.git)
+        repo="\${arg#https://github.com/frostyard/}"
+        repo="\${repo%.git}"
+        args+=("\${SYNC_SKILLS_TEST_REMOTES_DIR}/\${repo}.git")
+        ;;
+      *) args+=("$arg") ;;
+    esac
+  done
   exec "$real_git" "\${args[@]}"
 fi
 exec "$real_git" "$@"
@@ -187,7 +213,41 @@ exit 1
   );
   await chmod(path.join(fakeBin, "gh"), 0o755);
 
+  // scripts/lib/skills-sync-containment.sh shells out to `rsync -a
+  // --delete`. Real CI (ubuntu-latest) and most dev machines have it; a
+  // sandbox that doesn't gets a minimal fallback covering exactly that
+  // invocation shape, so these tests stay runnable without a real rsync.
+  if (!(await hasCommand("rsync"))) {
+    await writeFile(
+      path.join(fakeBin, "rsync"),
+      `#!/usr/bin/env bash
+set -euo pipefail
+src=""
+dst=""
+for arg in "$@"; do
+  case "$arg" in
+    -*) ;;
+    *) if [ -z "$src" ]; then src="$arg"; else dst="$arg"; fi ;;
+  esac
+done
+mkdir -p "$dst"
+find "$dst" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+cp -a "\${src%/}/." "$dst"
+`,
+    );
+    await chmod(path.join(fakeBin, "rsync"), 0o755);
+  }
+
   return { fakeBin, realGit: realGit.trim() };
+}
+
+async function hasCommand(cmd) {
+  try {
+    await execFileAsync("bash", ["-c", 'command -v "$1"', "has-command", cmd]);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 async function runSync({ coreRepo, remotesDir, log, fakeBin, realGit }) {
