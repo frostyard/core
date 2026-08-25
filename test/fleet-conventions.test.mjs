@@ -57,6 +57,8 @@ test("a conformant Go repository and a conformant Node repository pass", async (
     "frostyard/noderepo/package.json": JSON.stringify({
       scripts: { verify: "npm test", check: "npm test" },
     }),
+    "frostyard/noderepo/Makefile":
+      "verify:\n\t@true\ncheck:\n\t@true\nci:\n\t@true\n",
   });
 
   const results = await checkFleetConventions(fetchImpl, root);
@@ -65,6 +67,30 @@ test("a conformant Go repository and a conformant Node repository pass", async (
     { label: "frostyard/gorepo", failures: [] },
     { label: "frostyard/noderepo", failures: [] },
   ]);
+});
+
+test("a repository with package.json but no Makefile fails naming Makefile", async () => {
+  const root = await makeRepositoriesRoot([
+    {
+      repository: { owner: "frostyard", name: "noderepo" },
+      fleet_state: "enabled",
+    },
+  ]);
+  const fetchImpl = fakeFetch({
+    "frostyard/noderepo/mise.toml": '[tools]\nnode = "22"\n',
+    "frostyard/noderepo/mise.lock": "lockfile_version = 1\n",
+    "frostyard/noderepo/package.json": JSON.stringify({
+      scripts: { verify: "npm test", check: "npm test" },
+    }),
+  });
+
+  const [result] = await checkFleetConventions(fetchImpl, root);
+
+  assert.equal(result.label, "frostyard/noderepo");
+  assert.ok(
+    result.failures.some((failure) => failure.includes("Makefile")),
+    `expected a Makefile failure, got: ${result.failures.join("; ")}`,
+  );
 });
 
 test("a repository missing mise.lock fails naming mise.lock", async () => {

@@ -39,8 +39,8 @@ PR template ──► review rubric ──► CI gates ──► corrections ─
     (`.agents/skills/frostyard-docs-site/scaffold/tests/`, aliased at
     `tests/e2e/scaffold-tests`) — `npm ci`, then `npm test` builds the real
     site (Astro + Pagefind) and asserts on the final `dist/` HTML.
-- **Gate (fleet Go repositories)** — every enabled Go repository pins its
-  tools in `mise.toml`/`mise.lock` (Go only in `go.mod`), requires them
+- **Gate (fleet repositories)** — every enabled repository pins its
+  tools in `mise.toml`/`mise.lock`, requires them
   (no "skipping"), and exposes `make verify` (non-mutating; what a
   read-only reviewer runs), `make check` (developer, may format), and
   `make ci` (ADR-0022's gate, which calls `verify`)
