@@ -44,7 +44,10 @@ PR template ──► review rubric ──► CI gates ──► corrections ─
   (no "skipping"), and exposes `make verify` (non-mutating; what a
   read-only reviewer runs), `make check` (developer, may format), and
   `make ci` (ADR-0022's gate, which calls `verify`)
-  ([ADR-0043](../adr/0043-pin-repository-tools-in-mise-and-name-the-verify-gate.md));
+  ([ADR-0043](../adr/0043-pin-repository-tools-in-mise-and-name-the-verify-gate.md)),
+  exposed as the same three `make` targets in every repository whatever
+  its language
+  ([ADR-0044](../adr/0044-expose-the-make-gate-triad-in-every-repository.md));
   the organization gate checks presence, never versions, via
   `scripts/check-fleet-conventions.mjs` (`npm run check:fleet`) and CI's
   `fleet-conventions` job.
@@ -78,7 +81,9 @@ copy it as-is.
 
 - Rationale: [ADR-0019](../adr/0019-governance-as-code-and-risk-tiers.md),
   [ADR-0021](../adr/0021-sha-pinned-actions-and-least-privilege-ci.md),
-  [ADR-0029](../adr/0029-acmm-conformance-via-canonical-aliases.md)
+  [ADR-0029](../adr/0029-acmm-conformance-via-canonical-aliases.md),
+  [ADR-0043](../adr/0043-pin-repository-tools-in-mise-and-name-the-verify-gate.md),
+  [ADR-0044](../adr/0044-expose-the-make-gate-triad-in-every-repository.md)
 - Contracts: [specs/pr-review-rubric.md](../specs/pr-review-rubric.md),
   [specs/pr-acceptance-metric.md](../specs/pr-acceptance-metric.md)
 - Built in: the 2026-08-12 ACMM conformance PR
