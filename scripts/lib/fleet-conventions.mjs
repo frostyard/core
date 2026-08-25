@@ -75,40 +75,13 @@ export async function checkRepository(fetchImpl, owner, name) {
     failures.push("mise.lock is empty");
   }
 
-  const goMod = await fetchFile(fetchImpl, owner, name, "go.mod");
-  if (goMod !== null) {
-    const makefile = await fetchFile(fetchImpl, owner, name, "Makefile");
-    if (makefile === null) {
-      failures.push("Makefile missing");
-    } else {
-      for (const target of ["verify", "check", "ci"]) {
-        if (!hasMakeTarget(makefile, target)) {
-          failures.push(`Makefile missing ${target}: target`);
-        }
-      }
-    }
+  const makefile = await fetchFile(fetchImpl, owner, name, "Makefile");
+  if (makefile === null) {
+    failures.push("Makefile missing");
   } else {
-    const packageJson = await fetchFile(
-      fetchImpl,
-      owner,
-      name,
-      "package.json",
-    );
-    if (packageJson === null) {
-      failures.push("neither go.mod nor package.json found");
-    } else {
-      let parsed;
-      try {
-        parsed = JSON.parse(packageJson);
-      } catch (error) {
-        parsed = {};
-        failures.push(`package.json is not valid JSON: ${error.message}`);
-      }
-      if (!parsed.scripts?.verify) {
-        failures.push("package.json scripts.verify missing");
-      }
-      if (!parsed.scripts?.check) {
-        failures.push("package.json scripts.check missing");
+    for (const target of ["verify", "check", "ci"]) {
+      if (!hasMakeTarget(makefile, target)) {
+        failures.push(`Makefile missing ${target}: target`);
       }
     }
   }
