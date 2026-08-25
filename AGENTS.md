@@ -94,9 +94,12 @@ removed. -->
   non-mutating gate a read-only reviewer can run (`check:docs`,
   `check:organization`, `test` — nothing formats or writes); `npm run check`
   is the same gate today and is what CI calls, since this repository has
-  nothing beyond `verify` for a developer gate to add.
+  nothing beyond `verify` for a developer gate to add. `make verify` / `make
+  check` / `make ci` are the entry points CI, workers, reviewers, and the
+  organization gate invoke ([ADR-0044](docs/adr/0044-expose-the-make-gate-triad-in-every-repository.md));
+  each wraps its like-named npm script.
 - CI gate: [.github/workflows/ci.yml](.github/workflows/ci.yml) runs `npm ci &&
-  npm run check` at the root (strict organization authority via
+  make ci` at the root (strict organization authority via
   `scripts/check-organization.mjs`; every doc indexed, every relative link
   resolving, every symlink intact via `scripts/check-docs.mjs`; thresholds in
   `.coverage-thresholds.json`, `never_relax`) and the docs-site scaffold

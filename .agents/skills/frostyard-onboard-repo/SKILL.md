@@ -43,7 +43,9 @@ own those).
    - The four canonical surfaces at the default-branch head: `AGENTS.md`,
      `policies/agent-governance.json`, `.agents/skills/` (**a real git tree
      — the enrollment probe reads the tree API, where a symlink is a blob,
-     and refuses it**), `docs/README.md`. Missing docs shape or aliases →
+     and refuses it**), `docs/README.md`; plus a root `Makefile` with
+     `verify`, `check`, and `ci` targets (ADR-0044) — for a Node repository,
+     targets that wrap its npm scripts. Missing docs shape or aliases →
      run the `frostyard-repo-docs` / `frostyard-acmm-conformance` /
      `frostyard-go-repo` skills first, as their own pull requests.
    - Every CI workflow that triggers on `pull_request` also triggers on
