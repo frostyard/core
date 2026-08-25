@@ -20,11 +20,14 @@ const SURFACE_CONTRACT_PATH =
   "organization/contracts/repository-surfaces/v1.json";
 const SETTINGS_CONTRACT_PATH =
   "organization/contracts/repository-settings/v1.json";
+const EXPECTED_REJECTIONS_PATH =
+  "organization/fixtures/v1/invalid/expected-rejections.json";
 const STATIC_FILES = new Set([
   "organization/README.md",
   ...Object.values(SCHEMA_PATHS),
   SURFACE_CONTRACT_PATH,
   SETTINGS_CONTRACT_PATH,
+  EXPECTED_REJECTIONS_PATH,
 ]);
 const REPOSITORY_PATH =
   /^organization\/repositories\/([^/]+)\/([^/]+)\.json$/;
@@ -251,6 +254,30 @@ export function assertGovernanceInvariants(data, relativePath) {
       );
     }
     ids.add(boundary.id);
+  }
+}
+
+export function assertExpectedRejection(error, expectation, relativePath) {
+  if (
+    !expectation ||
+    typeof expectation.diagnostic !== "string" ||
+    expectation.diagnostic.length === 0
+  ) {
+    throw new OrganizationValidationError(
+      `${relativePath}: invalid fixture has no expected rejection diagnostic`,
+    );
+  }
+  const haystack = [error.message, ...(error.details ?? [])].join("\n");
+  if (!haystack.includes(expectation.diagnostic)) {
+    throw new OrganizationValidationError(
+      `${relativePath}: rejected for a different diagnostic than its expected ` +
+        `${JSON.stringify(expectation.constraint ?? relativePath)} constraint`,
+      [
+        `expected diagnostic to include: ${expectation.diagnostic}`,
+        `actual: ${error.message}`,
+        ...(error.details ?? []),
+      ],
+    );
   }
 }
 
@@ -673,6 +700,33 @@ export async function validateOrganization(repoRoot) {
     fixtureVerificationProfiles.set(verificationProfileKey(data.profile), data);
   }
 
+  const invalidFixturePaths = relativePaths.filter(
+    (item) => FIXTURE_PATH.exec(item)?.[1] === "invalid",
+  );
+  const expectedRejections = await readStrictJson(
+    path.join(repoRoot, EXPECTED_REJECTIONS_PATH),
+    EXPECTED_REJECTIONS_PATH,
+  );
+  const invalidFixtureNames = new Set(
+    invalidFixturePaths.map((item) => path.basename(item)),
+  );
+  const expectedRejectionNames = new Set(Object.keys(expectedRejections));
+  const missingExpectations = [...invalidFixtureNames].filter(
+    (name) => !expectedRejectionNames.has(name),
+  );
+  const staleExpectations = [...expectedRejectionNames].filter(
+    (name) => !invalidFixtureNames.has(name),
+  );
+  if (missingExpectations.length > 0 || staleExpectations.length > 0) {
+    throw new OrganizationValidationError(
+      `${EXPECTED_REJECTIONS_PATH}: expected rejection diagnostics do not match the invalid fixture corpus`,
+      [
+        ...missingExpectations.map((name) => `missing expectation for ${name}`),
+        ...staleExpectations.map((name) => `stale expectation for ${name}`),
+      ],
+    );
+  }
+
   let validFixtureCount = 0;
   let invalidFixtureCount = 0;
   let validVerificationProfileFixtureCount = 0;
@@ -721,6 +775,11 @@ export async function validateOrganization(repoRoot) {
       );
     } catch (error) {
       if (!(error instanceof OrganizationValidationError)) throw error;
+      assertExpectedRejection(
+        error,
+        expectedRejections[path.basename(relativePath)],
+        relativePath,
+      );
       invalidFixtureCount += 1;
       if (fixture.kind === "verificationProfile") {
         invalidVerificationProfileFixtureCount += 1;
