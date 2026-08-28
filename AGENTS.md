@@ -114,6 +114,16 @@ removed. -->
   default branch over the network for `mise.toml`, `mise.lock`, and its
   verify gate ([ADR-0043](docs/adr/0043-pin-repository-tools-in-mise-and-name-the-verify-gate.md)) —
   presence only, run as CI's `fleet-conventions` job, not part of `check`/`verify`.
+- Declare every GitHub Actions secret's expiry in
+  [.github/secrets-expiry.json](.github/secrets-expiry.json) — metadata only,
+  closed schema, `warn_days_before` at least 30 and `never_relax` true
+  ([ADR-0045](docs/adr/0045-guard-actions-secret-expiry-in-the-repository.md)).
+  `npm run check:secret-expiry` fails once a secret is inside its rotation
+  window or past its expiry; `.github/workflows/secrets-expiry.yml` runs it
+  daily. It is deliberately outside `verify`/`check` so a pending rotation
+  never blocks unrelated PRs. Never read, print, or fingerprint the secret
+  itself; rotate it in repository settings and update `expires_on` in the same
+  PR.
 - Conformance alias symlinks are listed in
   [ADR-0029](docs/adr/0029-acmm-conformance-via-canonical-aliases.md) —
   edit their canonical targets, never the aliases.
