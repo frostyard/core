@@ -57,6 +57,7 @@ Docs are split by the question they answer:
 - [0042 — Adopt a merge queue on the default branch](adr/0042-adopt-a-merge-queue-on-the-default-branch.md)
 - [0043 — Pin repository tools in mise and name the verify gate](adr/0043-pin-repository-tools-in-mise-and-name-the-verify-gate.md)
 - [0044 — Expose the make gate triad in every repository](adr/0044-expose-the-make-gate-triad-in-every-repository.md)
+- [0045 — Guard Actions-secret expiry with a committed record](adr/0045-guard-actions-secret-expiry-in-the-repository.md)
 
 ### Design
 

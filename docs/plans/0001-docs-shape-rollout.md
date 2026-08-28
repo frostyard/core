@@ -84,9 +84,13 @@ updex is the completed reference (updex#256, #257 merged).
 
 ## Open questions
 
-- **Where does the ORG_PAT contract live?** Resolve with core#15 — likely a
-  core design doc; record as an ADR only if the token model itself changes.
-  By Phase 1.
+- ~~**Where does the ORG_PAT contract live?**~~ Resolved. The permissions and
+  rotation contract lives in
+  [Skills sync operations](../design/skills-sync-operations.md); the expiry
+  date itself is machine-readable in `.github/secrets-expiry.json` and
+  enforced on a schedule by
+  [ADR-0045](../adr/0045-guard-actions-secret-expiry-in-the-repository.md),
+  which supersedes closed core#15 as the tracking mechanism.
 
 ## References
 
@@ -94,5 +98,6 @@ updex is the completed reference (updex#256, #257 merged).
   [ADR-0026](../adr/0026-distribute-core-skills-via-sync-prs.md); tracks
   [ADR-0021](../adr/0021-sha-pinned-actions-and-least-privilege-ci.md)
   adoption (Phase 4).
+- Resolved open question: [ADR-0045](../adr/0045-guard-actions-secret-expiry-in-the-repository.md).
 - Operates:
   [Skills sync operations](../design/skills-sync-operations.md)

@@ -94,11 +94,33 @@ The workflow maps the core Actions secret `ORG_PAT` to the script's required
 - **Metadata: Read**, implied by GitHub.
 
 The workflow grants no permissions to its `GITHUB_TOKEN` and checkout does not
-persist credentials. The current `ORG_PAT` expires on 2027-08-11; rotation and
-expiry follow-up is tracked in
-[core#15](https://github.com/frostyard/core/issues/15). After replacing the
-secret, manually dispatch the workflow. An unchanged run proves clone access;
-the next changed sync also exercises push and pull-request access.
+persist credentials.
+
+### Expiry and rotation
+
+`ORG_PAT`'s expiry is declared in
+[`.github/secrets-expiry.json`](../../.github/secrets-expiry.json), the
+canonical record ([ADR-0045](../adr/0045-guard-actions-secret-expiry-in-the-repository.md)).
+That file — not this document, and not the closed
+[core#15](https://github.com/frostyard/core/issues/15) — is the one place the
+date lives: it currently declares `2027-08-11` with a 60-day
+`warn_days_before` lead time. The record is metadata only; its schema is
+closed and holds no token value.
+
+[`scripts/check-secret-expiry.mjs`](../../scripts/check-secret-expiry.mjs)
+enforces it. `.github/workflows/secrets-expiry.yml` runs the guard daily and
+on dispatch, and the job fails — naming the secret, the date, and this
+runbook — once the token is within its lead window or past its expiry. The
+guard reads no secret, and it is deliberately not part of `make verify` /
+`make ci`, so an approaching rotation never blocks unrelated pull requests.
+Run it locally with `npm run check:secret-expiry`.
+
+To rotate: create the replacement token with the permissions listed above,
+replace the `ORG_PAT` repository secret, and update `expires_on` in the record
+in the same pull request — the guard keeps failing until the record matches
+the live token. After replacing the secret, manually dispatch the sync
+workflow. An unchanged run proves clone access; the next changed sync also
+exercises push and pull-request access.
 
 ### Lifecycle changes
 
@@ -125,6 +147,7 @@ error that exits immediately.
 | Signal | Recovery |
 | --- | --- |
 | `GH_TOKEN (ORG_PAT) is not configured` | Restore or rotate the core `ORG_PAT` Actions secret, then dispatch the workflow. |
+| `Secrets expiry` workflow fails for `ORG_PAT` | The declared expiry is inside its lead window or past. Rotate the token and update `expires_on` in [`.github/secrets-expiry.json`](../../.github/secrets-expiry.json) ([ADR-0045](../adr/0045-guard-actions-secret-expiry-in-the-repository.md)). |
 | `Resource not accessible by personal access token` | Check token expiry, consumer repository access, and Contents/Pull requests permissions; update the secret and dispatch. |
 | `clone failed for frostyard/<repo>` | Confirm the slug still exists and the token can read it; correct config or access, then dispatch. |
 | `skills-sync.json names unknown skill` | Correct the skill name or restore its core directory, then dispatch. Repositories after the failure were not attempted. |
@@ -139,12 +162,16 @@ error that exits immediately.
 - Rationale:
   [ADR-0026](../adr/0026-distribute-core-skills-via-sync-prs.md),
   [ADR-0019](../adr/0019-governance-as-code-and-risk-tiers.md),
-  [ADR-0021](../adr/0021-sha-pinned-actions-and-least-privilege-ci.md)
+  [ADR-0021](../adr/0021-sha-pinned-actions-and-least-privilege-ci.md),
+  [ADR-0045](../adr/0045-guard-actions-secret-expiry-in-the-repository.md)
 - Contributor guide: [Shared skills](shared-skills.md)
 - Executable contracts:
   [skills-sync.json](../../.github/skills-sync.json),
   [sync-skills.yml](../../.github/workflows/sync-skills.yml),
-  [sync-skills.sh](../../scripts/sync-skills.sh)
+  [sync-skills.sh](../../scripts/sync-skills.sh),
+  [secrets-expiry.json](../../.github/secrets-expiry.json),
+  [secrets-expiry.yml](../../.github/workflows/secrets-expiry.yml),
+  [check-secret-expiry.mjs](../../scripts/check-secret-expiry.mjs)
 - Built in:
   [Plan 0001, Phases 1-2](../plans/0001-docs-shape-rollout.md) and
   [Plan 0003](../plans/0003-onboard-firn-to-skills-sync.md)
