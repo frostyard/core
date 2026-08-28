@@ -56,34 +56,58 @@ method=""
 endpoint=""
 jq_filter=""
 has_input=0
+implies_post=0
+fields=""
 awaiting=""
 for arg in "$@"; do
   if [ -n "$awaiting" ]; then
     case "$awaiting" in
       -X) method="$arg" ;;
       --jq) jq_filter="$arg" ;;
-      --input) has_input=1 ;;
+      --input) has_input=1; implies_post=1 ;;
+      -f) implies_post=1; fields="$fields $arg" ;;
     esac
     awaiting=""
     continue
   fi
   case "$arg" in
-    -X|--jq|-f|-F|-H|--input) awaiting="$arg" ;;
+    -X|--method) awaiting=-X ;;
+    --jq) awaiting=--jq ;;
+    --input) awaiting=--input ;;
+    -f|--raw-field|-F|--field) awaiting=-f ;;
+    -H|--header) awaiting=-H ;;
     -*) ;;
     *) if [ -z "$endpoint" ]; then endpoint="$arg"; fi ;;
   esac
 done
 
-# Anything with an explicit non-GET verb mutates GitHub. Record it; never
-# answer it from a fixture, so a test can assert what would have been sent.
-if [ -n "$method" ] && [ "$method" != GET ]; then
+# Derive the method real gh api would use, not just the one spelled out:
+# an explicit -X/--method wins, otherwise a request body (--input, -f/-F and
+# their long forms) makes it a POST, otherwise it is a GET. Deriving it is the
+# point — a dry-run regression that mutates through an implicit POST must be
+# observed here, not answered from a fixture.
+effective_method="$method"
+if [ -z "$effective_method" ]; then
+  if [ "$implies_post" = 1 ]; then
+    effective_method=POST
+  else
+    effective_method=GET
+  fi
+fi
+
+# Every effective non-GET call mutates GitHub. Record it; never answer it from
+# a fixture, so a test can assert exactly what would have been sent.
+if [ "$effective_method" != GET ]; then
   body=""
   if [ "$has_input" = 1 ]; then
     # One record per call: the script sends pretty-printed JSON on stdin.
     body="$(cat)"
     body="$(printf '%s' "$body" | jq -c . 2>/dev/null || printf '%s' "$body" | tr '\\n' ' ')"
+  elif [ -n "$fields" ]; then
+    # No stdin body: record the field arguments that made this a POST.
+    body="$(printf '%s' "$fields" | sed 's/^ //' | tr '\\n' ' ')"
   fi
-  printf '%s\\t%s\\t%s\\n' "$method" "$endpoint" "$body" >> "$APPLY_TEST_MUTATIONS"
+  printf '%s\\t%s\\t%s\\n' "$effective_method" "$endpoint" "$body" >> "$APPLY_TEST_MUTATIONS"
   exit 0
 fi
 
@@ -220,6 +244,51 @@ test(
       assert.doesNotMatch(calls, /-X (PATCH|PUT|POST|DELETE)/, calls);
       assert.equal(await readFile(fixture.mutationsLog, "utf8"), "");
     }
+  },
+);
+
+// The dry-run assertions above are only as strong as the harness's notion of
+// "mutating". Real `gh api` sends POST whenever a request body is supplied, so
+// a regression could mutate GitHub without ever spelling `-X`. Pin that the
+// fake gh derives the effective method the same way.
+test(
+  "the fake gh records a body-bearing call with no -X as a POST mutation",
+  { skip },
+  async () => {
+    const fixture = await setupFixture(conformantRepository());
+
+    await execFileAsync(
+      "bash",
+      [
+        "-c",
+        `printf '%s' '{"${DRIFT_KEY}":${DRIFT_WANT}}' | gh api "repos/$APPLY_TEST_REPO" --input -`,
+      ],
+      { env: fixture.env },
+    );
+    await execFileAsync(
+      "bash",
+      ["-c", `gh api "repos/$APPLY_TEST_REPO/labels" -f name=queued`],
+      { env: fixture.env },
+    );
+
+    const mutations = (await readFile(fixture.mutationsLog, "utf8"))
+      .split("\n")
+      .filter(Boolean)
+      .map((line) => line.split("\t"));
+    assert.equal(
+      mutations.length,
+      2,
+      `expected both implicit POSTs to be recorded, got:\n${mutations.join("\n")}`,
+    );
+
+    const [input, field] = mutations;
+    assert.equal(input[0], "POST");
+    assert.equal(input[1], `repos/${REPO}`);
+    assert.deepEqual(JSON.parse(input[2]), { [DRIFT_KEY]: DRIFT_WANT });
+
+    assert.equal(field[0], "POST");
+    assert.equal(field[1], `repos/${REPO}/labels`);
+    assert.equal(field[2], "name=queued");
   },
 );
 
