@@ -60,6 +60,28 @@ const normalizeFragment = (fragment) => {
     return fragment.toLowerCase();
   }
 };
+// CommonMark fenced code blocks, backtick and tilde alike: up to three leading
+// spaces, three or more fence characters, closed by at least as many of the
+// same character (or by the end of the document). Fenced lines are blanked
+// rather than removed so surviving line anchors stay intact.
+function stripFences(text) {
+  const lines = text.split("\n");
+  let open = null;
+  return lines
+    .map((line) => {
+      if (open === null) {
+        const start = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line);
+        // A backtick fence's info string may not itself contain a backtick.
+        if (!start || (start[1][0] === "`" && start[2].includes("`"))) return line;
+        open = { char: start[1][0], length: start[1].length };
+        return "";
+      }
+      const end = /^ {0,3}(`{3,}|~{3,})[ \t]*$/.exec(line);
+      if (end && end[1][0] === open.char && end[1].length >= open.length) open = null;
+      return "";
+    })
+    .join("\n");
+}
 const anchorCache = new Map();
 function anchorsOf(path) {
   const cached = anchorCache.get(path);
@@ -68,7 +90,7 @@ function anchorsOf(path) {
   anchorCache.set(path, anchors);
   let body;
   try {
-    body = readFileSync(path, "utf8").replace(/```[\s\S]*?```/g, "");
+    body = stripFences(readFileSync(path, "utf8"));
   } catch {
     return anchors; // unreadable target; the path check already reported it
   }

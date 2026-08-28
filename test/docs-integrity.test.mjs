@@ -184,6 +184,48 @@ test("docs gate still reports an unresolvable path before looking at its fragmen
   );
 });
 
+test("docs gate rejects a link to a heading that only appears inside a tilde fence", async () => {
+  const root = await createFixture();
+  await writeFile(
+    path.join(root, "docs/adr/example.md"),
+    "# Example\n\n~~~markdown\n## Fenced only heading\n~~~\n",
+  );
+  await writeFile(
+    path.join(root, "docs/README.md"),
+    "[Metric](specs/pr-acceptance-metric.md)\n" +
+      "[Example](adr/example.md)\n" +
+      "[Fenced](adr/example.md#fenced-only-heading)\n",
+  );
+
+  await assert.rejects(
+    runDocsGate(root),
+    (error) =>
+      error.stderr.includes(
+        "link: docs/README.md -> adr/example.md#fenced-only-heading" +
+          " has no matching section anchor in docs/adr/example.md",
+      ),
+  );
+});
+
+test("docs gate still counts real headings around backtick and tilde fences", async () => {
+  const root = await createFixture();
+  await writeFile(
+    path.join(root, "docs/adr/example.md"),
+    "# Example\n\n~~~markdown\n## Fenced only heading\n```\n~~~\n\n" +
+      "## Real heading\n\n```markdown\n## Also fenced\n```\n\n## Later heading\n",
+  );
+  await writeFile(
+    path.join(root, "docs/README.md"),
+    "[Metric](specs/pr-acceptance-metric.md)\n" +
+      "[Example](adr/example.md)\n" +
+      "[Real](adr/example.md#real-heading)\n" +
+      "[Later](adr/example.md#later-heading)\n",
+  );
+
+  const { stdout } = await runDocsGate(root);
+  assert.match(stdout, /ok   link_integrity: 1\.000/);
+});
+
 async function createFixture() {
   const root = await mkdtemp(path.join(os.tmpdir(), "core-docs-gate-"));
   for (const dir of [
