@@ -41,7 +41,51 @@ for (const cat of categories) {
   }
 }
 
-// ---- 2. Link integrity: relative md links resolve. ----
+// ---- 2. Link integrity: relative md links resolve, fragments included. ----
+// GitHub-style heading slugs, so a link may only name a section that exists.
+const slugify = (heading) =>
+  heading
+    .replace(/`([^`]*)`/g, "$1")
+    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/<[^>]*>/g, "")
+    .replace(/[*_~]/g, "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s_-]/gu, "")
+    .replace(/\s/g, "-");
+const normalizeFragment = (fragment) => {
+  try {
+    return decodeURIComponent(fragment).toLowerCase();
+  } catch {
+    return fragment.toLowerCase();
+  }
+};
+const anchorCache = new Map();
+function anchorsOf(path) {
+  const cached = anchorCache.get(path);
+  if (cached) return cached;
+  const anchors = new Set();
+  anchorCache.set(path, anchors);
+  let body;
+  try {
+    body = readFileSync(path, "utf8").replace(/```[\s\S]*?```/g, "");
+  } catch {
+    return anchors; // unreadable target; the path check already reported it
+  }
+  const used = new Map();
+  for (const m of body.matchAll(/^ {0,3}#{1,6}[ \t]+(.+?)[ \t]*#*[ \t]*$/gm)) {
+    const slug = slugify(m[1]);
+    if (!slug) continue;
+    const seen = used.get(slug) ?? 0;
+    used.set(slug, seen + 1);
+    anchors.add(seen === 0 ? slug : `${slug}-${seen}`);
+  }
+  // Explicit HTML anchors: <a id="x">, <a name="x">, or id="x" on any tag.
+  for (const m of body.matchAll(/<[^>]*\s(?:id|name)=["']([^"']+)["']/g)) {
+    anchors.add(m[1].toLowerCase());
+  }
+  return anchors;
+}
 const mdFiles = [join(root, "AGENTS.md"), join(root, "README.md"), join(root, "docs/README.md")];
 for (const cat of categories) {
   for (const name of readdirSync(join(root, "docs", cat))) {
@@ -67,19 +111,31 @@ for (const file of mdFiles) {
     const target = m[1];
     if (
       /^[a-z][a-z+.-]*:/i.test(target) ||
-      target.startsWith("#") ||
       (isSkillDoc && target.startsWith("/"))
-    ) continue; // external, anchor, or site-root path
+    ) continue; // external or site-root path
+    const hash = target.indexOf("#");
+    const targetPath = hash === -1 ? target : target.slice(0, hash);
+    const fragment = hash === -1 ? "" : normalizeFragment(target.slice(hash + 1));
+    if (targetPath === "") {
+      if (fragment === "") continue; // a bare "#" links nowhere in particular
+      linksTotal++;
+      if (anchorsOf(file).has(fragment)) linksOk++;
+      else failures.push(`link: ${relative(root, file)} -> ${target} has no matching section anchor in ${relative(root, file)}`);
+      continue;
+    }
     linksTotal++;
-    const path = resolve(dirname(file), target.split("#")[0]);
+    const path = resolve(dirname(file), targetPath);
     if (
       isSkillDoc &&
       path !== skillsRoot &&
       !path.startsWith(skillsRoot + sep)
     ) {
       failures.push(`link: ${relative(root, file)} -> ${target} escapes .agents/skills`);
-    } else if (existsSync(path)) linksOk++;
-    else failures.push(`link: ${relative(root, file)} -> ${target} does not resolve`);
+    } else if (!existsSync(path)) {
+      failures.push(`link: ${relative(root, file)} -> ${target} does not resolve`);
+    } else if (fragment !== "" && path.endsWith(".md") && !anchorsOf(path).has(fragment)) {
+      failures.push(`link: ${relative(root, file)} -> ${target} has no matching section anchor in ${relative(root, path)}`);
+    } else linksOk++;
   }
 }
 

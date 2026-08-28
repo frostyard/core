@@ -101,6 +101,89 @@ test("docs gate accepts index coverage from an actual relative markdown link", a
   assert.match(stdout, /ok   docs_index_coverage: 1\.000/);
 });
 
+test("docs gate accepts valid same-document and cross-document section anchors", async () => {
+  const root = await createFixture();
+  await writeFile(
+    path.join(root, "docs/adr/example.md"),
+    "# Example\n\n## Phase 4 — Supply-chain cleanup\n\n[back to the top](#example)\n",
+  );
+  await writeFile(
+    path.join(root, "docs/README.md"),
+    "[Metric](specs/pr-acceptance-metric.md)\n" +
+      "[Example](adr/example.md)\n" +
+      "[Phase 4](adr/example.md#phase-4--supply-chain-cleanup)\n",
+  );
+
+  const { stdout } = await runDocsGate(root);
+  assert.match(stdout, /ok   link_integrity: 1\.000/);
+  assert.match(stdout, /ok   docs_index_coverage: 1\.000/);
+});
+
+test("docs gate rejects a same-document link to a nonexistent section anchor", async () => {
+  const root = await createFixture();
+  await writeFile(
+    path.join(root, "docs/adr/example.md"),
+    "# Example\n\n[missing section](#no-such-heading)\n",
+  );
+  await writeFile(
+    path.join(root, "docs/README.md"),
+    "[Metric](specs/pr-acceptance-metric.md)\n[Example](adr/example.md)\n",
+  );
+
+  await assert.rejects(
+    runDocsGate(root),
+    (error) =>
+      error.stderr.includes(
+        "link: docs/adr/example.md -> #no-such-heading" +
+          " has no matching section anchor in docs/adr/example.md",
+      ),
+  );
+});
+
+test("docs gate rejects a cross-document link to a nonexistent section anchor", async () => {
+  const root = await createFixture();
+  await writeFile(path.join(root, "docs/adr/example.md"), "# Example\n");
+  await writeFile(
+    path.join(root, "docs/design/uses-example.md"),
+    "# Uses example\n\n[phase](../adr/example.md#no-such-heading)\n",
+  );
+  await writeFile(
+    path.join(root, "docs/README.md"),
+    "[Metric](specs/pr-acceptance-metric.md)\n" +
+      "[Example](adr/example.md)\n" +
+      "[Uses](design/uses-example.md)\n",
+  );
+
+  await assert.rejects(
+    runDocsGate(root),
+    (error) =>
+      error.stderr.includes(
+        "link: docs/design/uses-example.md -> ../adr/example.md#no-such-heading" +
+          " has no matching section anchor in docs/adr/example.md",
+      ),
+  );
+});
+
+test("docs gate still reports an unresolvable path before looking at its fragment", async () => {
+  const root = await createFixture();
+  await writeFile(
+    path.join(root, "docs/adr/example.md"),
+    "# Example\n\n[gone](../design/missing.md#anything)\n",
+  );
+  await writeFile(
+    path.join(root, "docs/README.md"),
+    "[Metric](specs/pr-acceptance-metric.md)\n[Example](adr/example.md)\n",
+  );
+
+  await assert.rejects(
+    runDocsGate(root),
+    (error) =>
+      error.stderr.includes(
+        "link: docs/adr/example.md -> ../design/missing.md#anything does not resolve",
+      ),
+  );
+});
+
 async function createFixture() {
   const root = await mkdtemp(path.join(os.tmpdir(), "core-docs-gate-"));
   for (const dir of [
