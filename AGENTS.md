@@ -89,7 +89,7 @@ valuable ones: every choice an agent doesn't have to make is a failure mode
 removed. -->
 
 - Tools are pinned in [mise.toml](mise.toml)/[mise.lock](mise.lock)
-  (ADR-0043): `mise install` provisions the same Node release Snowcat
+  (ADR-0043): `mise install` provisions the same Node and jq releases Snowcat
   workers, CI, and developers run. `npm run verify` is the credential-free,
   non-mutating gate a read-only reviewer can run (`check:docs`,
   `check:organization`, `test` — nothing formats or writes); `npm run check`

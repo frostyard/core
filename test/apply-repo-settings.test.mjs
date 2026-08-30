@@ -147,14 +147,8 @@ else
 fi
 `;
 
-const hasJq = await commandExists("jq");
-const skip = hasJq
-  ? false
-  : "jq is required by scripts/apply-repo-settings.sh and is not on PATH";
-
 test(
   "the default invocation plans a drifted setting and issues no mutating call",
-  { skip },
   async () => {
     const fixture = await setupFixture(driftedRepository());
 
@@ -192,7 +186,7 @@ test(
   },
 );
 
-test("--apply issues exactly the expected mutation", { skip }, async () => {
+test("--apply issues exactly the expected mutation", async () => {
   const fixture = await setupFixture(driftedRepository());
 
   const { stdout } = await run(fixture, [...BASE_ARGS, "--apply"]);
@@ -224,7 +218,6 @@ test("--apply issues exactly the expected mutation", { skip }, async () => {
 
 test(
   "an already-conformant repository is idempotent in both modes",
-  { skip },
   async () => {
     for (const args of [BASE_ARGS, [...BASE_ARGS, "--apply"]]) {
       const fixture = await setupFixture(conformantRepository());
@@ -253,7 +246,6 @@ test(
 // fake gh derives the effective method the same way.
 test(
   "the fake gh records a body-bearing call with no -X as a POST mutation",
-  { skip },
   async () => {
     const fixture = await setupFixture(conformantRepository());
 
@@ -387,13 +379,4 @@ function run({ env }, args) {
       }
     });
   });
-}
-
-async function commandExists(command) {
-  try {
-    await execFileAsync("command", ["-v", command], { shell: "/bin/bash" });
-    return true;
-  } catch {
-    return false;
-  }
 }

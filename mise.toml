@@ -2,4 +2,5 @@
 lockfile = true
 
 [tools]
+jq = "1"
 node = "22"
