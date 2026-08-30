@@ -68,8 +68,8 @@ PR branch.
    category's `TEMPLATE.md`, add them to `docs/README.md`, and maintain the
    required cross-links. Update skills, templates, and assets at their
    canonical paths.
-3. Run `npm ci && npm run check` at the root. When changing the docs-site
-   scaffold, also run `npm ci && npm test` from
+3. Run `mise install && npm ci && npm run check` at the root. When changing
+   the docs-site scaffold, also run `npm ci && npm test` from
    `.agents/skills/frostyard-docs-site/scaffold/`.
 4. Open a PR from the branch, declare its risk tier, and complete the
    applicable housekeeping items in the PR template. Core squash-merges PRs;
