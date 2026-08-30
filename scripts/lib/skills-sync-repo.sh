@@ -16,6 +16,13 @@ source "${SKILLS_SYNC_REPO_LIB_DIR}/skills-sync-containment.sh"
 # argument), mirrors the named skills into it via skills_sync_sync_repo,
 # and opens or updates its sync PR when the mirrored tree changed.
 #
+# The credential reaches only the four subprocesses that authenticate to
+# GitHub — the clone, the push, and the two gh pull-request calls — each
+# wrapped in skills_sync_authenticated. Everything else this function runs
+# (mktemp, realpath, the mkdir/rsync/printf sync copy path, and the local
+# git add/diff/checkout/commit against the clone) executes with no
+# GH_TOKEN in its environment at all.
+#
 # The mktemp clone is removed before this function returns on every exit
 # path — clone failure, an unknown skill, containment failure, no change,
 # a git/gh failure, and success — via a RETURN trap bound to this
@@ -32,10 +39,16 @@ skills_sync_run_repo() {
   dir=$(mktemp -d)
   trap "rm -rf '${dir}'" RETURN
 
+  # Take the org-wide credential out of the exported environment before the
+  # first subprocess runs. A caller that already captured it (the
+  # scripts/sync-skills.sh entry point) makes this a no-op; a caller that
+  # hands the function an exported GH_TOKEN gets the same containment.
+  skills_sync_capture_token
+
   local cred_helper
   cred_helper=$(skills_sync_credential_helper)
 
-  if ! git -c credential.helper="$cred_helper" clone --quiet --depth 1 \
+  if ! skills_sync_authenticated git -c credential.helper="$cred_helper" clone --quiet --depth 1 \
       "https://github.com/frostyard/${repo}.git" "$dir"; then
     echo "::error::clone failed for frostyard/${repo}" >&2
     return 1
@@ -78,15 +91,15 @@ skills_sync_run_repo() {
     git checkout -q -B "$branch"
     git -c user.name="$git_name" -c user.email="$git_email" \
       commit -q -m "chore: sync agent skills from frostyard/core@${src_sha}"
-    git -c credential.helper="$cred_helper" push -qf origin "$branch"
+    skills_sync_authenticated git -c credential.helper="$cred_helper" push -qf origin "$branch"
     # Check-then-create, with no fallback masking: a create failure (e.g.
     # token missing pull-requests:write) must fail the run loudly.
-    existing=$(gh pr list --repo "frostyard/${repo}" --head "$branch" --state open \
-      --json number --jq '.[].number')
+    existing=$(skills_sync_authenticated gh pr list --repo "frostyard/${repo}" \
+      --head "$branch" --state open --json number --jq '.[].number')
     if [ -n "$existing" ]; then
       echo "== ${repo}: PR #${existing} already open — branch force-updated"
     else
-      gh pr create --repo "frostyard/${repo}" --head "$branch" \
+      skills_sync_authenticated gh pr create --repo "frostyard/${repo}" --head "$branch" \
         --title "chore: sync agent skills from frostyard/core" \
         --body "$(printf 'Automated skill sync from [frostyard/core](https://github.com/frostyard/core) @ %s per [ADR-0026](https://github.com/frostyard/core/blob/main/docs/adr/0026-distribute-core-skills-via-sync-prs.md).\n\nSynced skills: %s\n\nThese directories are managed in core — edit them there, not here. Local edits are overwritten by the next sync.\n\nRisk tier: 1 — documentation/skills only, no code or workflow changes.' "$src_sha" "${skills[*]}")"
     fi

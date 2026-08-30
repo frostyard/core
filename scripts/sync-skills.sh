@@ -16,12 +16,18 @@ BRANCH=chore/sync-core-skills
 GIT_NAME="frostyard-core[bot]"
 GIT_EMAIL="core@frostyard.invalid"
 
-: "${GH_TOKEN:?GH_TOKEN (ORG_PAT) is not configured}"
-export GH_TOKEN
-
 SELF_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # shellcheck source=lib/skills-sync-repo.sh
 source "${SELF_DIR}/lib/skills-sync-repo.sh"
+
+# Least privilege: the workflow hands us the org-wide ORG_PAT exported as
+# GH_TOKEN, which every descendant would otherwise inherit. Capture it into
+# a private shell variable and unset it here, before the first subprocess
+# runs, so the jq calls below and the mktemp/realpath/mkdir/rsync/printf
+# work inside the sync see no credential. skills_sync_authenticated
+# re-supplies it to the git clone/push and gh calls that authenticate.
+# Fails closed when GH_TOKEN is not configured.
+skills_sync_capture_token
 
 fail=0
 for repo in $(jq -r '.repos | keys[]' "$CONFIG"); do
