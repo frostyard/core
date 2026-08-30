@@ -131,6 +131,15 @@ token_probe realpath
 exec real-realpath "$@"
 `;
 
+function probedPassthroughStub(label, target) {
+  return `#!/usr/bin/env bash
+set -euo pipefail
+${TOKEN_PROBE}
+token_probe ${label}
+exec ${target} "$@"
+`;
+}
+
 test("removes the clone directory and never leaks the token on a successful sync", async () => {
   const { env, log, coreRoot } = await setupFixture();
 
@@ -163,7 +172,7 @@ test("supplies GH_TOKEN only to the subprocesses that authenticate to GitHub", a
 
   // Assert positively on the local work too, so a future refactor that
   // simply stopped running these commands could not silently pass above.
-  for (const label of ["git add", "git diff", "git checkout", "git commit", "rsync", "realpath"]) {
+  for (const label of ["git add", "git diff", "git checkout", "git commit", "mktemp", "rsync", "realpath"]) {
     assert.deepEqual(
       probes.filter(([name]) => name === label).map(([, state]) => state).at(0),
       "absent",
@@ -251,6 +260,13 @@ async function setupFixture() {
   await writeFile(path.join(binDir, "realpath"), REALPATH_STUB);
   await chmod(path.join(binDir, "realpath"), 0o755);
   await execFileAsync("ln", ["-s", await which("realpath"), path.join(binDir, "real-realpath")]);
+
+  for (const command of ["dirname", "mktemp"]) {
+    const target = `real-${command}`;
+    await writeFile(path.join(binDir, command), probedPassthroughStub(command, target));
+    await chmod(path.join(binDir, command), 0o755);
+    await execFileAsync("ln", ["-s", await which(command), path.join(binDir, target)]);
+  }
 
   const env = {
     ...process.env,

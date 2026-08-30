@@ -10,6 +10,17 @@
 # Requires: GH_TOKEN with repo scope across the org (the ORG_PAT secret).
 set -euo pipefail
 
+# Bootstrap the auth helper with shell parameter expansion only: dirname,
+# pwd, and every other child would still inherit the workflow's exported
+# GH_TOKEN until skills_sync_capture_token removes it below.
+SYNC_SKILLS_BOOTSTRAP_DIR=${BASH_SOURCE[0]%/*}
+if [ "$SYNC_SKILLS_BOOTSTRAP_DIR" = "${BASH_SOURCE[0]}" ]; then
+  SYNC_SKILLS_BOOTSTRAP_DIR=.
+fi
+# shellcheck source=lib/skills-sync-auth.sh
+source "${SYNC_SKILLS_BOOTSTRAP_DIR}/lib/skills-sync-auth.sh"
+skills_sync_capture_token
+
 CONFIG=.github/skills-sync.json
 SRC_SHA=$(git rev-parse --short HEAD)
 BRANCH=chore/sync-core-skills
@@ -21,13 +32,11 @@ SELF_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 source "${SELF_DIR}/lib/skills-sync-repo.sh"
 
 # Least privilege: the workflow hands us the org-wide ORG_PAT exported as
-# GH_TOKEN, which every descendant would otherwise inherit. Capture it into
-# a private shell variable and unset it here, before the first subprocess
-# runs, so the jq calls below and the mktemp/realpath/mkdir/rsync/printf
-# work inside the sync see no credential. skills_sync_authenticated
-# re-supplies it to the git clone/push and gh calls that authenticate.
-# Fails closed when GH_TOKEN is not configured.
-skills_sync_capture_token
+# GH_TOKEN, which every descendant would otherwise inherit. It was captured
+# above before git rev-parse and path resolution ran, so the jq calls below
+# and the mktemp/realpath/mkdir/rsync/printf work inside the sync see no
+# credential. skills_sync_authenticated re-supplies it to the git clone/push
+# and gh calls that authenticate.
 
 fail=0
 for repo in $(jq -r '.repos | keys[]' "$CONFIG"); do

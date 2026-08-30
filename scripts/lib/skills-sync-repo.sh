@@ -2,7 +2,13 @@
 # Per-repo sync orchestration for scripts/sync-skills.sh (ADR-0026).
 set -euo pipefail
 
-SKILLS_SYNC_REPO_LIB_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+# Resolve enough of this library's location to load its siblings using shell
+# expansion only. Direct callers may source this file while GH_TOKEN is still
+# exported, so no source-time child may run before the function captures it.
+SKILLS_SYNC_REPO_LIB_DIR=${BASH_SOURCE[0]%/*}
+if [ "$SKILLS_SYNC_REPO_LIB_DIR" = "${BASH_SOURCE[0]}" ]; then
+  SKILLS_SYNC_REPO_LIB_DIR=.
+fi
 # shellcheck source=skills-sync-auth.sh
 source "${SKILLS_SYNC_REPO_LIB_DIR}/skills-sync-auth.sh"
 # shellcheck source=skills-sync-containment.sh
@@ -35,15 +41,15 @@ skills_sync_run_repo() {
   shift 6
   local skills=("$@")
 
+  # Take the org-wide credential out of the exported environment before the
+  # first subprocess runs. A caller that already captured it (the
+  # scripts/sync-skills.sh entry point) makes this a no-op; a direct caller
+  # that hands the function an exported GH_TOKEN gets the same containment.
+  skills_sync_capture_token
+
   local dir
   dir=$(mktemp -d)
   trap "rm -rf '${dir}'" RETURN
-
-  # Take the org-wide credential out of the exported environment before the
-  # first subprocess runs. A caller that already captured it (the
-  # scripts/sync-skills.sh entry point) makes this a no-op; a caller that
-  # hands the function an exported GH_TOKEN gets the same containment.
-  skills_sync_capture_token
 
   local cred_helper
   cred_helper=$(skills_sync_credential_helper)
