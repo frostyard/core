@@ -20,6 +20,18 @@ const repoLibPath = path.join(repoRoot, "scripts/lib/skills-sync-repo.sh");
 
 const FAKE_TOKEN = "fake-test-token-do-not-use-1234567890";
 
+// Every stub below records whether GH_TOKEN was present in its own
+// environment — the string "present" or "absent" and nothing else. The
+// value is never written, so the log these tests read back can never hold
+// a credential even if the scoping under test regresses.
+const TOKEN_PROBE = `token_probe() {
+  if [ -n "\${GH_TOKEN:-}" ]; then
+    printf 'token %s present\\n' "$1" >> "$SYNC_TEST_LOG"
+  else
+    printf 'token %s absent\\n' "$1" >> "$SYNC_TEST_LOG"
+  fi
+}`;
+
 // Stub `git` and `gh` so these tests never touch the network or GitHub:
 // every subcommand that would otherwise reach github.com (clone, push, pr
 // list/create) is faked and logged; every other subcommand (init, add,
@@ -27,6 +39,7 @@ const FAKE_TOKEN = "fake-test-token-do-not-use-1234567890";
 // scratch clone so the function's real control flow is exercised.
 const GIT_STUB = `#!/usr/bin/env bash
 set -euo pipefail
+${TOKEN_PROBE}
 printf 'git %s\\n' "$*" >> "$SYNC_TEST_LOG"
 dest="\${!#}"
 # Find the subcommand without consuming argv — "$@" must reach real-git
@@ -44,6 +57,7 @@ for arg in "$@"; do
     *) subcmd="$arg"; break ;;
   esac
 done
+token_probe "git $subcmd"
 case "$subcmd" in
   clone)
     if [ -n "\${SYNC_TEST_CLONE_FAIL:-}" ]; then
@@ -69,6 +83,8 @@ esac
 
 const GH_STUB = `#!/usr/bin/env bash
 set -euo pipefail
+${TOKEN_PROBE}
+token_probe "gh $1-$2"
 printf 'gh %s\\n' "$*" >> "$SYNC_TEST_LOG"
 case "$1 $2" in
   "pr list")
@@ -80,8 +96,19 @@ case "$1 $2" in
 esac
 `;
 
-const RSYNC_FALLBACK = `#!/usr/bin/env bash
+// The sync copy path. Always shimmed so its environment is recorded, then
+// delegated to the real rsync when the machine has one (a `real-rsync`
+// symlink is installed beside this stub); a sandbox without rsync falls
+// back to a minimal implementation covering exactly the `rsync -a --delete
+// <src>/ <dst>/` shape scripts/lib/skills-sync-containment.sh invokes, so
+// these tests stay runnable either way.
+const RSYNC_STUB = `#!/usr/bin/env bash
 set -euo pipefail
+${TOKEN_PROBE}
+token_probe rsync
+if command -v real-rsync >/dev/null 2>&1; then
+  exec real-rsync "$@"
+fi
 src=""
 dst=""
 for arg in "$@"; do
@@ -95,6 +122,24 @@ find "$dst" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
 cp -a "\${src%/}/." "$dst"
 `;
 
+// A second unauthenticated local helper: skills_sync_run_repo and the
+// containment checks both canonicalize paths with it.
+const REALPATH_STUB = `#!/usr/bin/env bash
+set -euo pipefail
+${TOKEN_PROBE}
+token_probe realpath
+exec real-realpath "$@"
+`;
+
+function probedPassthroughStub(label, target) {
+  return `#!/usr/bin/env bash
+set -euo pipefail
+${TOKEN_PROBE}
+token_probe ${label}
+exec ${target} "$@"
+`;
+}
+
 test("removes the clone directory and never leaks the token on a successful sync", async () => {
   const { env, log, coreRoot } = await setupFixture();
 
@@ -106,6 +151,37 @@ test("removes the clone directory and never leaks the token on a successful sync
   assert.match(logText, /git -c credential\.helper=.*clone --quiet --depth 1 https:\/\/github\.com\/frostyard\/example-repo\.git/);
   assert.match(logText, /gh pr create/);
   await assertCloneDirRemoved(logText);
+});
+
+// Least privilege at the subprocess boundary: the ORG_PAT is org-wide and
+// write-capable, so only the four calls that authenticate to GitHub may
+// see it. Everything else the sync runs — the local git commands against
+// the temporary clone, and the copy path that mirrors skills into it —
+// must run with no GH_TOKEN in its environment at all.
+test("supplies GH_TOKEN only to the subprocesses that authenticate to GitHub", async () => {
+  const { env, log, coreRoot } = await setupFixture();
+
+  await runRepo(env, ["example-repo", coreRoot, "chore/sync", "abc123", "bot", "bot@example.invalid", "example"]);
+
+  const probes = await readTokenProbes(log);
+  assert.deepEqual(
+    probes.filter(([, state]) => state === "present").map(([label]) => label).sort(),
+    ["gh pr-create", "gh pr-list", "git clone", "git push"],
+    `unexpected set of token-bearing subprocesses in:\n${probes.map((p) => p.join(" ")).join("\n")}`,
+  );
+
+  // Assert positively on the local work too, so a future refactor that
+  // simply stopped running these commands could not silently pass above.
+  for (const label of ["git add", "git diff", "git checkout", "git commit", "mktemp", "rsync", "realpath"]) {
+    assert.deepEqual(
+      probes.filter(([name]) => name === label).map(([, state]) => state).at(0),
+      "absent",
+      `expected ${label} to run without GH_TOKEN, probes:\n${probes.map((p) => p.join(" ")).join("\n")}`,
+    );
+  }
+
+  const logText = await readFile(log, "utf8");
+  assert.doesNotMatch(logText, new RegExp(FAKE_TOKEN));
 });
 
 test("removes the clone directory when the clone fails", async () => {
@@ -175,13 +251,21 @@ async function setupFixture() {
   await chmod(path.join(binDir, "gh"), 0o755);
   await execFileAsync("ln", ["-s", await which("git"), path.join(binDir, "real-git")]);
 
-  // scripts/lib/skills-sync-containment.sh shells out to `rsync -a
-  // --delete`. Real CI (ubuntu-latest) and most dev machines have it; a
-  // sandbox that doesn't gets a minimal fallback covering exactly that
-  // invocation shape, so these tests stay runnable without a real rsync.
-  if (!(await hasCommand("rsync"))) {
-    await writeFile(path.join(binDir, "rsync"), RSYNC_FALLBACK);
-    await chmod(path.join(binDir, "rsync"), 0o755);
+  await writeFile(path.join(binDir, "rsync"), RSYNC_STUB);
+  await chmod(path.join(binDir, "rsync"), 0o755);
+  if (await hasCommand("rsync")) {
+    await execFileAsync("ln", ["-s", await which("rsync"), path.join(binDir, "real-rsync")]);
+  }
+
+  await writeFile(path.join(binDir, "realpath"), REALPATH_STUB);
+  await chmod(path.join(binDir, "realpath"), 0o755);
+  await execFileAsync("ln", ["-s", await which("realpath"), path.join(binDir, "real-realpath")]);
+
+  for (const command of ["dirname", "mktemp"]) {
+    const target = `real-${command}`;
+    await writeFile(path.join(binDir, command), probedPassthroughStub(command, target));
+    await chmod(path.join(binDir, command), 0o755);
+    await execFileAsync("ln", ["-s", await which(command), path.join(binDir, target)]);
   }
 
   const env = {
@@ -225,6 +309,20 @@ function runRepo(env, args) {
       },
     );
   });
+}
+
+// Returns [label, "present" | "absent"] for every `token <label> <state>`
+// line the stubs recorded, in invocation order.
+async function readTokenProbes(log) {
+  const text = await readFile(log, "utf8");
+  return text
+    .split("\n")
+    .filter((line) => line.startsWith("token "))
+    .map((line) => {
+      const rest = line.slice("token ".length);
+      const cut = rest.lastIndexOf(" ");
+      return [rest.slice(0, cut), rest.slice(cut + 1)];
+    });
 }
 
 async function assertCloneDirRemoved(logText) {
