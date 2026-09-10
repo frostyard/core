@@ -59,6 +59,9 @@ Docs are split by the question they answer:
 - [0044 — Expose the make gate triad in every repository](adr/0044-expose-the-make-gate-triad-in-every-repository.md)
 - [0045 — Guard Actions-secret expiry with a committed record](adr/0045-guard-actions-secret-expiry-in-the-repository.md)
 - [0046 — Rename the cayo server image to floe](adr/0046-rename-cayo-server-image-to-floe.md)
+- [0047 — Retire NBC on a proportional four-user fast path](adr/0047-retire-nbc-on-a-proportional-fast-path.md)
+- [0048 — Publish Debian packages to explicit codenames](adr/0048-publish-debian-packages-to-explicit-codenames.md)
+- [0049 — Retire omarchy-apps without breaking Snosi](adr/0049-retire-omarchy-apps-without-breaking-snosi.md)
 
 ### Design
 
@@ -82,6 +85,7 @@ Docs are split by the question they answer:
 - [Firn skills sync onboarding](plans/0003-onboard-firn-to-skills-sync.md)
 - [Dev release concurrency rollout](plans/0004-dev-release-concurrency-rollout.md)
 - [Organization authority rollout](plans/0005-organization-authority-rollout.md)
+- [NBC retirement and Debian suite migration fast path](plans/0006-nbc-retirement-and-debian-suite-migration-fast-path.md)
 
 ## Conventions
 
