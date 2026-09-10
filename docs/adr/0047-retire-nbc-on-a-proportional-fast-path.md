@@ -1,6 +1,6 @@
 # 0047 — Retire NBC on a proportional four-user fast path
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-09-09
 
 ## Context
@@ -14,7 +14,7 @@ The deployed population is approximately four known users: Brian and three
 directly reachable friends. Enterprise fleet discovery, a broad hardware
 matrix, and a long formal support program are disproportionate at this scale.
 The useful safety boundary is direct coordination, preserved recovery
-artifacts, and proof on configurations actually in use.
+artifacts, and evidence for configurations actually in use.
 
 Current evidence is not green: retained Lab data reports no green Firn
 installation run, explicit Debian release suites do not exist, and the NBC
@@ -89,4 +89,3 @@ recovery check. Archive remains a separately approved GitHub action.
   [ADR-0031](0031-retire-dakota-secure-bootc-installer.md)
 - Product decision:
   [Snosi ADR-0015](https://github.com/frostyard/snosi/blob/main/docs/adr/0015-retire-native-ab-images-and-nbc-installs.md)
-

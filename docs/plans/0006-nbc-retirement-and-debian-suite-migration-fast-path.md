@@ -1,8 +1,8 @@
 # Plan: NBC retirement and Debian suite migration fast path
 
 This plan sequences proportional NBC retirement, explicit Debian suites, and
-`omarchy-apps` retirement. No implementation phase begins until its Proposed
-ADR is accepted by a human. Every GitHub, workflow, credential, R2,
+`omarchy-apps` retirement. No implementation phase begins until its governing
+ADR is Accepted on `core/main`. Every GitHub, workflow, credential, R2,
 publication, and archive mutation is separately presented for approval.
 
 ## Phase 1 — Accept the operating boundary
@@ -88,4 +88,3 @@ publication, and archive mutation is separately presented for approval.
   [ADR-0049](../adr/0049-retire-omarchy-apps-without-breaking-snosi.md)
 - Coordinates with:
   [Organization portfolio stewardship](0002-org-portfolio-roadmap.md)
-

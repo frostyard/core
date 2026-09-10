@@ -1,6 +1,6 @@
 # 0010 — Publish packages through the shared repogen action, incrementally, never deleting
 
-- **Status:** Accepted
+- **Status:** Superseded by [0048](0048-publish-debian-packages-to-explicit-codenames.md)
 - **Date:** 2026-08-11
 
 ## Context

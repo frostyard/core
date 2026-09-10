@@ -1,6 +1,6 @@
 # 0049 — Retire omarchy-apps without breaking Snosi
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-09-09
 
 ## Context
@@ -63,4 +63,3 @@ is the default; it implies neither support nor further releases.
   [ADR-0021](0021-sha-pinned-actions-and-least-privilege-ci.md)
 - Related:
   [ADR-0048](0048-publish-debian-packages-to-explicit-codenames.md)
-

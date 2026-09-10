@@ -1,6 +1,6 @@
 # 0048 — Publish Debian packages to explicit codenames
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-09-09
 
 ## Context
@@ -17,7 +17,7 @@ metadata download can be treated as an empty repository.
 [ADR-0010](0010-publish-packages-via-repogen-to-r2.md) established shared,
 incremental, non-deleting publication. Its per-producer writer model and
 implicit release identity are no longer safe for parallel Debian releases.
-If accepted, this ADR supersedes ADR-0010.
+This ADR supersedes ADR-0010.
 
 ## Decision
 
@@ -90,11 +90,10 @@ publication. `omarchy-apps` is excluded from the future publisher set.
 
 - Implements through:
   [Plan 0006](../plans/0006-nbc-retirement-and-debian-suite-migration-fast-path.md)
-- Supersedes on acceptance:
+- Supersedes:
   [ADR-0010](0010-publish-packages-via-repogen-to-r2.md)
 - Builds on:
   [ADR-0009](0009-single-artifact-origin-repository-frostyard-org.md),
   [ADR-0014](0014-single-gpg-trust-root.md),
   [ADR-0021](0021-sha-pinned-actions-and-least-privilege-ci.md), and
   [ADR-0023](0023-verified-pinned-downloads.md)
-
