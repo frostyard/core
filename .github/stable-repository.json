@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "never_relax": true,
+  "base_url": "https://repository.frostyard.org/",
+  "suite": "stable",
+  "public_key": {
+    "path": "public.key",
+    "sha256": "08b6a503987814e08026a636b1f94bbc300126d77cb12787ea25d0286e24293e",
+    "fingerprint": "432C452CD2B7F4FF1B5D23264DE6A2016E622F97"
+  },
+  "metadata": {
+    "release": {
+      "path": "dists/stable/Release",
+      "sha256": "067d873d8a51bb2e70b51da4cd488599d5133a47dac289f6ea52924aef6249ab"
+    },
+    "inrelease": {
+      "path": "dists/stable/InRelease",
+      "sha256": "68e35e909b8cbcd5f2d62362f4bee86366a56562e2ae361018564af207cef1c6"
+    },
+    "release_gpg": {
+      "path": "dists/stable/Release.gpg",
+      "sha256": "9f1494216e701554a7f2b2a357787349dddf8ce3b7ba71f1a47e001c845d6c11"
+    }
+  },
+  "identity": {
+    "Origin": "Repogen Repository",
+    "Label": "Frostyard Repository",
+    "Suite": "stable",
+    "Codename": "stable",
+    "Components": "main",
+    "Architectures": "all amd64"
+  },
+  "indexes": [
+    "main/binary-all/Packages",
+    "main/binary-all/Packages.gz",
+    "main/binary-amd64/Packages",
+    "main/binary-amd64/Packages.gz"
+  ],
+  "expected_pool_objects": 227,
+  "expected_pool_bytes": 2961094046
+}

@@ -99,3 +99,5 @@ publication. `omarchy-apps` is excluded from the future publisher set.
   [ADR-0014](0014-single-gpg-trust-root.md),
   [ADR-0021](0021-sha-pinned-actions-and-least-privilege-ci.md), and
   [ADR-0023](0023-verified-pinned-downloads.md)
+- Monitored by:
+  [stable repository drift alarm](../design/stable-repository-drift-alarm.md)

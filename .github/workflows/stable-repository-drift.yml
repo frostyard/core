@@ -1,0 +1,28 @@
+# Read-only stable repository alarm (ADR-0014, ADR-0048). This job verifies
+# the frozen public baseline and never receives credentials or mutates storage.
+name: Stable repository drift
+
+on:
+  schedule:
+    # The complete retained pool is about 2.8 GiB, so run the full streamed
+    # verification weekly rather than transferring it on every CI event.
+    - cron: "23 5 * * 1"
+  workflow_dispatch: {}
+
+permissions: {}
+
+concurrency:
+  group: stable-repository-drift
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@3c2e0cf82a5b2e5249f0d3635a4d83d0ae861518 # v4.2.5
+      - run: npm run check:stable-repository

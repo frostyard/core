@@ -14,6 +14,7 @@
     "check:fleet": "node scripts/check-fleet-conventions.mjs",
     "check:scripts": "node scripts/check-scripts.mjs",
     "check:secret-expiry": "node scripts/check-secret-expiry.mjs",
+    "check:stable-repository": "node scripts/check-stable-repository.mjs",
     "test": "node --test test/*.test.mjs"
   },
   "dependencies": {

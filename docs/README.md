@@ -69,6 +69,7 @@ Docs are split by the question they answer:
 - [Shared skills](design/shared-skills.md)
 - [Skills sync operations](design/skills-sync-operations.md)
 - [Organization authority](design/organization-authority.md)
+- [Stable repository drift alarm](design/stable-repository-drift-alarm.md)
 
 ### Specs
 
@@ -77,6 +78,7 @@ Docs are split by the question they answer:
 - [Organization repository enrollment](specs/organization-repository-enrollment.md)
 - [Organization verification profiles](specs/organization-verification-profiles.md)
 - [Organization goals](specs/organization-goals.md)
+- [Stable repository drift alarm](specs/stable-repository-drift-alarm.md)
 
 ### Plans
 
