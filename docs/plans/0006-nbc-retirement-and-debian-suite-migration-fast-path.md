@@ -87,4 +87,5 @@ publication, and archive mutation is separately presented for approval.
   and
   [ADR-0049](../adr/0049-retire-omarchy-apps-without-breaking-snosi.md)
 - Coordinates with:
-  [Organization portfolio stewardship](0002-org-portfolio-roadmap.md)
+  [Organization portfolio stewardship](0002-org-portfolio-roadmap.md) and the
+  [Repogen multi-suite implementation plan](0007-support-suites-in-repogen.md)
