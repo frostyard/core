@@ -86,7 +86,7 @@ Docs are split by the question they answer:
 - [Dev release concurrency rollout](plans/0004-dev-release-concurrency-rollout.md)
 - [Organization authority rollout](plans/0005-organization-authority-rollout.md)
 - [NBC retirement and Debian suite migration fast path](plans/0006-nbc-retirement-and-debian-suite-migration-fast-path.md)
-- [Repogen multi-suite implementation](plans/0007-support-suites-in-repogen.md)
+- [Support suites in Repogen](plans/0007-support-suites-in-repogen.md)
 
 ## Conventions
 

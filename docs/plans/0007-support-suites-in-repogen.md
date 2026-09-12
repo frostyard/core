@@ -218,7 +218,7 @@ Run recovery and outreach in parallel:
 - Contact and record a disposition for **all four known users** identified by ADR-0048/Plan 0006, including the three other users Plan 0006 says must be contacted. Record in-use product/hardware configurations, supported migration path, direct-disclosure need, and whether Pilothouse/Snowcat Cockpit or other non-closure packages are actually used.
 - Record Brian as interim release/exception owner and identify a backup/successor; do not reopen the already assigned interim ownership.
 
-**Gate:** baseline is restorable in rehearsal; read-only probe is green; every known user has a disposition and each in-use configuration is known. **Stop:** unexplained stable drift, unreachable indexed object, unknown user disposition, or absent interim operational coverage. **Blocks:** production canary.
+**Done when:** baseline is restorable in rehearsal; read-only probe is green; every known user has a disposition and each in-use configuration is known. **Stop:** unexplained stable drift, unreachable indexed object, unknown user disposition, or absent interim operational coverage. **Blocks:** production canary.
 
 ### Phase 1 — Bounded Repogen safety and Trixie canary
 
@@ -226,7 +226,7 @@ Implement R1–R5 only: explicit validation and fixed Release identity, Debian-o
 
 After separate publication authorization, publish exactly one `gchlog` Trixie initialize transaction. Because this is a newly absent prefix with by-hash enabled before first InRelease, there is no legacy Trixie generation to race. Do not accept another Trixie or any Forky publication until Phase 2 passes.
 
-**Gate:** real apt install from signed Trixie; manifest matches public digests/identity; stable is byte-identical; first-publication failure leaves no visible incomplete suite. **Rollback:** remove/disable the unpublished or failed new prefix only under operational authorization; if first InRelease succeeded, retain it and correct forward after Phase 2 rather than rewrite stable. **Stop:** mutable tool, unsigned output, pool uncertainty, broad upload, or stable drift. **Blocks:** closure expansion, not the canary itself.
+**Done when:** real apt install from signed Trixie; manifest matches public digests/identity; stable is byte-identical; first-publication failure leaves no visible incomplete suite. **Rollback:** remove/disable the unpublished or failed new prefix only under operational authorization; if first InRelease succeeded, retain it and correct forward after Phase 2 rather than rewrite stable. **Stop:** mutable tool, unsigned output, pool uncertainty, broad upload, or stable drift. **Blocks:** closure expansion, not the canary itself.
 
 ### Phase 2 — Repogen hardening and durable protected writer
 
@@ -234,7 +234,7 @@ Implement R6–R10 in staging: deterministic/no-op output, complete local failur
 
 **Credential sequence per producer:** verify immutable submission in staging → authorize/perform first central publication → verify public output/manifest → disable/remove producer production signing/R2 credentials and direct Debian action → verify a subsequent request succeeds centrally and a direct mutation attempt lacks credentials. This plan proposes the sequence; it does not claim advisory permissions technically enforce it.
 
-**Gate:** failures before every publish step retain an installable old generation; same-suite contention retains both requests; cross-suite attempts cannot corrupt shared pool; coalesced dispatch recovers; unauthorized producer/suite/path is rejected; canary remains installable. **Stop:** lost intake, mutable dependency, whole-tree upload, unverifiable provenance, or credential duplication after cutover. **Blocks:** minimum Trixie closure.
+**Done when:** failures before every publish step retain an installable old generation; same-suite contention retains both requests; cross-suite attempts cannot corrupt shared pool; coalesced dispatch recovers; unauthorized producer/suite/path is rejected; canary remains installable. **Stop:** lost intake, mutable dependency, whole-tree upload, unverifiable provenance, or credential duplication after cutover. **Blocks:** minimum Trixie closure.
 
 ### Phase 3 — Trixie minimum closure
 
@@ -242,7 +242,7 @@ Implement R6–R10 in staging: deterministic/no-op output, complete local failur
 - Publish each package explicitly with provenance. Migrate/remove credentials producer by producer.
 - Keep stable bytes unchanged; do not import the 227-entry historical set.
 
-**Gate:** clean Trixie environments resolve/install exact approved closure; package-set manifest has no unsupported stable leakage. **Stop:** other-codename candidate, dependency mismatch, pool collision, unresolved Incus provenance for required packages, or stable change. **Blocks:** Snosi explicit Trixie.
+**Done when:** clean Trixie environments resolve/install exact approved closure; package-set manifest has no unsupported stable leakage. **Stop:** other-codename candidate, dependency mismatch, pool collision, unresolved Incus provenance for required packages, or stable change. **Blocks:** Snosi explicit Trixie.
 
 ### Phase 4 — Explicit Trixie consumers and accepted use gates
 
@@ -254,7 +254,7 @@ Implement R6–R10 in staging: deterministic/no-op output, complete local failur
 - Observe for **48 hours spanning at least one real publication**. Every in-use configuration must be green or its limitation must be disclosed directly to the affected user; public website copy is not a substitute for direct disclosure.
 - Promote Trixie consumer defaults only under separate operational/product authorization.
 
-**Gate:** every reported class meets install/update/rollback, the 48-hour window completes across a real publication, Firn-only instructions are actionable, and each known user's in-use configuration is green or directly disclosed. Lab/testsuite provenance is correct and stable remains byte-identical. **Stop:** mixed sources, missing provenance, failed rollback, ambiguous channel, undisclosed limitation, or observation gap. **Blocks:** Forky lane.
+**Done when:** every reported class meets install/update/rollback, the 48-hour window completes across a real publication, Firn-only instructions are actionable, and each known user's in-use configuration is green or directly disclosed. Lab/testsuite provenance is correct and stable remains byte-identical. **Stop:** mixed sources, missing provenance, failed rollback, ambiguous channel, undisclosed limitation, or observation gap. **Blocks:** Forky lane.
 
 ### Phase 5 — Isolated Forky
 
@@ -263,13 +263,13 @@ Implement R6–R10 in staging: deterministic/no-op output, complete local failur
 - Add Snosi Forky as isolated lane; do not replace Trixie default. Audit upstream Trixie/backports/vendor sources. Docker may remain Trixie-sourced only with explicit compatibility evidence until appropriate Forky source exists.
 - Produce OSVersion 14 sysexts beside retained OSVersion 13. Add immutable/per-codename OCI tags; only separately promoted product channel may move `latest`.
 
-**Gate:** both APT codenames independently verify/install; no leakage; OS 13/14 sysexts select correctly; claimed products/hardware paths pass. **Stop:** unresolved Incus closure, path/digest collision, default-channel race, Trixie regression, or unsupported lane represented as supported. **Blocks:** Forky promotion.
+**Done when:** both APT codenames independently verify/install; no leakage; OS 13/14 sysexts select correctly; claimed products/hardware paths pass. **Stop:** unresolved Incus closure, path/digest collision, default-channel race, Trixie regression, or unsupported lane represented as supported. **Blocks:** Forky promotion.
 
 ### Phase 6 — Promotion and retention
 
 Promote a verified Forky image channel only after human product-policy authorization. Keep Trixie for ADR-0048's 90-day and all-four-users retention gate and stable through 2027-09-30. Website/release notes change only after promotion evidence. Rollback repoints consumers/default channels to known-good Trixie digests without rewriting suites.
 
-**Gate:** promotion manifest, support matrix, rollback evidence, retention/user dispositions, and credential inventory complete. **Stop:** alerting gap, unresolved user/support disposition, or inability to restore previous channel.
+**Done when:** promotion manifest, support matrix, rollback evidence, retention/user dispositions, and credential inventory complete. **Stop:** alerting gap, unresolved user/support disposition, or inability to restore previous channel.
 
 ## Acceptance matrix
 
