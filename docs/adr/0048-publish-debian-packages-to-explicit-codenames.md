@@ -90,6 +90,8 @@ publication. `omarchy-apps` is excluded from the future publisher set.
 
 - Implements through:
   [Plan 0006](../plans/0006-nbc-retirement-and-debian-suite-migration-fast-path.md)
+- Detailed implementation sequence:
+  [Plan 0007](../plans/0007-support-suites-in-repogen.md)
 - Supersedes:
   [ADR-0010](0010-publish-packages-via-repogen-to-r2.md)
 - Builds on:
