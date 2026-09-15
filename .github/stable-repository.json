@@ -11,15 +11,15 @@
   "metadata": {
     "release": {
       "path": "dists/stable/Release",
-      "sha256": "067d873d8a51bb2e70b51da4cd488599d5133a47dac289f6ea52924aef6249ab"
+      "sha256": "c363d215c449aa257d9392a9dbbfcf2666732062f30b529ad294f571f372cd92"
     },
     "inrelease": {
       "path": "dists/stable/InRelease",
-      "sha256": "68e35e909b8cbcd5f2d62362f4bee86366a56562e2ae361018564af207cef1c6"
+      "sha256": "edf980f5503fc524c4aeaec87bd797670e3bb93960cd7bcf8b637bb7b9e5afe6"
     },
     "release_gpg": {
       "path": "dists/stable/Release.gpg",
-      "sha256": "9f1494216e701554a7f2b2a357787349dddf8ce3b7ba71f1a47e001c845d6c11"
+      "sha256": "a5d95a0bbb0272f539a5738971055b2a77cba1b45d12f3c1209fad3d5cc90232"
     }
   },
   "identity": {
@@ -36,6 +36,6 @@
     "main/binary-amd64/Packages",
     "main/binary-amd64/Packages.gz"
   ],
-  "expected_pool_objects": 227,
-  "expected_pool_bytes": 2961094046
+  "expected_pool_objects": 228,
+  "expected_pool_bytes": 2965276828
 }

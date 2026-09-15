@@ -98,16 +98,24 @@ function fixture() {
   return { bodies, fetchImpl, indexes, record, release, signatureVerifier };
 }
 
-test("the committed baseline pins the accepted stable repository", async () => {
+test("the committed baseline pins the correction-forward stable candidate", async () => {
   const record = await loadRecord(repoRoot);
   assert.equal(record.base_url, "https://repository.frostyard.org/");
   assert.equal(record.public_key.fingerprint, "432C452CD2B7F4FF1B5D23264DE6A2016E622F97");
   assert.equal(
     record.metadata.release.sha256,
-    "067d873d8a51bb2e70b51da4cd488599d5133a47dac289f6ea52924aef6249ab",
+    "c363d215c449aa257d9392a9dbbfcf2666732062f30b529ad294f571f372cd92",
   );
-  assert.equal(record.expected_pool_objects, 227);
-  assert.equal(record.expected_pool_bytes, 2961094046);
+  assert.equal(
+    record.metadata.inrelease.sha256,
+    "edf980f5503fc524c4aeaec87bd797670e3bb93960cd7bcf8b637bb7b9e5afe6",
+  );
+  assert.equal(
+    record.metadata.release_gpg.sha256,
+    "a5d95a0bbb0272f539a5738971055b2a77cba1b45d12f3c1209fad3d5cc90232",
+  );
+  assert.equal(record.expected_pool_objects, 228);
+  assert.equal(record.expected_pool_bytes, 2965276828);
 });
 
 test("the verifier accepts an exact signed-index fixture", async () => {

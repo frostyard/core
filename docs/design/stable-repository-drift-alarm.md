@@ -60,6 +60,23 @@ Changes to the committed baseline require independent review and the exact
 human authority applicable to the underlying stable mutation. A digest update
 must never be used to silence an unexplained alarm.
 
+## Baseline provenance
+
+The correction-forward candidate baseline was observed on 2026-09-15 after a
+signed stable update dated 2026-09-14T23:16:54Z. Relative to the verified
+2026-09-12 snapshot, all 227 prior package entries were unchanged and the
+signed indexes added exactly
+`pool/main/f/frostyard-updex/frostyard-updex_2.0.1_amd64.deb`
+(4,182,782 bytes, SHA-256
+`51e2ac000b3749d39809ab8df36d6b319b2b97010531bd42f36544dddcea84bf`).
+That identity matches the public Updex v2.0.1 release asset and the successful
+[Updex release workflow](https://github.com/frostyard/updex/actions/runs/34908032866),
+which uploaded the same path while producing the observed Release timestamp.
+All four signed indexes and the added pool object were checked against signed
+SHA-256 metadata before this candidate baseline was recorded. This provenance
+explains the observed delta; it does not substitute for independent review or
+authorize a future stable mutation.
+
 ## References
 
 - Rationale:
