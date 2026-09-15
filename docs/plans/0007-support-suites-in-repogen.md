@@ -360,7 +360,7 @@ Exact CLI/manifest names, staging layout, canonical sort, by-hash construction, 
 
 ## First 10 actions after separate implementation authorization
 
-1. Capture/verify signed stable recovery snapshot, stream-hash referenced pool objects, record Release identity/cache/storage evidence, inventory credentials, establish stable-drift alarm, contact all four known users, and record Brian plus backup coverage.
+1. Capture/verify signed stable recovery snapshot, stream-hash referenced pool objects, record Release identity/cache/storage evidence, inventory credentials, establish the [stable repository drift alarm](../design/stable-repository-drift-alarm.md), contact all four known users, and record Brian plus backup coverage.
 2. Land Repogen production-contract docs defining R1–R5 canary scope, fixed Origin/Label, no Valid-Until initially, one-codename/main-only behavior, immutable pool, strict restore/initialize, and Debian/sysext separation.
 3. Implement explicit target/identity validation and Debian-only filtering; reject implicit/invalid/stable inputs before mutation.
 4. Implement fail-closed signed restore including every architecture and separate absent-prefix initialize; remove both silent-drop paths.

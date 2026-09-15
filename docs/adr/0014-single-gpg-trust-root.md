@@ -58,3 +58,5 @@ update channel the keys protect.
 - Builds on: [ADR-0008](0008-sysext-distribution-and-update-contract.md),
   [ADR-0010](0010-publish-packages-via-repogen-to-r2.md)
 - Related: [ADR-0023](0023-verified-pinned-downloads.md)
+- Monitored by:
+  [stable repository drift alarm](../design/stable-repository-drift-alarm.md)
