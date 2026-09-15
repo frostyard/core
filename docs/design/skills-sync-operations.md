@@ -96,6 +96,32 @@ The workflow maps the core Actions secret `ORG_PAT` to the script's required
 The workflow grants no permissions to its `GITHUB_TOKEN` and checkout does not
 persist credentials.
 
+Because that PAT is org-wide and write-capable, the script narrows it twice —
+by value and by environment:
+
+- **By value.** `skills_sync_credential_helper`
+  ([`scripts/lib/skills-sync-auth.sh`](../../scripts/lib/skills-sync-auth.sh))
+  is a [git-credential(1)](https://git-scm.com/docs/git-credential) helper
+  containing the literal characters `$GH_TOKEN`, never the token's value, so
+  the secret never reaches a remote URL, argv, a log line, or a cloned repo's
+  `.git/config`.
+- **By environment.** `GH_TOKEN` arrives exported, which would hand it to
+  every descendant of the sync. `skills_sync_capture_token` moves it into a
+  private shell variable and unsets it before the first subprocess runs, and
+  `skills_sync_authenticated` puts it back for exactly one command at a time.
+  Only four subprocesses receive it: the `git clone`, the `git push`, and the
+  `gh pr list` / `gh pr create` calls. The `jq` config reads, `mktemp`,
+  `realpath`, the `mkdir`/`rsync`/`printf` copy path, and the local
+  `git add`/`diff`/`checkout`/`commit` against the temporary clone all run
+  with no credential in their environment.
+
+Both narrowings are regression-tested:
+[`test/sync-skills-auth.test.mjs`](../../test/sync-skills-auth.test.mjs)
+covers the helper template, and
+[`test/sync-skills-run-repo.test.mjs`](../../test/sync-skills-run-repo.test.mjs)
+asserts, from stubs that record only token presence or absence and never its
+value, that exactly those four calls see `GH_TOKEN`.
+
 ### Expiry and rotation
 
 `ORG_PAT`'s expiry is declared in
