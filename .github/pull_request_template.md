@@ -22,6 +22,10 @@ Risk tier: 1 — <!-- justification -->
 - [ ] Every new doc indexed in `docs/README.md`
 - [ ] Cross-links added in both directions (ADR ↔ design ↔ spec ↔ plan)
 - [ ] New significant decision recorded as an ADR *first*, in this PR
+- [ ] New/edited ADRs are fact-only (context, decision, consequences) — no
+      narration of who asked, who was consulted, or the author's process;
+      that goes here, in this description
+      ([ADR-0051](../docs/adr/0051-adrs-state-facts-not-process.md))
 - [ ] Conformance aliases (ADR-0029) untouched — canonical targets edited
       instead
 

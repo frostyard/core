@@ -16,6 +16,7 @@ pass.
 | --- | --- |
 | Risk tier declared | PR body has a "Risk tier" section declaring the **highest applicable** tier — never lower ([ADR-0019](../adr/0019-governance-as-code-and-risk-tiers.md)). Docs/skills-only changes in this repo are tier 1 (the precedent set by `scripts/sync-skills.sh` PR bodies). Scale harmonization is open work ([core#13](https://github.com/frostyard/core/issues/13)) — cite the tier, don't invent a scale. |
 | Docs housekeeping | New docs start from their category `TEMPLATE.md`, are indexed in [docs/README.md](../README.md), and cross-link in both directions. New significant decision ⇒ ADR first, in the same change. |
+| ADR voice | ADRs (new or edited) state context, decision, and consequences as facts only — no narration of who asked, who was consulted, or how the author reached the decision ([ADR-0051](../adr/0051-adrs-state-facts-not-process.md)). That belongs in the PR description, not the ADR text. |
 | Workflows least-privilege | Any new or changed workflow uses full 40-char SHA-pinned actions with a `# vX.Y.Z` comment, top-level `permissions: {}`, and `persist-credentials: false` ([ADR-0021](../adr/0021-sha-pinned-actions-and-least-privilege-ci.md)). |
 | Docs-integrity gate green | `node scripts/check-docs.mjs` passes: every doc indexed, every relative link resolving, every symlink alias intact (thresholds in `.coverage-thresholds.json`). |
 | Scaffold suite green | If `.agents/skills/frostyard-docs-site/scaffold/**` changed: `npm ci && npm test` in the scaffold passes (CI runs it either way). |
@@ -34,5 +35,6 @@ pass.
 ## References
 
 - Rationale: [ADR-0019](../adr/0019-governance-as-code-and-risk-tiers.md),
-  [ADR-0029](../adr/0029-acmm-conformance-via-canonical-aliases.md)
+  [ADR-0029](../adr/0029-acmm-conformance-via-canonical-aliases.md),
+  [ADR-0051](../adr/0051-adrs-state-facts-not-process.md)
 - Context: [design/quality-loop.md](../design/quality-loop.md)

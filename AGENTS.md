@@ -73,6 +73,10 @@ Start from .agents/skills/TEMPLATE/SKILL.md. -->
   PR template's Risk tier section; reviews apply
   [docs/specs/pr-review-rubric.md](docs/specs/pr-review-rubric.md)
   ([ADR-0019](docs/adr/0019-governance-as-code-and-risk-tiers.md)).
+- ADRs record the decision, not how it was reached. State context, decision,
+  and consequences as facts. No narration of who asked, who was consulted, or
+  the author's process; that belongs in the PR description
+  ([ADR-0051](docs/adr/0051-adrs-state-facts-not-process.md)).
 
 ## Code conventions (live — the code exists)
 
