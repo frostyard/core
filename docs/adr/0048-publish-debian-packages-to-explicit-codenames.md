@@ -101,3 +101,6 @@ publication. `omarchy-apps` is excluded from the future publisher set.
   [ADR-0023](0023-verified-pinned-downloads.md)
 - Monitored by:
   [stable repository drift alarm](../design/stable-repository-drift-alarm.md)
+- Proposed NBC-specific retention clarification (does not amend this ADR's
+  signed `stable` floor):
+  [ADR-0052](0052-remove-nbc-artifact-retention-gates.md)

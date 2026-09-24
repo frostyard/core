@@ -83,6 +83,9 @@ recovery check. Archive remains a separately approved GitHub action.
 
 - Retention clause (artifacts outside signed `stable` only) amended by:
   [ADR-0050](0050-replace-nbc-retention-date-with-a-completion-condition.md)
+- Proposed successor (NBC-specific artifact-retention clause only; ADR-0050
+  remains operative until acceptance):
+  [ADR-0052](0052-remove-nbc-artifact-retention-gates.md)
 - Implements through:
   [Plan 0006](../plans/0006-nbc-retirement-and-debian-suite-migration-fast-path.md)
 - Builds on:
