@@ -6,10 +6,10 @@ the 2026-09-30 NBC/native A/B support cutoff in
 coordinates with [Plan 0006](0006-nbc-retirement-and-debian-suite-migration-fast-path.md)
 but does not replace its Debian-suite work or decide retention policy.
 [ADR-0050](../adr/0050-replace-nbc-retention-date-with-a-completion-condition.md)
-is Accepted and its outside-`stable` completion conditions still apply;
-[ADR-0052](../adr/0052-remove-nbc-artifact-retention-gates.md) is Proposed,
-not operative. Four-user outreach and readiness are support work, **not** a
-new artifact-retention condition. The support cutoff does not wait for a
+is Accepted; its outside-`stable` completion conditions no longer apply under
+Accepted [ADR-0052](../adr/0052-remove-nbc-artifact-retention-gates.md).
+Four-user outreach and readiness are support work, **not** a new
+artifact-retention condition. The support cutoff does not wait for a
 readiness pass, and a failed case must be disclosed rather than hidden.
 
 This is an order of work, not production authority. Approval or merge of this
@@ -161,12 +161,13 @@ presenting production actions for approval.
   byte, even outside `dists/`, readable and unchanged through at least
   2027-09-30 under
   [ADR-0048](../adr/0048-publish-debian-packages-to-explicit-codenames.md).
-  Existing debs may remain. Until Proposed ADR-0052 is Accepted,
+  Existing debs may remain. Accepted
+  [ADR-0052](../adr/0052-remove-nbc-artifact-retention-gates.md) removes
   [ADR-0050](../adr/0050-replace-nbc-retention-date-with-a-completion-condition.md)'s
-  outside-`stable` disposition and documentation completion conditions remain
-  operative; four-user **readiness** is independent of those retention gates.
-  Inventory is not a delete instruction and the live Firn ISO is not a
-  retiring native installer object.
+  outside-`stable` disposition and documentation completion conditions;
+  four-user **readiness** is independent of artifact retention. Inventory is
+  not a delete instruction and the live Firn ISO is not a retiring native
+  installer object.
 - **Done when:** bucket reality and manifests have been reconciled into an
   auditable exact-object ledger with unresolved gaps explicit, stable-suite
   protection and runbook/rollback dependencies marked, and Brian has the
@@ -198,8 +199,8 @@ presenting production actions for approval.
   signed-`stable` floor and coordinates with
   [Plan 0006](0006-nbc-retirement-and-debian-suite-migration-fast-path.md).
 - Retention boundary: Accepted
-  [ADR-0050](../adr/0050-replace-nbc-retention-date-with-a-completion-condition.md);
-  Proposed, not operative
+  [ADR-0050](../adr/0050-replace-nbc-retention-date-with-a-completion-condition.md)'s
+  outside-`stable` completion conditions are removed by Accepted
   [ADR-0052](../adr/0052-remove-nbc-artifact-retention-gates.md).
 - Artifact and installer context:
   [ADR-0009](../adr/0009-single-artifact-origin-repository-frostyard-org.md),
