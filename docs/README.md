@@ -62,6 +62,7 @@ Docs are split by the question they answer:
 - [0047 — Retire NBC on a proportional four-user fast path](adr/0047-retire-nbc-on-a-proportional-fast-path.md)
 - [0048 — Publish Debian packages to explicit codenames](adr/0048-publish-debian-packages-to-explicit-codenames.md)
 - [0049 — Retire omarchy-apps without breaking Snosi](adr/0049-retire-omarchy-apps-without-breaking-snosi.md)
+- [0050 — Replace the NBC/native-A/B retention date with a completion condition](adr/0050-replace-nbc-retention-date-with-a-completion-condition.md)
 
 ### Design
 

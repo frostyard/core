@@ -86,6 +86,10 @@ publication, and archive mutation is separately presented for approval.
   [ADR-0048](../adr/0048-publish-debian-packages-to-explicit-codenames.md),
   and
   [ADR-0049](../adr/0049-retire-omarchy-apps-without-breaking-snosi.md)
+- Retention clause amended by:
+  [ADR-0050](../adr/0050-replace-nbc-retention-date-with-a-completion-condition.md)
+  (Phase 6's archive precondition now includes the completion condition that
+  ADR replaces ADR-0047's calendar date with)
 - Coordinates with:
   [Organization portfolio stewardship](0002-org-portfolio-roadmap.md) and the
   [Repogen multi-suite implementation plan](0007-support-suites-in-repogen.md)
