@@ -64,6 +64,7 @@ Docs are split by the question they answer:
 - [0049 — Retire omarchy-apps without breaking Snosi](adr/0049-retire-omarchy-apps-without-breaking-snosi.md)
 - [0050 — Replace the NBC/native-A/B retention date with a completion condition](adr/0050-replace-nbc-retention-date-with-a-completion-condition.md)
 - [0051 — ADRs state facts only, not the process that produced them](adr/0051-adrs-state-facts-not-process.md)
+- [0052 — Remove the outside-`stable` completion condition; keep separate approval for disposal](adr/0052-remove-outside-stable-completion-condition.md)
 
 ### Design
 
@@ -91,6 +92,7 @@ Docs are split by the question they answer:
 - [Organization authority rollout](plans/0005-organization-authority-rollout.md)
 - [NBC retirement and Debian suite migration fast path](plans/0006-nbc-retirement-and-debian-suite-migration-fast-path.md)
 - [Support suites in Repogen](plans/0007-support-suites-in-repogen.md)
+- [Post-NBC bootc-only transition (Snosi/Firn)](plans/0008-post-nbc-bootc-only-transition.md)
 
 ## Conventions
 

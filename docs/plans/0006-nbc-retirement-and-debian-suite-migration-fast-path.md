@@ -88,8 +88,17 @@ publication, and archive mutation is separately presented for approval.
   [ADR-0049](../adr/0049-retire-omarchy-apps-without-breaking-snosi.md)
 - Retention clause amended by:
   [ADR-0050](../adr/0050-replace-nbc-retention-date-with-a-completion-condition.md)
-  (Phase 6's archive precondition now includes the completion condition that
-  ADR replaces ADR-0047's calendar date with)
+  (Accepted; Phase 6's archive precondition, for artifacts outside signed
+  `stable`, currently requires ADR-0050's completion condition), with a
+  proposed further amendment in
+  [ADR-0052](../adr/0052-remove-outside-stable-completion-condition.md)
+  (Proposed; would remove that completion condition entirely, leaving only
+  Brian's separate approval, once accepted — until then ADR-0050's condition
+  remains in force)
 - Coordinates with:
-  [Organization portfolio stewardship](0002-org-portfolio-roadmap.md) and the
-  [Repogen multi-suite implementation plan](0007-support-suites-in-repogen.md)
+  [Organization portfolio stewardship](0002-org-portfolio-roadmap.md), the
+  [Repogen multi-suite implementation plan](0007-support-suites-in-repogen.md),
+  and the
+  [post-NBC bootc-only transition plan](0008-post-nbc-bootc-only-transition.md)
+  (production-readiness, a distinct question from this plan's
+  retirement/retention sequencing)
