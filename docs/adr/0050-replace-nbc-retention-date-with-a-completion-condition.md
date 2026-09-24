@@ -135,8 +135,7 @@ pass their recovery check).
   ADR rather than an edit to 0047)
 - Implements through:
   [Plan 0006](../plans/0006-nbc-retirement-and-debian-suite-migration-fast-path.md)
-- Proposed successor (outside-`stable` completion condition only; still
-  operative until acceptance):
+- Accepted successor (outside-`stable` completion condition only):
   [ADR-0052](0052-remove-nbc-artifact-retention-gates.md)
 - Product context:
   [Snosi migration runbook](https://github.com/frostyard/snosi/blob/main/docs/nbc-to-bootc-migration.md)

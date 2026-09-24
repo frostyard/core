@@ -88,10 +88,11 @@ publication, and archive mutation is separately presented for approval.
   [ADR-0049](../adr/0049-retire-omarchy-apps-without-breaking-snosi.md)
 - Retention clause amended by:
   [ADR-0050](../adr/0050-replace-nbc-retention-date-with-a-completion-condition.md)
-  (Phase 6's archive precondition now includes the completion condition that
-  ADR replaces ADR-0047's calendar date with)
-- Proposed successor for NBC-specific retention only (ADR-0050's condition
-  remains operative until acceptance; Phase 6's other requirements remain):
+  (replaced ADR-0047's calendar date with a completion condition for artifacts
+  outside signed `stable`; that condition is since removed by ADR-0052, which
+  does not relax ADR-0048's signed `stable` floor)
+- Accepted successor for NBC-specific retention only (Phase 6's other
+  requirements remain):
   [ADR-0052](../adr/0052-remove-nbc-artifact-retention-gates.md)
 - Coordinates with:
   [Organization portfolio stewardship](0002-org-portfolio-roadmap.md) and the
