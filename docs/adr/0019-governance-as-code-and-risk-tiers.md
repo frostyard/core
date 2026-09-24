@@ -62,4 +62,6 @@ shared vocabulary for how much scrutiny a change deserves.
 - Extended by:
   [ADR-0035](0035-author-organization-authority-as-strict-json.md), which keeps
   repository policy instances local while core publishes their canonical
-  schema and the organization enrollment authority
+  schema and the organization enrollment authority, and
+  [ADR-0051](0051-adrs-state-facts-not-process.md), which places a review
+  rubric check for ADR voice alongside this ADR's rubric

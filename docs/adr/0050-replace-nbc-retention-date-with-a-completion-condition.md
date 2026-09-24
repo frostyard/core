@@ -1,6 +1,6 @@
 # 0050 — Replace the NBC/native-A/B retention date with a completion condition
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-09-23
 
 ## Context
@@ -14,38 +14,30 @@ rest of ADR-0047 — the 2026-09-30 support cutoff, the four-user fast path,
 migration readiness gates, interim ownership, and the archive precondition
 for `frostyard/nbc` — is unaffected and remains Accepted.
 
-Brian asked for the fixed one-year date to be removed. Before drafting,
-Murbella (keeper of `snosi`) was consulted on whether anything in Snosi's
-domain is load-bearing against that calendar horizon. Her answer:
+`bootc rollback` and native A/B's dual-slot rollback are both host-local;
+neither reaches back to retained registry/R2 artifacts. Snosi's documented
+migration path is fresh reinstall from the current Firn ISO plus operator
+backup/restore, not an update hop from, or in-place conversion of, retained
+nbc/native-A/B artifacts. Snosi's commitment to the four known users is
+best-effort migration help through 2026-10-31 only (per ADR-0047), a shorter
+horizon than 2027-09-30. One documented edge case assumes retained nbc
+install media exists: the migration runbook's "backing out" path (§8), which
+reinstalls nbc media to reverse a migration; it is framed as a discouraged
+last resort, not a guarantee. The 2027-09-30 date is not load-bearing for any
+Snosi rollback or migration-tooling guarantee; the only real dependency is
+the four known users' migration disposition.
 
-- `bootc rollback` and native A/B's dual-slot rollback are both host-local;
-  neither reaches back to retained registry/R2 artifacts.
-- Snosi's documented migration path is fresh reinstall from the current Firn
-  ISO plus operator backup/restore — not an update hop from, or in-place
-  conversion of, retained nbc/native-A/B artifacts.
-- Snosi's own commitment to the four known users is best-effort migration
-  help through **2026-10-31** only (per ADR-0047), a much shorter horizon
-  than 2027-09-30.
-- One documented edge case does assume retained nbc install media exists:
-  the migration runbook's "backing out" path (§8), which reinstalls nbc
-  media to reverse a migration. It is already framed as a discouraged
-  last resort, not a guarantee.
-
-Her conclusion: the 2027-09-30 date is not load-bearing for any Snosi
-guarantee. The only real dependency is the four known users' migration
-disposition.
-
-Separately, Accepted [ADR-0048](0048-publish-debian-packages-to-explicit-codenames.md)
+Accepted [ADR-0048](0048-publish-debian-packages-to-explicit-codenames.md)
 independently requires: "Keep the current signed `stable` repository readable
 and unchanged through at least 2027-09-30 as a legacy recovery source." NBC's
 `.deb` packages, their signed indexes, and their checksums are published
 inside that shared `stable` suite, alongside every other legacy package.
 ADR-0048's floor was decided for the whole suite's recovery value, not for
-NBC specifically, and this ADR does not touch it. Anything ADR-0050 says
-about removing a calendar floor therefore applies only to the part of
-ADR-0047's frozen artifact set that ADR-0048 does not already govern:
-native A/B disk images, NBC installer media, and any public verification
-material held outside the signed `stable` APT tree.
+NBC specifically, and this ADR does not touch it. Anything this ADR says
+about removing a calendar floor applies only to the part of ADR-0047's
+frozen artifact set that ADR-0048 does not already govern: native A/B disk
+images, NBC installer media, and any public verification material held
+outside the signed `stable` APT tree.
 
 ## Decision
 
@@ -120,13 +112,11 @@ pass their recovery check).
 ## Alternatives considered
 
 - **Shorten the fixed date instead of removing it.** Rejected: any new
-  calendar date would be as arbitrary as the one being replaced, and
-  Murbella's answer showed the real dependency is a condition (migration
-  disposition), not a duration.
+  calendar date would be as arbitrary as the one being replaced; the real
+  dependency is a condition (migration disposition), not a duration.
 - **Leave ADR-0047's date in place and treat it as a floor, not a target.**
-  Rejected: Brian's instruction was to remove the one-year mandate, not
-  reinterpret it; an unstated "floor" invites exactly the ambiguity this ADR
-  exists to resolve.
+  Rejected: an unstated "floor" invites the ambiguity this ADR exists to
+  resolve.
 - **Amend ADR-0047 directly.** Rejected: ADR-0047 is Accepted and
   semantically immutable; ADR-0033 permits only link-destination repairs to
   an Accepted ADR, not a change to its retention obligation. A new ADR is

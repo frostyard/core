@@ -20,6 +20,12 @@ authored ([ADR-0019](../../docs/adr/0019-governance-as-code-and-risk-tiers.md)).
    ([ADR-0021](../../docs/adr/0021-sha-pinned-actions-and-least-privilege-ci.md)).
 5. Confirm the PR body declares a risk tier (highest applicable, never
    lower) in the template's Risk tier section.
-6. Report findings as review comments ordered by severity; state plainly
+6. If the diff adds or edits an ADR, confirm its text states context,
+   decision, and consequences as facts only — no narration of who asked, who
+   was consulted, or the author's process
+   ([ADR-0051](../../docs/adr/0051-adrs-state-facts-not-process.md)). Flag
+   any such narration as a rubric failure; it belongs in the PR description,
+   not the ADR.
+7. Report findings as review comments ordered by severity; state plainly
    when a row passes. A PR with any failing rubric row gets "request
    changes", not silence.

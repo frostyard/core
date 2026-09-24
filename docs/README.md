@@ -63,6 +63,7 @@ Docs are split by the question they answer:
 - [0048 — Publish Debian packages to explicit codenames](adr/0048-publish-debian-packages-to-explicit-codenames.md)
 - [0049 — Retire omarchy-apps without breaking Snosi](adr/0049-retire-omarchy-apps-without-breaking-snosi.md)
 - [0050 — Replace the NBC/native-A/B retention date with a completion condition](adr/0050-replace-nbc-retention-date-with-a-completion-condition.md)
+- [0051 — ADRs state facts only, not the process that produced them](adr/0051-adrs-state-facts-not-process.md)
 
 ### Design
 
