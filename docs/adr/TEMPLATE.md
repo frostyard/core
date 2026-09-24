@@ -5,6 +5,10 @@ Filename: NNNN-kebab-case-title.md (next free number).
 ADRs are semantically immutable once Accepted. ADR-0033 permits link-only
 maintenance; to reverse a decision, write a new ADR and set the old one's
 Status to "Superseded by NNNN".
+ADRs record the decision, not how it was reached. State context, decision,
+and consequences as facts. No narration of who asked, who was consulted, or
+the author's process; that belongs in the PR description
+([ADR-0051](0051-adrs-state-facts-not-process.md)).
 -->
 
 - **Status:** Proposed | Accepted | Superseded by [NNNN](NNNN-title.md)
