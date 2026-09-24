@@ -1,6 +1,6 @@
 # 0052 — Remove NBC/native-A/B artifact retention gates
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-09-24
 
 ## Context
@@ -10,8 +10,8 @@ NBC/native-A/B support on 2026-09-30 and requires final artifacts to be
 retained through 2027-09-30. [ADR-0050](0050-replace-nbc-retention-date-with-a-completion-condition.md)
 replaces that date for artifacts outside signed `stable` with recorded
 dispositions for the four known users and currency of documentation that
-references those artifacts. Until this ADR is Accepted, those completion
-conditions remain in force.
+references those artifacts. Before this ADR's acceptance, those completion
+conditions remained in force.
 
 [ADR-0048](0048-publish-debian-packages-to-explicit-codenames.md) separately
 requires the signed `stable` repository to remain readable and unchanged
@@ -69,18 +69,19 @@ changes to the live Firn installer ISO.
 
 - Retiring images, installer media, verification material, and existing debs
   have no NBC-specific one-year floor or four-user/documentation completion
-  gate once this ADR is Accepted; keeping existing debs remains permitted.
+  gate; keeping existing debs remains permitted.
 - An independently protected deb in `pool/` cannot be removed while its
   bytes are referenced by signed `stable` under ADR-0048. Removing an index
   alone or leaving a broken index does not satisfy that ADR.
 - Unresolved users or misleading recovery instructions are no longer
   automatic retention blockers; separately authorized actions must surface
-  those risks without treating this proposal as operational permission.
+  those risks without treating this decision as operational permission.
 - ADR-0047's support, migration, provenance, and archive obligations remain
   separate from artifact retention. The production Firn installer remains
   outside this retirement scope.
-- While this ADR is Proposed, ADR-0050's existing completion conditions
-  still apply to artifacts outside signed `stable`.
+- ADR-0050's four-user-disposition and documentation-currency conditions no
+  longer apply to artifacts outside signed `stable`; ADR-0048's floor is
+  unaffected.
 
 ## Alternatives considered
 
