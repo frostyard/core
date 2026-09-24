@@ -90,6 +90,9 @@ publication, and archive mutation is separately presented for approval.
   [ADR-0050](../adr/0050-replace-nbc-retention-date-with-a-completion-condition.md)
   (Phase 6's archive precondition now includes the completion condition that
   ADR replaces ADR-0047's calendar date with)
+- Proposed successor for NBC-specific retention only (ADR-0050's condition
+  remains operative until acceptance; Phase 6's other requirements remain):
+  [ADR-0052](../adr/0052-remove-nbc-artifact-retention-gates.md)
 - Coordinates with:
   [Organization portfolio stewardship](0002-org-portfolio-roadmap.md) and the
   [Repogen multi-suite implementation plan](0007-support-suites-in-repogen.md)
