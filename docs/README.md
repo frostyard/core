@@ -92,6 +92,7 @@ Docs are split by the question they answer:
 - [Organization authority rollout](plans/0005-organization-authority-rollout.md)
 - [NBC retirement and Debian suite migration fast path](plans/0006-nbc-retirement-and-debian-suite-migration-fast-path.md)
 - [Support suites in Repogen](plans/0007-support-suites-in-repogen.md)
+- [Post-NBC bootc-only transition (Snosi/Firn)](plans/0008-post-nbc-bootc-only-transition.md)
 
 ## Conventions
 

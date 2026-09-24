@@ -95,4 +95,6 @@ publication, and archive mutation is separately presented for approval.
   [ADR-0052](../adr/0052-remove-nbc-artifact-retention-gates.md)
 - Coordinates with:
   [Organization portfolio stewardship](0002-org-portfolio-roadmap.md) and the
-  [Repogen multi-suite implementation plan](0007-support-suites-in-repogen.md)
+  [Repogen multi-suite implementation plan](0007-support-suites-in-repogen.md),
+  and the distinct post-cutoff Snosi/Firn bootc-only operations and disposal
+  inventory in [Plan 0008](0008-post-nbc-bootc-only-transition.md)
