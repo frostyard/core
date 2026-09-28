@@ -55,8 +55,9 @@ constraints on snapshot versions (must begin with a digit).
 ## References
 
 - Shapes: [updex `.goreleaser.yaml` + `snapshot.yml`](https://github.com/frostyard/updex/blob/main/.goreleaser.yaml),
-  [chairlift `.svu.yaml`](https://github.com/frostyard/chairlift/blob/main/.svu.yaml),
+  [chairlift `.svu.yml`](https://github.com/frostyard/chairlift/blob/main/.svu.yml),
   [pilothouse `scripts/bump.sh`](https://github.com/frostyard/pilothouse/blob/main/scripts/bump.sh),
   the [frostyard-go-repo skill](../../.agents/skills/frostyard-go-repo/SKILL.md)
 - Builds on: [ADR-0011](0011-frostyard-prefixed-package-names.md)
 - Refined by: [ADR-0034](0034-cancel-stale-rolling-dev-releases.md)
+- Filename amendment proposed in: [ADR-0053](0053-name-the-svu-config-svu-yml.md) (config filename)
