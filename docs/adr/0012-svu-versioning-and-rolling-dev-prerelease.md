@@ -60,4 +60,4 @@ constraints on snapshot versions (must begin with a digit).
   the [frostyard-go-repo skill](../../.agents/skills/frostyard-go-repo/SKILL.md)
 - Builds on: [ADR-0011](0011-frostyard-prefixed-package-names.md)
 - Refined by: [ADR-0034](0034-cancel-stale-rolling-dev-releases.md)
-- Filename amendment proposed in: [ADR-0053](0053-name-the-svu-config-svu-yml.md) (config filename)
+- Amended by: [ADR-0053](0053-name-the-svu-config-svu-yml.md) (config filename)

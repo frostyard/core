@@ -1,6 +1,6 @@
 # 0053 — Name the svu config file `.svu.yml`
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-09-28
 
 ## Context
