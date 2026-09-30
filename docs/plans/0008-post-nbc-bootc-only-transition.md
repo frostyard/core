@@ -1,6 +1,6 @@
 # Plan: Post-NBC bootc-only transition (Snosi/Firn)
 
-**Status:** Draft. This plan sequences Snosi/Firn bootc-only operations after
+**Status:** Draft (not yet adopted; authorizes no deletion). This plan sequences Snosi/Firn bootc-only operations after
 the 2026-09-30 NBC/native A/B support cutoff in
 [ADR-0047](../adr/0047-retire-nbc-on-a-proportional-fast-path.md). It
 coordinates with [Plan 0006](0006-nbc-retirement-and-debian-suite-migration-fast-path.md)

@@ -104,6 +104,8 @@ pass their recovery check).
   re-flagged unavailable) before any install media it depends on is removed
   — not after. This is now a named, ordered precondition for archive, not a
   silent gap.
+  - Amended by [ADR-0052](0052-remove-nbc-artifact-retention-gates.md): no
+    longer an archive gate; see its Decision.
 - Readers of ADR-0047 alone will still see "through 2027-09-30" in its
   immutable text; ADR-0047's own References now link forward to this ADR as
   its amendment (link-only maintenance under ADR-0033), and this ADR is the

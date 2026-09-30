@@ -106,4 +106,5 @@ changes to the live Firn installer ISO.
   [ADR-0048](0048-publish-debian-packages-to-explicit-codenames.md)
 - Builds on: [ADR-0033](0033-link-maintenance-in-immutable-adrs.md)
 - Shapes: [Plan 0006](../plans/0006-nbc-retirement-and-debian-suite-migration-fast-path.md),
+  [Plan 0008](../plans/0008-post-nbc-bootc-only-transition.md),
   [stable repository drift alarm](../design/stable-repository-drift-alarm.md)

@@ -1,5 +1,8 @@
 # Plan: NBC retirement and Debian suite migration fast path
 
+**Status:** Active. Retention gates in this plan are amended by
+[ADR-0052](../adr/0052-remove-nbc-artifact-retention-gates.md).
+
 This plan sequences proportional NBC retirement, explicit Debian suites, and
 `omarchy-apps` retirement. No implementation phase begins until its governing
 ADR is Accepted on `core/main`. Every GitHub, workflow, credential, R2,
