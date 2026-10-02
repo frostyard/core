@@ -59,3 +59,5 @@ manifest-last, followed by an explicit CDN purge.
 - Builds on: [ADR-0001](0001-record-architecture-decisions.md)
 - Related: [ADR-0008](0008-sysext-distribution-and-update-contract.md),
   [ADR-0010](0010-publish-packages-via-repogen-to-r2.md)
+- Proposed partial supersession: [ADR-0055](0055-publish-debian-packages-through-the-apt-publisher.md)
+  (Debian namespace; not in effect until Accepted)
