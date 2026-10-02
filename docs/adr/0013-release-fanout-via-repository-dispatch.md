@@ -45,3 +45,5 @@ failed notification must not fail the release that already published.
   [chairlift `snapshot.yml`](https://github.com/frostyard/chairlift/blob/main/.github/workflows/snapshot.yml),
   [pilothouse `release.yml`](https://github.com/frostyard/pilothouse/blob/main/.github/workflows/release.yml)
 - Builds on: [ADR-0010](0010-publish-packages-via-repogen-to-r2.md)
+- Proposed supersession: [ADR-0056](0056-rebuild-images-after-apt-publication.md)
+  (not in effect until Accepted)

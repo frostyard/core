@@ -67,6 +67,8 @@ Docs are split by the question they answer:
 - [0052 — Remove NBC/native-A/B artifact retention gates](adr/0052-remove-nbc-artifact-retention-gates.md)
 - [0053 — Name the svu config file `.svu.yml`](adr/0053-name-the-svu-config-svu-yml.md)
 - [0054 — Remove four-known-users gates from suite migration](adr/0054-remove-four-known-users-gates-from-suite-migration.md)
+- [0055 — Publish Debian packages through the apt-publisher single writer](adr/0055-publish-debian-packages-through-the-apt-publisher.md)
+- [0056 — The APT publisher triggers image rebuilds after packages are live](adr/0056-rebuild-images-after-apt-publication.md)
 
 ### Design
 
@@ -75,6 +77,7 @@ Docs are split by the question they answer:
 - [Skills sync operations](design/skills-sync-operations.md)
 - [Organization authority](design/organization-authority.md)
 - [Stable repository drift alarm](design/stable-repository-drift-alarm.md)
+- [Debian publication](design/debian-publication.md)
 
 ### Specs
 
@@ -95,6 +98,7 @@ Docs are split by the question they answer:
 - [Debian suite migration fast path](plans/0006-nbc-retirement-and-debian-suite-migration-fast-path.md)
 - [Support suites in Repogen](plans/0007-support-suites-in-repogen.md)
 - [Post-NBC bootc-only transition (Snosi/Firn)](plans/0008-post-nbc-bootc-only-transition.md)
+- [Debian publication through apt-publisher](plans/0009-debian-publication-through-apt-publisher.md)
 
 ## Conventions
 

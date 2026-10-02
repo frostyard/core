@@ -106,3 +106,5 @@ publication. `omarchy-apps` is excluded from the future publisher set.
   [ADR-0052](0052-remove-nbc-artifact-retention-gates.md)
 - Proposed partial supersession: [ADR-0054](0054-remove-four-known-users-gates-from-suite-migration.md)
   (four-known-users conditions; not in effect until Accepted)
+- Proposed supersession: [ADR-0055](0055-publish-debian-packages-through-the-apt-publisher.md)
+  (not in effect until Accepted)
