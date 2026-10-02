@@ -108,3 +108,4 @@ changes to the live Firn installer ISO.
 - Shapes: [Plan 0006](../plans/0006-nbc-retirement-and-debian-suite-migration-fast-path.md),
   [Plan 0008](../plans/0008-post-nbc-bootc-only-transition.md),
   [stable repository drift alarm](../design/stable-repository-drift-alarm.md)
+- Current successor for ADR-0048's signed-`stable` floor: [ADR-0055](0055-publish-debian-packages-through-the-apt-publisher.md)

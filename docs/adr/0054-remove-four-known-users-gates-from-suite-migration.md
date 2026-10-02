@@ -1,6 +1,6 @@
 # 0054 — Remove four-known-users gates from suite migration
 
-- **Status:** Accepted
+- **Status:** Superseded by [0055](0055-publish-debian-packages-through-the-apt-publisher.md)
 - **Date:** 2026-10-02
 
 ## Context
@@ -55,5 +55,4 @@ All other ADR-0048 decisions remain in force.
   [Plan 0007](../plans/0007-support-suites-in-repogen.md)
 - Builds on: [ADR-0033](0033-link-maintenance-in-immutable-adrs.md),
   [ADR-0052](0052-remove-nbc-artifact-retention-gates.md)
-- Proposed supersession: [ADR-0055](0055-publish-debian-packages-through-the-apt-publisher.md)
-  (not in effect until Accepted)
+- Superseded by: [ADR-0055](0055-publish-debian-packages-through-the-apt-publisher.md)

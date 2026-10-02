@@ -60,3 +60,4 @@ that don't hold them locally.
 - Builds on: [ADR-0009](0009-single-artifact-origin-repository-frostyard-org.md)
 - Related: [ADR-0014](0014-single-gpg-trust-root.md),
   [ADR-0021](0021-sha-pinned-actions-and-least-privilege-ci.md)
+- Current successor: [ADR-0055](0055-publish-debian-packages-through-the-apt-publisher.md) (supersedes ADR-0048)

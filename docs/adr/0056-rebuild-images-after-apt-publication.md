@@ -1,6 +1,6 @@
 # 0056 — The APT publisher triggers image rebuilds after packages are live
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-10-02
 
 ## Context

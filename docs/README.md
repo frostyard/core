@@ -25,7 +25,7 @@ Docs are split by the question they answer:
 - [0010 — Publish packages through the shared repogen action](adr/0010-publish-packages-via-repogen-to-r2.md)
 - [0011 — Distro packages are named frostyard-&lt;tool&gt;](adr/0011-frostyard-prefixed-package-names.md)
 - [0012 — svu-derived versions, make bump, and the rolling dev prerelease](adr/0012-svu-versioning-and-rolling-dev-prerelease.md)
-- [0013 — Component releases trigger image rebuilds via repository_dispatch](adr/0013-release-fanout-via-repository-dispatch.md)
+- [0013 — Component releases trigger image rebuilds via repository_dispatch](adr/0013-release-fanout-via-repository-dispatch.md) *(superseded by 0056)*
 - [0014 — One GPG repository key, baked into images](adr/0014-single-gpg-trust-root.md)
 - [0015 — os-release is the image identity surface](adr/0015-os-release-image-identity.md)
 - [0016 — Reverse-DNS org.frostyard.* identifiers](adr/0016-reverse-dns-org-frostyard-identifiers.md)
@@ -60,13 +60,13 @@ Docs are split by the question they answer:
 - [0045 — Guard Actions-secret expiry with a committed record](adr/0045-guard-actions-secret-expiry-in-the-repository.md)
 - [0046 — Rename the cayo server image to floe](adr/0046-rename-cayo-server-image-to-floe.md)
 - [0047 — Retire NBC on a proportional four-user fast path](adr/0047-retire-nbc-on-a-proportional-fast-path.md)
-- [0048 — Publish Debian packages to explicit codenames](adr/0048-publish-debian-packages-to-explicit-codenames.md)
+- [0048 — Publish Debian packages to explicit codenames](adr/0048-publish-debian-packages-to-explicit-codenames.md) *(superseded by 0055)*
 - [0049 — Retire omarchy-apps without breaking Snosi](adr/0049-retire-omarchy-apps-without-breaking-snosi.md)
 - [0050 — Replace the NBC/native-A/B retention date with a completion condition](adr/0050-replace-nbc-retention-date-with-a-completion-condition.md)
 - [0051 — ADRs state facts only, not the process that produced them](adr/0051-adrs-state-facts-not-process.md)
 - [0052 — Remove NBC/native-A/B artifact retention gates](adr/0052-remove-nbc-artifact-retention-gates.md)
 - [0053 — Name the svu config file `.svu.yml`](adr/0053-name-the-svu-config-svu-yml.md)
-- [0054 — Remove four-known-users gates from suite migration](adr/0054-remove-four-known-users-gates-from-suite-migration.md)
+- [0054 — Remove four-known-users gates from suite migration](adr/0054-remove-four-known-users-gates-from-suite-migration.md) *(superseded by 0055)*
 - [0055 — Publish Debian packages through the apt-publisher single writer](adr/0055-publish-debian-packages-through-the-apt-publisher.md)
 - [0056 — The APT publisher triggers image rebuilds after packages are live](adr/0056-rebuild-images-after-apt-publication.md)
 
@@ -95,8 +95,8 @@ Docs are split by the question they answer:
 - [Firn skills sync onboarding](plans/0003-onboard-firn-to-skills-sync.md)
 - [Dev release concurrency rollout](plans/0004-dev-release-concurrency-rollout.md)
 - [Organization authority rollout](plans/0005-organization-authority-rollout.md)
-- [Debian suite migration fast path](plans/0006-nbc-retirement-and-debian-suite-migration-fast-path.md)
-- [Support suites in Repogen](plans/0007-support-suites-in-repogen.md)
+- [Debian suite migration fast path](plans/0006-nbc-retirement-and-debian-suite-migration-fast-path.md) *(superseded by Plan 0009)*
+- [Support suites in Repogen](plans/0007-support-suites-in-repogen.md) *(superseded by Plan 0009)*
 - [Post-NBC bootc-only transition (Snosi/Firn)](plans/0008-post-nbc-bootc-only-transition.md)
 - [Debian publication through apt-publisher](plans/0009-debian-publication-through-apt-publisher.md)
 
