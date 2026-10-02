@@ -1,11 +1,9 @@
 # Plan: Debian publication through apt-publisher
 
-**Status:** Proposed. It becomes Active, replacing
+**Status:** Active. Governed by [ADR-0055](../adr/0055-publish-debian-packages-through-the-apt-publisher.md)
+and [ADR-0056](../adr/0056-rebuild-images-after-apt-publication.md); replaces
 [Plan 0006](0006-nbc-retirement-and-debian-suite-migration-fast-path.md) and
-[Plan 0007](0007-support-suites-in-repogen.md), when
-[ADR-0055](../adr/0055-publish-debian-packages-through-the-apt-publisher.md)
-and [ADR-0056](../adr/0056-rebuild-images-after-apt-publication.md) are
-Accepted.
+[Plan 0007](0007-support-suites-in-repogen.md).
 
 This plan moves every Frostyard Debian producer and consumer from the frozen
 legacy `stable` suite to explicit codenames at

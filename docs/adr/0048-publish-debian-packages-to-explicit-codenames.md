@@ -1,6 +1,6 @@
 # 0048 — Publish Debian packages to explicit codenames
 
-- **Status:** Accepted
+- **Status:** Superseded by [0055](0055-publish-debian-packages-through-the-apt-publisher.md)
 - **Date:** 2026-09-09
 
 ## Context
@@ -104,7 +104,6 @@ publication. `omarchy-apps` is excluded from the future publisher set.
 - Accepted NBC-specific retention clarification (does not amend this ADR's
   signed `stable` floor):
   [ADR-0052](0052-remove-nbc-artifact-retention-gates.md)
-- Proposed partial supersession: [ADR-0054](0054-remove-four-known-users-gates-from-suite-migration.md)
-  (four-known-users conditions; not in effect until Accepted)
-- Proposed supersession: [ADR-0055](0055-publish-debian-packages-through-the-apt-publisher.md)
-  (not in effect until Accepted)
+- Superseded in part by: [ADR-0054](0054-remove-four-known-users-gates-from-suite-migration.md)
+  (four-known-users conditions)
+- Superseded by: [ADR-0055](0055-publish-debian-packages-through-the-apt-publisher.md)

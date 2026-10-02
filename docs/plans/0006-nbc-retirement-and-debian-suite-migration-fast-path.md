@@ -4,9 +4,9 @@
 [ADR-0048](../adr/0048-publish-debian-packages-to-explicit-codenames.md) as
 amended by [ADR-0054](../adr/0054-remove-four-known-users-gates-from-suite-migration.md).
 
-Proposed replacement: [Plan 0009](0009-debian-publication-through-apt-publisher.md), not in effect until
+**Superseded by [Plan 0009](0009-debian-publication-through-apt-publisher.md)** on 2026-10-02, when
 [ADR-0055](../adr/0055-publish-debian-packages-through-the-apt-publisher.md) and
-[ADR-0056](../adr/0056-rebuild-images-after-apt-publication.md) are Accepted.
+[ADR-0056](../adr/0056-rebuild-images-after-apt-publication.md) were Accepted. Kept as a historical record.
 
 This plan sequences explicit Debian suites. Each GitHub, workflow, credential,
 R2, publication, and archive mutation requires separate approval. No phase

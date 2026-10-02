@@ -2,7 +2,7 @@
 
 Living document. Rationale:
 [ADR-0014](../adr/0014-single-gpg-trust-root.md),
-[ADR-0048](../adr/0048-publish-debian-packages-to-explicit-codenames.md).
+[ADR-0055](../adr/0055-publish-debian-packages-through-the-apt-publisher.md).
 Contracts:
 [stable repository drift alarm](../specs/stable-repository-drift-alarm.md).
 
@@ -81,7 +81,9 @@ authorize a future stable mutation.
 
 - Rationale:
   [ADR-0014](../adr/0014-single-gpg-trust-root.md),
-  [ADR-0048](../adr/0048-publish-debian-packages-to-explicit-codenames.md)
+  [ADR-0055](../adr/0055-publish-debian-packages-through-the-apt-publisher.md)
+  (signed-`stable` floor; first recorded in
+  [ADR-0048](../adr/0048-publish-debian-packages-to-explicit-codenames.md))
 - Accepted NBC-specific policy clarification (does not change this verifier):
   [ADR-0052](../adr/0052-remove-nbc-artifact-retention-gates.md)
 - Contracts:

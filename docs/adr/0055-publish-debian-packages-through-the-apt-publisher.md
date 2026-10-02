@@ -1,6 +1,6 @@
 # 0055 — Publish Debian packages through the apt-publisher single writer
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-10-02
 
 ## Context

@@ -3,7 +3,7 @@
 **Status:** Draft (not yet adopted; authorizes no deletion). This plan sequences Snosi/Firn bootc-only operations after
 the 2026-09-30 NBC/native A/B support cutoff in
 [ADR-0047](../adr/0047-retire-nbc-on-a-proportional-fast-path.md). It
-coordinates with [Plan 0006](0006-nbc-retirement-and-debian-suite-migration-fast-path.md)
+coordinates with [Plan 0009](0009-debian-publication-through-apt-publisher.md)
 but does not replace its Debian-suite work or decide retention policy.
 [ADR-0050](../adr/0050-replace-nbc-retention-date-with-a-completion-condition.md)
 is Accepted; its outside-`stable` completion conditions no longer apply under
@@ -74,8 +74,8 @@ presenting production actions for approval.
   Do not treat this as permission to mutate a signed repository, delete
   existing packages or objects, or archive a repository. Existing debs may
   remain. This plan owns NBC archive sequencing under ADR-0047's preconditions;
-  Plan 0006 owns the parallel explicit-suite migration;
-  [ADR-0048](../adr/0048-publish-debian-packages-to-explicit-codenames.md)
+  Plan 0009 owns the parallel explicit-suite migration;
+  [ADR-0055](../adr/0055-publish-debian-packages-through-the-apt-publisher.md)
   rejects `stable` as a write target.
 - Preserve ADR-0047's narrow emergency exception: Brian's written approval
   identifies the **exact** artifact, reason, digest, affected users, test
@@ -161,7 +161,7 @@ presenting production actions for approval.
 - Protect signed `stable` metadata and **every** referenced `pool/` package
   byte, even outside `dists/`, readable and unchanged through at least
   2027-09-30 under
-  [ADR-0048](../adr/0048-publish-debian-packages-to-explicit-codenames.md).
+  [ADR-0055](../adr/0055-publish-debian-packages-through-the-apt-publisher.md).
   Existing debs may remain. Accepted
   [ADR-0052](../adr/0052-remove-nbc-artifact-retention-gates.md) removes
   [ADR-0050](../adr/0050-replace-nbc-retention-date-with-a-completion-condition.md)'s
@@ -211,9 +211,9 @@ presenting production actions for approval.
 
 - Implements the post-cutoff and migration-readiness portions of
   [ADR-0047](../adr/0047-retire-nbc-on-a-proportional-fast-path.md); preserves
-  [ADR-0048](../adr/0048-publish-debian-packages-to-explicit-codenames.md)'s
+  [ADR-0055](../adr/0055-publish-debian-packages-through-the-apt-publisher.md)'s
   signed-`stable` floor and coordinates with
-  [Plan 0006](0006-nbc-retirement-and-debian-suite-migration-fast-path.md).
+  [Plan 0009](0009-debian-publication-through-apt-publisher.md).
 - Retention boundary: Accepted
   [ADR-0050](../adr/0050-replace-nbc-retention-date-with-a-completion-condition.md)'s
   outside-`stable` completion conditions are removed by Accepted
