@@ -66,6 +66,7 @@ Docs are split by the question they answer:
 - [0051 — ADRs state facts only, not the process that produced them](adr/0051-adrs-state-facts-not-process.md)
 - [0052 — Remove NBC/native-A/B artifact retention gates](adr/0052-remove-nbc-artifact-retention-gates.md)
 - [0053 — Name the svu config file `.svu.yml`](adr/0053-name-the-svu-config-svu-yml.md)
+- [0054 — Remove four-known-users gates from suite migration](adr/0054-remove-four-known-users-gates-from-suite-migration.md)
 
 ### Design
 
@@ -91,7 +92,7 @@ Docs are split by the question they answer:
 - [Firn skills sync onboarding](plans/0003-onboard-firn-to-skills-sync.md)
 - [Dev release concurrency rollout](plans/0004-dev-release-concurrency-rollout.md)
 - [Organization authority rollout](plans/0005-organization-authority-rollout.md)
-- [NBC retirement and Debian suite migration fast path](plans/0006-nbc-retirement-and-debian-suite-migration-fast-path.md)
+- [Debian suite migration fast path](plans/0006-nbc-retirement-and-debian-suite-migration-fast-path.md)
 - [Support suites in Repogen](plans/0007-support-suites-in-repogen.md)
 - [Post-NBC bootc-only transition (Snosi/Firn)](plans/0008-post-nbc-bootc-only-transition.md)
 

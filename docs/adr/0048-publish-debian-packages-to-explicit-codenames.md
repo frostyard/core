@@ -104,3 +104,5 @@ publication. `omarchy-apps` is excluded from the future publisher set.
 - Accepted NBC-specific retention clarification (does not amend this ADR's
   signed `stable` floor):
   [ADR-0052](0052-remove-nbc-artifact-retention-gates.md)
+- Proposed partial supersession: [ADR-0054](0054-remove-four-known-users-gates-from-suite-migration.md)
+  (four-known-users conditions; not in effect until Accepted)

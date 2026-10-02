@@ -6,13 +6,13 @@ or support announcements.
 
 ## Executive decision
 
-Frostyard does **not** currently publish an APT suite named `main`. As observed on **2026-09-12**, production exposes only `dists/stable`; its signed Release metadata says `Origin: Repogen Repository`, `Label: Frostyard Repository`, `Suite: stable`, `Codename: stable`, `Components: main`, and `Architectures: all amd64`. It has no `Acquire-By-Hash` or `Valid-Until` field. `main` is the sole APT **component** and, separately, the common Git default branch. Snosi's operating-system base is Debian **Trixie**, but its Frostyard package source still reads from APT suite `stable`.
+**Historical baseline (2026-09-12), refreshed in Phase 0:** Frostyard did **not** publish an APT suite named `main`. Production exposed only `dists/stable`; its signed Release metadata said `Origin: Repogen Repository`, `Label: Frostyard Repository`, `Suite: stable`, `Codename: stable`, `Components: main`, and `Architectures: all amd64`. It had no `Acquire-By-Hash` or `Valid-Until` field. `main` is the sole APT **component** and, separately, the common Git default branch. Snosi's operating-system base was Debian **Trixie**, but its Frostyard package source still read from APT suite `stable`.
 
-Accepted [ADR-0048](../adr/0048-publish-debian-packages-to-explicit-codenames.md) and [Plan 0006](0006-nbc-retirement-and-debian-suite-migration-fast-path.md) already decide the direction: freeze legacy `stable`; publish explicit immutable `trixie` first and `forky` later; make Repogen the sole protected production metadata writer; fail closed; pin tooling; retain compact manifests; and migrate by a canary and then the minimum supported package closure. This plan implements that decision rather than reopening it.
+[ADR-0048](../adr/0048-publish-debian-packages-to-explicit-codenames.md), as amended by proposed [ADR-0054](../adr/0054-remove-four-known-users-gates-from-suite-migration.md), and [Plan 0006](0006-nbc-retirement-and-debian-suite-migration-fast-path.md) define the direction: freeze legacy `stable`; publish explicit immutable `trixie` first and `forky` later; make Repogen the sole protected production metadata writer; fail closed; pin tooling; retain compact manifests; and migrate by a canary and then the minimum supported package closure. This plan implements that direction rather than reopening it.
 
 Repogen already generates **one arbitrary codename per invocation**. Keep that as the transaction boundary. Do not build a giant all-suites command and do not expand this into multi-component support. The first problem is safe package selection, strict restoration, immutable shared-pool handling, signed by-hash publication, and a protected writer. In keeping with the accepted proportional fast path, the first Trixie canary is gated only on the bounded R1–R5 safety subset below. Determinism, durable reconciliation, complete failure-injection hardening, sysext correction, and producer migration remain mandatory before expanding the Trixie closure or beginning Forky.
 
-## Verified baseline
+## Verified baseline — Historical baseline (2026-09-12), refreshed in Phase 0
 
 Live observations below are a snapshot from **2026-09-12** and can drift:
 
@@ -50,19 +50,25 @@ Scope is APT publication, affected package producers and consumers, image/instal
 
 ## Accepted non-negotiable constraints
 
-These come from ADR-0048/Plan 0006 and related accepted decisions; implementation may choose mechanics but may not silently weaken them:
+These come from ADR-0048, Plan 0006, and related accepted decisions. The amended
+constraints 7 and 9 below, including removal of four-user gates, apply only
+once [ADR-0054](../adr/0054-remove-four-known-users-gates-from-suite-migration.md)
+is Accepted on `core/main`. Until then, ADR-0048's original four-user
+confirmation condition and corresponding user-disposition gates govern.
+Implementation may choose mechanics but may not silently weaken the governing
+decision:
 
 1. Production writes use explicit matching immutable `codename` and `suite`; `stable` is rejected as a write target.
-2. Existing signed `stable` remains byte-preserved and readable through at least **2027-09-30**.
+2. Existing signed `stable`, including indexes and referenced `pool/` bytes, remains byte-preserved and readable through at least **2027-09-30**; no `stable`-to-codename redirect, symlink, or alias suite.
 3. Repogen becomes the one protected production metadata writer. Producers submit immutable packages; they do not independently mutate APT metadata after migration.
 4. Existing-state reads, signature verification, every architecture index parse, and checksum checks fail closed. Missing state is first-suite creation only when explicitly requested.
 5. Action references use full SHAs. Repogen pins bind an exact version, exact asset name, and verified digest. The observed v0.4.1 `repogen-linux-amd64` digest was `429f832d49433d5ec72679b580f716d192098214dde66812094dfae4fe2bb7c4`, but migration targets a new correctness release rather than blessing v0.4.1.
 6. Every publication records a compact, durable manifest linking producer provenance, exact artifacts, target codename, tooling, Release identity, and previous/resulting Release digests. This is the accepted proportional record, not a new full-attestation prerequisite.
-7. Migration order is frozen baseline and user disposition → bounded Repogen safety/protected-writer subset → `gchlog` Trixie canary → remaining Repogen hardening → minimum Snosi Trixie closure → explicit Trixie consumers → isolated Forky.
+7. Migration order is refreshed frozen baseline → bounded Repogen safety/protected-writer subset → `gchlog` Trixie canary → remaining Repogen hardening → minimum Snosi Trixie closure → explicit Trixie consumers → isolated Forky.
 8. A package may be reused across codenames only when the exact bytes/digest are identical and compatibility is recorded. Otherwise its Debian version/filename must be suite-distinct.
-9. Trixie remains available at least 90 days after Forky promotion and until **all four known users** governed by ADR-0048 confirm migration. Phase 0 must record a disposition for each user; this is not deferred to promotion.
-10. NBC is never published to Forky; its lifecycle follows [ADR-0047](../adr/0047-retire-nbc-on-a-proportional-fast-path.md). `omarchy-apps` does not become a future multi-suite publisher; its frozen dependencies follow [ADR-0049](../adr/0049-retire-omarchy-apps-without-breaking-snosi.md).
-11. Plan 0006 names Brian as the interim release and exception owner; the remaining ownership question is the backup/successor, not whether an interim owner exists.
+9. Trixie remains readable for at least 90 days after Forky promotion per [ADR-0054](../adr/0054-remove-four-known-users-gates-from-suite-migration.md). Signed `stable` remains readable and unchanged, including indexes and referenced `pool/` bytes, through at least 2027-09-30; no `stable`-to-codename redirect, symlink, or alias suite is permitted.
+10. NBC/native A/B lifecycle work follows [Plan 0008](0008-post-nbc-bootc-only-transition.md) and [ADR-0047](../adr/0047-retire-nbc-on-a-proportional-fast-path.md); `omarchy-apps` retirement follows [ADR-0049](../adr/0049-retire-omarchy-apps-without-breaking-snosi.md). Neither is a suite-migration gate.
+11. Brian remains the interim release and exception owner; the remaining ownership question is the backup/successor, not whether an interim owner exists.
 12. This plan's authority is advisory. Workflow/environment permissions and secret placement are proposed operational controls, not a claim that ADC's advisory authority is technically enforced.
 
 ## Target architecture
@@ -182,43 +188,46 @@ Sysext correction is coupled but not a canary blocker and not an excuse to break
 
 | Property | Current role/assumption | Required change | Order/dependency | Measurable gate |
 |---|---|---|---|---|
-| **core** | ADR-0048 and Plan 0006 are accepted policy; adjacent lifecycle/signing ADRs govern exceptions; Brian is interim release/exception owner. | Track implementation evidence, four-user dispositions, package/consumer compatibility ledger, Firn-only migration instructions, runbook, rollback, retention, backup/successor ownership, and follow-up pool/sysext/serialization/version ADRs. | Start with R1/Phase 0; continue each phase. | Core status matches live endpoints/manifests; each known user has a disposition; contradictions and user-visible limitations are recorded. |
+| **core** | ADR-0048 as amended by ADR-0054 and Plan 0006 govern suite migration; adjacent lifecycle/signing ADRs govern exceptions; Brian is interim release/exception owner. | Track implementation evidence, package/consumer compatibility ledger, Firn-only migration instructions, runbook, rollback, retention, backup/successor ownership, and follow-up pool/sysext/serialization/version ADRs. | Start with R1/Phase 0; continue each phase. | Core status matches live endpoints/manifests; contradictions and user-visible limitations are recorded. |
 | **repogen** | One arbitrary codename per run; implicit stable direct action; broad restore/upload; mutable binary; two parse-drop paths; no by-hash/digest collision guard. | Complete R1–R5 for the canary, then R6–R10 before closure expansion; become the sole protected APT metadata writer while preserving sysext via a separate path. | First. | Two signed suites eventually coexist; no-op deterministic; failures/concurrency preserve prior metadata and stable bytes. |
-| **snosi** | Debian Trixie base consumes Frostyard `stable`; publishes sysext through Repogen; selected upstream Forky systemd packages do not imply Frostyard Forky support. | First add an explicit Trixie test lane and Release identity/digest assertions; later add isolated Forky. Preserve OS 13 sysexts while adding OS 14. Remove NBC edges per ADR-0047, not by matrixing them. | After Trixie closure; Forky after producer lanes. | Clean supported profiles build from one matching Frostyard codename; recorded Release digest; switch-back and image rollback pass. |
+| **snosi** | Debian Trixie base consumes Frostyard `stable`; publishes sysext through Repogen; selected upstream Forky systemd packages do not imply Frostyard Forky support. | First add an explicit Trixie test lane and Release identity/digest assertions; later add isolated Forky. Preserve OS 13 sysexts while adding OS 14. | After Trixie closure; Forky after producer lanes. | Clean supported profiles build from one matching Frostyard codename; recorded Release digest; switch-back and image rollback pass. |
 | **bootc-debian** | Critical producer built in `debian:trixie`; dependencies include Trixie-specific `libgpgme11t64`. | Add explicit Trixie/Forky builds, re-derive runtime dependencies (`libgpgme45` on Forky evidence), install-test each, use suite-distinct versions when bytes differ, submit manifests, remove direct writer credentials after cutover. | After central writer; before Forky Snosi. | `bootc` and `libostree-1-1` install in clean matching-suite environments; collision preflight passes. |
 | **Incus fork** | Critical five-package family is in stable; source workflow creates Debian 12/13 artifacts, but no checked-in production publication bridge was found. Forky needs `libgpgme45` and `libnet9`. | Identify/document actual publication bridge and owner; add Debian 14 lane/runtime tests; route full cohort through central intake with provenance. | Discovery starts early; blocks Forky Incus/Snosi. | Proven source→artifact→manifest→index chain for all five packages; clean Forky Incus sysext test. **Unresolved bridge is a blocker.** |
-| **gchlog** | Chosen Trixie canary; current workflow implicit/mutable; no live stable entry observed. | Produce reproducible Trixie deb, pin workflow/tooling, submit one compact immutable intake, clean-install, record rollback, then freeze Trixie writes until R6–R10. | First production object after R1–R5 and separate publication authorization. | Signed `dists/trixie` canary with by-hash, valid manifest, real apt install, stable digests unchanged. |
+| **gchlog** | Chosen Trixie canary; **Lucilla** (Keeper of packages and sysext delivery, owner of `frostyard/gchlog`) is the canary owner; current workflow implicit/mutable; no live stable entry observed. | Produce reproducible Trixie deb, pin workflow/tooling, submit one compact immutable intake, clean-install, record rollback, then freeze Trixie writes until R6–R10. | First production object after R1–R5 and separate publication authorization. | Signed `dists/trixie` canary with by-hash, valid manifest, real apt install, stable digests unchanged. |
 | **updex** | Deb producer and sysext consumer; `%w` follows OS VERSION_ID. | Explicit suite submissions; add Debian 13/14 version/comparator fixtures and `%w=13/14` tests. Keep APT and ext publication distinct. | Trixie closure, then Forky. | Matching package installs; each host selects only matching sysext generation. |
 | **chairlift** | Deb producer and image update UI; current publication implicit. Stable also contains `frostyard-chairlift-system-integration`. | Build/install/runtime test both packages and suites; submit manifests. Surface image/codename provenance without normalizing raw APT-suite mixing as UX. | Trixie closure; before affected product promotion. | GTK/service and system-integration packages pass both closures; reported codename matches image. |
-| **firn** | Deb producer/installer; catalogs OCI `latest`-style channels and uses Trixie bootstrap guests. | Publish per supported suite; carry codename/support separately from OCI ref; suite-qualify channels/digests; produce actionable Firn-only migration instructions; matrix every reported product/hardware class. | After repository closure and image channels. | Published Firn ISO installs every reported class; each class passes one real update and user-data-preserving rollback; limitations are disclosed directly to affected users. |
+| **firn** | Deb producer/installer; catalogs OCI `latest`-style channels and uses Trixie bootstrap guests. | Publish per supported suite; carry codename/support separately from OCI ref; suite-qualify channels/digests; produce actionable Firn-only migration instructions; validate supported product/hardware classes. | After repository closure and image channels. | Published Firn ISO installs supported classes; each class passes one real update and user-data-preserving rollback; limitations are communicated separately as support work. |
 | **first-setup** | `all` package consumed by Snow; implicit publisher. | Decide whether it remains in Forky Snow. If retained, build/install/UI-test and publish explicitly; otherwise remove/replace dependency before Forky. | Trixie closure; human support choice blocks Forky Snow. | `snow-first-setup` works on each supported generation or has no remaining Forky dependency. |
 | **intuneme** | Deb producer consumed by Snow and Sundog. | Validate runtime/service dependencies, publish explicitly, gate both images. | Trixie closure; then Forky products. | Clean install and functional service test on each supported codename. |
-| **nbc** | Legacy publisher/dependency; accepted retirement and no Forky. | No Forky package/lane. Preserve stable; only separately approved emergency Trixie publication. Remove from Snosi/Forky and later remove writer credentials under accepted lifecycle. | Retirement alongside Trixie closure. | No NBC in Forky index/image; frozen/recovery artifacts remain reachable. |
-| **omarchy-apps** | Retiring Trixie-only publisher; Snosi still uses frozen `voxtype` and `moonlight-qt`. | No multi-suite publisher. Freeze; retain until replacement/removal; Brian makes the ADR-0049 exception decision; remove workflow/credentials under separate operational action. | Does not block Repogen; replacement decision blocks removal from Snosi. | No new Trixie/Forky publication; replacement/removal tested before deindexing. |
-| **pilothouse** | Active deb publisher, while observed Snosi sysext downloads a pinned GitHub-release deb rather than APT. | Confirm supported APT consumers during Phase 0 user disposition. Migrate only if one exists; otherwise preserve stable and retire redundant APT publication. | After minimum closure; support disposition. | Consumer/provenance evidence or explicit stable-only classification. |
-| **snowcat-cockpit** | Active deb publisher with stable history; no observed Snosi base dependency. | Confirm supported consumers during Phase 0; migrate explicitly or classify stable-only and remove direct writer edge after authorization. | After minimum closure; support disposition. | Matching-suite install test or recorded exclusion. |
+| **nbc** | Stale — governed by [Plan 0008](0008-post-nbc-bootc-only-transition.md)/[ADR-0052](../adr/0052-remove-nbc-artifact-retention-gates.md); not part of suite migration. | No suite-migration task. | Outside this plan. | See Plan 0008/ADR-0052. |
+| **omarchy-apps** | Stale — governed by [ADR-0049](../adr/0049-retire-omarchy-apps-without-breaking-snosi.md); not part of suite migration. | No suite-migration task. | Outside this plan. | See ADR-0049. |
+| **pilothouse** | Active deb publisher, while observed Snosi sysext downloads a pinned GitHub-release deb rather than APT. | Confirm supported APT consumers during Phase 0 as non-gating information. Migrate only if one exists; otherwise preserve stable and retire redundant APT publication. | After minimum closure; consumer evidence. | Consumer/provenance evidence or explicit stable-only classification. |
+| **snowcat-cockpit** | Active deb publisher with stable history; no observed Snosi base dependency. | Confirm supported consumers during Phase 0 as non-gating information; migrate explicitly or classify stable-only and remove direct writer edge after authorization. | After minimum closure; consumer evidence. | Matching-suite install test or recorded exclusion. |
 | **Lab** | Validation orchestrator; `suite` currently means Behave group, and image refs may be pinned independently. | Add separate `debian-codename` and Frostyard Release/image digest inputs, state keys, results, and suite-qualified polling. Preserve test-suite vocabulary. | Before consumer promotion. | Trixie/Forky lanes assert `/etc/os-release`, repository digest, and image digest. |
 | **testsuite** | Identity feature hardcodes Trixie/13. | Parameterize trusted expected codename/version without overloading Behave suite; run same behavior groups for both. | Before Forky promotion. | Identity reports 13/trixie and 14/forky in respective lanes; cross-wiring fails. |
-| **frostyard-org** | Website accurately says Trixie; extension sync chooses first matching filename and becomes ambiguous with OS 13/14 coexistence. | Keep Trixie claim until promotion evidence. Make extension availability OS-version/codename aware. Publish support matrix only from live signed/promotion evidence; link Firn-only migration guidance and disclosed limitations. | After verified promotion, not package upload. | Claims match live suites and promotion manifest; dual-generation catalog is unambiguous; affected users have direct disclosure. |
+| **frostyard-org** | Website accurately says Trixie; extension sync chooses first matching filename and becomes ambiguous with OS 13/14 coexistence. | Keep Trixie claim until promotion evidence. Make extension availability OS-version/codename aware. Publish support matrix only from live signed/promotion evidence; link Firn-only migration guidance and known limitations. | After verified promotion, not package upload. | Claims match live suites and promotion manifest; dual-generation catalog is unambiguous. |
 | **historical/out of scope** | Plow is archived historical repository management; Igloo/legacy packages remain in stable; `pm`, `clix`, `std`, Homebrew and ordinary Git branches have no APT edge. | Preserve frozen stable; do not copy mixed historical set. Label Plow historical; require supported consumer/provenance before legacy names enter new suites. | No critical-path implementation. | Stable intact; no unsupported leakage. |
 
 The open [frostyard/snosi#924](https://github.com/frostyard/snosi/pull/924) is evidence/spike, not architecture or readiness. On 2026-09-12 it was draft, conflicting, review-required, and had failing lanes. Rebase/extract proven findings into an isolated current-main Forky lane after Trixie gates, or replace it with smaller changes; do not use it as proof of support.
 
 ## Rollout phases, dependencies, and stop conditions
 
-### Phase 0 — Freeze, recoverable baseline, and user disposition
+### Phase 0 — Freeze and recoverable baseline
 
-Run recovery and outreach in parallel:
+Establish the recovery boundary before the canary:
 
+- Refresh the 2026-09-12 historical baseline against current signed endpoints, producer workflows, and consumers; record dates, digests, and any drift before relying on it.
 - Snapshot signed stable metadata, all referenced pool-object digests, public-key fingerprint, Release identity, cache headers, and storage version IDs where available.
 - Verify offline/public `gpgv`, every Release checksum, pool reachability, and one clean apt install.
 - Stream-hash referenced legacy pool objects to establish the verified digest map; do not infer SHA-256 from ETag.
 - Inventory which producer repositories hold signing/R2 write secrets without reading or recording secret values.
 - Freeze nonessential legacy writes under separate operational authorization.
-- Contact and record a disposition for **all four known users** identified by ADR-0048/Plan 0006, including the three other users Plan 0006 says must be contacted. Record in-use product/hardware configurations, supported migration path, direct-disclosure need, and whether Pilothouse/Snowcat Cockpit or other non-closure packages are actually used.
+- Confirm support-package consumers (including Pilothouse and Snowcat Cockpit) as non-gating information; record product/hardware configurations and disclosure needs where known.
+- First, pin frostyard/bootc-debian's publish Action to a full commit SHA (owner: frostyard/bootc-debian owner).
+- Then make that Action refuse codename `stable` (owner: frostyard/bootc-debian owner).
 - Record Brian as interim release/exception owner and identify a backup/successor; do not reopen the already assigned interim ownership.
 
-**Done when:** baseline is restorable in rehearsal; read-only probe is green; every known user has a disposition and each in-use configuration is known. **Stop:** unexplained stable drift, unreachable indexed object, unknown user disposition, or absent interim operational coverage. **Blocks:** production canary.
+**Done when:** ADR-0054 is Accepted on `core/main`, the baseline is refreshed and restorable in rehearsal, the read-only probe is green, and the bootc-debian Action is pinned and rejects `stable` in that order. Support-package consumer findings are recorded where available but do not gate the canary after ADR-0054's acceptance. **Stop:** ADR-0054 remains Proposed (ADR-0048's original four-user confirmation and user-disposition conditions still govern), unexplained stable drift, unreachable indexed object, unpinned or `stable`-accepting bootc-debian Action, or absent interim operational coverage. **Blocks:** production canary.
 
 ### Phase 1 — Bounded Repogen safety and Trixie canary
 
@@ -238,7 +247,7 @@ Implement R6–R10 in staging: deterministic/no-op output, complete local failur
 
 ### Phase 3 — Trixie minimum closure
 
-- Derive the minimum Snosi package closure from a clean build. Expected names include `bootc`, `libostree-1-1`, `frostyard-updex`, `frostyard-chairlift`, `frostyard-chairlift-system-integration`, `snow-first-setup`, `frostyard-intuneme`, `frostyard-firn`, the required five-package Incus family, and frozen Omarchy exceptions only until replaced. Confirm rather than blindly copy this list.
+- Derive the minimum Snosi package closure from a clean build. Expected names include `bootc`, `libostree-1-1`, `frostyard-updex`, `frostyard-chairlift`, `frostyard-chairlift-system-integration`, `snow-first-setup`, `frostyard-intuneme`, `frostyard-firn`, and the required five-package Incus family. Confirm rather than blindly copy this list; manage retirement exceptions under their separate decisions.
 - Publish each package explicitly with provenance. Migrate/remove credentials producer by producer.
 - Keep stable bytes unchanged; do not import the 227-entry historical set.
 
@@ -248,13 +257,13 @@ Implement R6–R10 in staging: deterministic/no-op output, complete local failur
 
 - Switch a nonpublishing Snosi lane from Frostyard `stable` to `trixie`; assert Origin, Label, Suite, Codename, signature, by-hash, and Release digest in image provenance.
 - Parameterize Lab/testsuite and make Firn/image channels codename-aware.
-- From the published Firn ISO, install **every reported product/hardware class** captured in Phase 0.
-- For each reported class, prove one real update and one user-data-preserving rollback. Exercise secure boot/TPM where claimed.
+- From the published Firn ISO, install each product/hardware class in the supported promotion scope.
+- For each supported class, prove one real update and one user-data-preserving rollback. Exercise secure boot/TPM where claimed.
 - Publish actionable **Firn-only migration documentation**, not generic repository prose.
-- Observe for **48 hours spanning at least one real publication**. Every in-use configuration must be green or its limitation must be disclosed directly to the affected user; public website copy is not a substitute for direct disclosure.
+- Observe for **48 hours spanning at least one real publication**. Disclose known limitations directly to affected users; public website copy is not a substitute for direct disclosure.
 - Promote Trixie consumer defaults only under separate operational/product authorization.
 
-**Done when:** every reported class meets install/update/rollback, the 48-hour window completes across a real publication, Firn-only instructions are actionable, and each known user's in-use configuration is green or directly disclosed. Lab/testsuite provenance is correct and stable remains byte-identical. **Stop:** mixed sources, missing provenance, failed rollback, ambiguous channel, undisclosed limitation, or observation gap. **Blocks:** Forky lane.
+**Done when:** supported classes meet install/update/rollback, the 48-hour window completes across a real publication, and Firn-only instructions are actionable. Lab/testsuite provenance is correct and stable remains byte-identical. Disclosure is support work, not a suite-migration gate. **Stop:** mixed sources, missing provenance, failed rollback, ambiguous channel, or observation gap. **Blocks:** Forky lane.
 
 ### Phase 5 — Isolated Forky
 
@@ -267,9 +276,9 @@ Implement R6–R10 in staging: deterministic/no-op output, complete local failur
 
 ### Phase 6 — Promotion and retention
 
-Promote a verified Forky image channel only after human product-policy authorization. Keep Trixie for ADR-0048's 90-day and all-four-users retention gate and stable through 2027-09-30. Website/release notes change only after promotion evidence. Rollback repoints consumers/default channels to known-good Trixie digests without rewriting suites.
+Promote a verified Forky image channel only after human product-policy authorization. Keep Trixie readable for at least 90 days after promotion per ADR-0054; keep signed `stable` and its referenced `pool/` bytes readable and unchanged through at least 2027-09-30 without a `stable`-to-codename alias. Website/release notes change only after promotion evidence. Rollback repoints consumers/default channels to known-good Trixie digests without rewriting suites.
 
-**Done when:** promotion manifest, support matrix, rollback evidence, retention/user dispositions, and credential inventory complete. **Stop:** alerting gap, unresolved user/support disposition, or inability to restore previous channel.
+**Done when:** promotion manifest, support matrix, rollback evidence, retention record, and credential inventory complete. **Stop:** alerting gap or inability to restore previous channel.
 
 ## Acceptance matrix
 
@@ -279,7 +288,7 @@ Promote a verified Forky image channel only after human product-policy authoriza
 | Repogen repository integration | Generate signed Trixie/Forky under one root; mutate either without changing other/stable; identical shared-pool reuse using verified digest; divergent object rejection; `all`/`amd64`; Packages round trip; real `gpgv`; Release/by-hash checks; repeated no-op unchanged; failure preserves prior tree. |
 | Publisher failure/concurrency/recovery | Explicit initialize; 403/5xx/timeout/checksum failure closed; exact action/binary asset pin; two same-suite requests retained; cross-suite pool safety; recover coalesced dispatch; failure after each upload stage; cache/read-back/manifest failure cannot report success; old clients acquire by hash. |
 | Real APT | Fresh Debian Trixie/Forky with only matching Frostyard source; `apt-get update`, policy, download, install/configure/start; wrong key/tampered metadata/deb fail; repeated update during publish no hash mismatch; no other-codename candidate; source rollback and explicit downgrade/hold behavior. |
-| Snosi/Lab/testsuite/Firn | Clean explicit Trixie then isolated Forky; expected `/etc/os-release`, Origin/Label and Release digest; every reported product/hardware class installed from published Firn ISO; one real update and user-data-preserving rollback per class; 48-hour observation across real publication; Firn-only instructions; direct user disclosure for limitations. |
+| Snosi/Lab/testsuite/Firn | Clean explicit Trixie then isolated Forky; expected `/etc/os-release`, Origin/Label and Release digest; supported product/hardware classes installed from published Firn ISO; one real update and user-data-preserving rollback per class; 48-hour observation across real publication; Firn-only instructions; communicate limitations as support work, not a suite gate. |
 | Sysext | Same extension name/version/arch for OS 13/14 coexists; SHA256SUMS retains both; `%w=13` selects `_13_`, `%w=14` selects `_14_`; concurrent reconciliation loses neither; website reports generation. |
 | Stability/isolation | Baseline stable Release, InRelease, Release.gpg, indexes, and referenced pool objects byte-identical; negative allowlist proves no legacy/other-suite leakage. |
 | Provenance/credentials | Every index addition traces to producer commit/run/artifact/tooling; compact manifest chain matches remote Release; migrated producers lack production APT signing/R2 write credentials; central rejection covers unknown producer/suite/path. |
@@ -305,7 +314,7 @@ Record and alert on:
 - pool/by-hash reachability, conditional-create conflicts, and stale staging objects;
 - any stable digest drift;
 - producer credential-removal status;
-- consumer image digest, Debian codename, Frostyard Release digest, reported product/hardware class, user disposition, and direct-disclosure state.
+- consumer image digest, Debian codename, Frostyard Release digest, supported product/hardware class, and known support limitations.
 
 Do not log signing material, passphrases, credentials, or commands containing them.
 
@@ -345,22 +354,22 @@ Rejected alternatives:
 
 ### Human policy decisions
 
-1. Based on Phase 0 dispositions, which non-closure packages remain supported in Trixie/Forky, especially Pilothouse, Snowcat Cockpit, and Incus beyond Snosi.
+1. Based on consumer evidence, which non-closure packages remain supported in Trixie/Forky, especially Pilothouse, Snowcat Cockpit, and Incus beyond Snosi.
 2. Organization-wide Debian revision convention for suite-distinct builds.
 3. Whether `snow-first-setup` remains in Forky Snow or is replaced/removed.
-4. Brian, as existing interim release/exception owner under Plan 0006/ADR-0049, decides retain/remove successors for frozen `voxtype` and `moonlight-qt`; the open ownership decision is a backup/successor, not the interim assignee.
+4. Whether to expand supported architectures beyond `amd64` and `all` after the initial rollout.
 5. Products, architectures, hardware paths, and rollback promises defining initial Forky support if a lane remains red.
 6. When product `latest` moves from Trixie to Forky, customer-facing support window, and whether cross-major rollback is in-place or reinstall-based.
-7. Who serves as backup/successor operator for the central writer after the already named interim owner. The requirement to contact all four known users is already accepted and is not an open policy decision.
+7. Who serves as backup/successor operator for the central writer after the already named interim owner.
 8. Whether to adopt a `Valid-Until` refresh/expiry SLA later; initial omission is the defined migration behavior.
 
 ### Routine engineering decisions once implementation is authorized
 
-Exact CLI/manifest names, staging layout, canonical sort, by-hash construction, conditional R2 request implementation, streaming digest cache, cache headers consistent with transaction, fixture structure, retry mechanics, dashboard presentation, direct user-disclosure recording, and producer credential removal after proven cutover do not require new product policy. The unresolved Incus publication bridge is an evidence task; if no authorized bridge/operator is found, it becomes a human blocker before Forky Incus support.
+Exact CLI/manifest names, staging layout, canonical sort, by-hash construction, conditional R2 request implementation, streaming digest cache, cache headers consistent with transaction, fixture structure, retry mechanics, dashboard presentation, and producer credential removal after proven cutover do not require new product policy. The unresolved Incus publication bridge is an evidence task; if no authorized bridge/operator is found, it becomes a human blocker before Forky Incus support.
 
 ## First 10 actions after separate implementation authorization
 
-1. Capture/verify signed stable recovery snapshot, stream-hash referenced pool objects, record Release identity/cache/storage evidence, inventory credentials, establish the [stable repository drift alarm](../design/stable-repository-drift-alarm.md), contact all four known users, and record Brian plus backup coverage.
+1. Refresh the historical baseline; capture/verify signed stable recovery snapshot, stream-hash referenced pool objects, record Release identity/cache/storage evidence, inventory credentials, establish the [stable repository drift alarm](../design/stable-repository-drift-alarm.md), pin frostyard/bootc-debian's publish Action to a full commit SHA, then make that Action refuse codename `stable` (frostyard/bootc-debian owner); record interim and backup coverage.
 2. Land Repogen production-contract docs defining R1–R5 canary scope, fixed Origin/Label, no Valid-Until initially, one-codename/main-only behavior, immutable pool, strict restore/initialize, and Debian/sysext separation.
 3. Implement explicit target/identity validation and Debian-only filtering; reject implicit/invalid/stable inputs before mutation.
 4. Implement fail-closed signed restore including every architecture and separate absent-prefix initialize; remove both silent-drop paths.
@@ -369,14 +378,16 @@ Exact CLI/manifest names, staging layout, canonical sort, by-hash construction, 
 7. After separate publication authorization, initialize Trixie with `gchlog`, prove real apt install and unchanged stable, then freeze further new-suite writes.
 8. Complete deterministic/no-op generation, comprehensive staged failure atomicity, durable intake/recovery, per-codename concurrency, sysext OSVersion correction, action split, and pinned Repogen release (R6–R10).
 9. Derive/publish exact Snosi Trixie closure including `frostyard-chairlift-system-integration`, resolve Incus bridge, and cut over/remove producer credentials one by one.
-10. Enable explicit Trixie Snosi/Lab/testsuite/Firn lanes; install every reported class from published Firn ISO, run real update/rollback per class, publish Firn-only instructions, complete the 48-hour real-publication observation, and directly disclose any limitation before Forky work.
+10. Enable explicit Trixie Snosi/Lab/testsuite/Firn lanes; install supported classes from published Firn ISO, run real update/rollback per class, publish Firn-only instructions, complete the 48-hour real-publication observation, and communicate known limitations separately from suite gates.
 
 ## References
 
 - Governing decision:
   [ADR-0048](../adr/0048-publish-debian-packages-to-explicit-codenames.md)
+  as amended by [ADR-0054](../adr/0054-remove-four-known-users-gates-from-suite-migration.md)
 - Coordinates with:
-  [Plan 0006](0006-nbc-retirement-and-debian-suite-migration-fast-path.md)
+  [Plan 0006](0006-nbc-retirement-and-debian-suite-migration-fast-path.md),
+  [Plan 0008](0008-post-nbc-bootc-only-transition.md) for separate NBC/native A/B work
 - Related accepted decisions:
   [ADR-0007](../adr/0007-frostyard-sysext-filename-pattern.md),
   [ADR-0009](../adr/0009-single-artifact-origin-repository-frostyard-org.md),

@@ -56,8 +56,8 @@ is the default; it implies neither support nor further releases.
 
 ## References
 
-- Implements through:
-  [Plan 0006](../plans/0006-nbc-retirement-and-debian-suite-migration-fast-path.md)
+- Historical implementation plan (now suite-migration only):
+  [Plan 0006](https://github.com/frostyard/core/blob/6de77557eca347d80132e588afa0f0062dda5aa5/docs/plans/0006-nbc-retirement-and-debian-suite-migration-fast-path.md)
 - Builds on:
   [ADR-0010](0010-publish-packages-via-repogen-to-r2.md) and
   [ADR-0021](0021-sha-pinned-actions-and-least-privilege-ci.md)

@@ -73,7 +73,8 @@ presenting production actions for approval.
   the specific workflows, destinations, credentials and affected consumers.
   Do not treat this as permission to mutate a signed repository, delete
   existing packages or objects, or archive a repository. Existing debs may
-  remain. Plan 0006 owns the parallel explicit-suite and archive sequencing;
+  remain. This plan owns NBC archive sequencing under ADR-0047's preconditions;
+  Plan 0006 owns the parallel explicit-suite migration;
   [ADR-0048](../adr/0048-publish-debian-packages-to-explicit-codenames.md)
   rejects `stable` as a write target.
 - Preserve ADR-0047's narrow emergency exception: Brian's written approval
@@ -174,6 +175,21 @@ presenting production actions for approval.
   risks and a per-object proposal for a **separate** authorization decision.
   No deletion or archive is a done-when requirement or authorized by this
   plan's approval or merge.
+
+## Phase 6 — Archive frostyard/nbc
+
+- Verify [ADR-0047](../adr/0047-retire-nbc-on-a-proportional-fast-path.md)'s
+  archive preconditions: the EOL README is live; normal publication and
+  credential access are disabled; open items are dispositioned; active
+  supported-product dependencies are removed; and retained artifacts pass a
+  public download and verification recovery check. Keep Git history, source
+  tags, and the source-commit/artifact-digest manifest indefinitely.
+- Present the exact `frostyard/nbc` GitHub archive action and precondition
+  evidence to Brian. The archive action itself requires Brian's separate
+  authorization; approval of this plan does not authorize it.
+- **Done when:** all archive preconditions have recorded evidence and the
+  separately authorized archive action is complete. If authorization is not
+  granted, leave the repository unarchived.
 
 ## Later / ideas
 
