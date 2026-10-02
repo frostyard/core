@@ -1,6 +1,6 @@
 # 0054 — Remove four-known-users gates from suite migration
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-10-02
 
 ## Context
