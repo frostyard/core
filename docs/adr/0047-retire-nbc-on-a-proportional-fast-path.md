@@ -85,8 +85,10 @@ recovery check. Archive remains a separately approved GitHub action.
   [ADR-0050](0050-replace-nbc-retention-date-with-a-completion-condition.md)
 - Accepted successor (NBC-specific artifact-retention clause only):
   [ADR-0052](0052-remove-nbc-artifact-retention-gates.md)
-- Implements through:
-  [Plan 0006](../plans/0006-nbc-retirement-and-debian-suite-migration-fast-path.md)
+- Historical implementation plan (now suite-migration only):
+  [Plan 0006](https://github.com/frostyard/core/blob/6de77557eca347d80132e588afa0f0062dda5aa5/docs/plans/0006-nbc-retirement-and-debian-suite-migration-fast-path.md)
+- Current NBC archive sequence:
+  [Plan 0008](../plans/0008-post-nbc-bootc-only-transition.md)
 - Builds on:
   [ADR-0027](0027-retire-fisherman-superseded-by-firn.md),
   [ADR-0028](0028-retire-snosi-install-superseded-by-firn.md), and
