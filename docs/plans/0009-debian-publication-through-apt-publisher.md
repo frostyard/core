@@ -40,15 +40,21 @@ caching, Snosi, and `forky`. NBC and omarchy-apps retirement stay with
   packages through the public URL, and `stable` is unchanged. All held on
   2026-10-02.
 
-## Phase 3 — Cache immutable paths
+## Phase 3 — Cache immutable paths (done 2026-10-03)
 
-- [ ] Add a Cloudflare Cache Rule for `/debian/pool/*` and
-  `/debian/dists/*/by-hash/*`: eligible for cache, ignore origin headers, edge
-  and browser TTL of one year
-  ([design: CDN](../design/debian-publication.md)).
-- [ ] Leave `InRelease`, `Release`, `Release.gpg` and `Packages*` uncached.
+- [x] The Cloudflare Cache Rule `apt immutable` caches
+  `repository.frostyard.org` paths under `/debian/pool/` and
+  `/debian/dists/**/by-hash/` at the edge for one year.
+  - Status codes of 400 and up are `no-store`.
+  - Browser TTL respects the origin.
+  - Details are in the [design doc's CDN section](../design/debian-publication.md).
+- [x] `InRelease`, `Release`, `Release.gpg` and `Packages*` stay uncached.
 - **Done when:** a second request for a `by-hash` URL returns
-  `cf-cache-status: HIT`, while `InRelease` stays `DYNAMIC`.
+  `cf-cache-status: HIT`, while `InRelease` stays `DYNAMIC`. This held on
+  2026-10-03:
+  - a `by-hash` index and a pool `.deb` went `MISS`, then `HIT`;
+  - a missing file was `BYPASS` both times;
+  - `InRelease` was `DYNAMIC`.
 
 ## Phase 4 — Move producers
 

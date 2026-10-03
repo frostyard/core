@@ -87,10 +87,19 @@ Signed-By: /etc/apt/keyrings/frostyard.gpg
     client-payload: '{"repo": "${{ github.repository }}", "tag": "${{ github.ref_name }}"}'
 ```
 
-**CDN.** On 2026-10-02 the zone cached nothing on the repository: every
-response was `cf-cache-status: DYNAMIC`. After each publish, the writer purges
-the mutable index URLs (`InRelease`, `Release`, `Release.gpg`, `Packages*`).
-`pool/` and `by-hash/` paths never change under the same name.
+**CDN.** The `frostyard.org` zone's Cache Rule `apt immutable` caches only
+the repository paths that never change under the same name.
+
+- It matches
+  `http.host eq "repository.frostyard.org" and (starts_with(http.request.uri.path, "/debian/pool/") or (starts_with(http.request.uri.path, "/debian/dists/") and http.request.uri.path contains "/by-hash/"))`.
+- Matching paths are eligible for cache, with an edge TTL of 1 year that
+  ignores cache-control headers.
+- A Status code TTL of `no-store` for codes of 400 and up keeps errors out
+  of the cache. The TTL override otherwise applies to every status code.
+- Browser TTL respects the origin.
+- Everything else is uncached (`DYNAMIC`), including the mutable indexes.
+  After each publish, the writer purges the mutable index URLs
+  (`InRelease`, `Release`, `Release.gpg`, `Packages*`) as a safety net.
 
 ## Operational notes
 
