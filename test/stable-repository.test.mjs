@@ -104,18 +104,18 @@ test("the committed baseline pins the correction-forward stable candidate", asyn
   assert.equal(record.public_key.fingerprint, "432C452CD2B7F4FF1B5D23264DE6A2016E622F97");
   assert.equal(
     record.metadata.release.sha256,
-    "c363d215c449aa257d9392a9dbbfcf2666732062f30b529ad294f571f372cd92",
+    "0f4a2059c0d5a6b196baf2372295886434e42da41aab096479a2b9a46ea0ba7f",
   );
   assert.equal(
     record.metadata.inrelease.sha256,
-    "edf980f5503fc524c4aeaec87bd797670e3bb93960cd7bcf8b637bb7b9e5afe6",
+    "a448fe206ec65ed401885b82f875ccca239f94ffa4b1a4da4420f427ba9c6321",
   );
   assert.equal(
     record.metadata.release_gpg.sha256,
-    "a5d95a0bbb0272f539a5738971055b2a77cba1b45d12f3c1209fad3d5cc90232",
+    "89786851b29fff96eced67dcb562849296c75f5bcf44ec66acc03f21428f4734",
   );
-  assert.equal(record.expected_pool_objects, 228);
-  assert.equal(record.expected_pool_bytes, 2965276828);
+  assert.equal(record.expected_pool_objects, 234);
+  assert.equal(record.expected_pool_bytes, 3145098600);
 });
 
 test("the verifier accepts an exact signed-index fixture", async () => {
