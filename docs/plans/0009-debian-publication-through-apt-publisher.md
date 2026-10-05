@@ -8,9 +8,14 @@ and [ADR-0056](../adr/0056-rebuild-images-after-apt-publication.md); replaces
 This plan moves every Frostyard Debian producer and consumer from the frozen
 legacy `stable` suite to explicit codenames at
 `https://repository.frostyard.org/debian/`, published by
-[`frostyard/apt-publisher`](https://github.com/frostyard/apt-publisher). The
-writer and the seeded `trixie` suite exist. What remains is producers,
-caching, Snosi, and `forky`. NBC and omarchy-apps retirement stay with
+[`frostyard/apt-publisher`](https://github.com/frostyard/apt-publisher).
+
+- **Done:** the writer, the seeded `trixie` suite, CDN caching, every
+  producer whose packages Snosi installs, and Snosi itself (Phases 1–5).
+- **What remains:** validating `forky` (Phase 6) and steady state
+  (Phase 7).
+
+NBC and omarchy-apps retirement stay with
 [Plan 0008](0008-post-nbc-bootc-only-transition.md) and
 [ADR-0049](../adr/0049-retire-omarchy-apps-without-breaking-snosi.md).
 
