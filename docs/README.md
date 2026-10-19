@@ -69,6 +69,7 @@ Docs are split by the question they answer:
 - [0054 — Remove four-known-users gates from suite migration](adr/0054-remove-four-known-users-gates-from-suite-migration.md) *(superseded by 0055)*
 - [0055 — Publish Debian packages through the apt-publisher single writer](adr/0055-publish-debian-packages-through-the-apt-publisher.md)
 - [0056 — The APT publisher triggers image rebuilds after packages are live](adr/0056-rebuild-images-after-apt-publication.md)
+- [0057 — Run frostyard's first-party apps behind lodge](adr/0057-run-first-party-apps-behind-lodge.md)
 
 ### Design
 
