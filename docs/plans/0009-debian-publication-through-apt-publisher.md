@@ -163,8 +163,9 @@ ever need APT publication.
     `debian:trixie` before publishing to APT.
   - Not attested.
 - **snowcat-cockpit.** Ships `frostyard-snowcat-cockpit`. Attested, static.
-- **gchlog.** Ships `frostyard-gchlog`, which is not in the legacy suite.
-  The repository has been dormant since February 2026.
+- **gchlog.** Retired and archived on 2026-10-21. Its only user was
+  first-setup's `Justfile` (`gchlog --write`), and that step is being
+  replaced. `frostyard-gchlog` was never published to any suite.
 - No producer to migrate:
   - igloo (archived);
   - nbc (archived; [ADR-0052](../adr/0052-remove-nbc-artifact-retention-gates.md));
@@ -178,6 +179,12 @@ ever need APT publication.
   - Each first release was checked from outside: routing, signature, index
     contents, apt canary, attestation where registered, and legacy `stable`
     unchanged.
+- **No separate canary.**
+  [ADR-0048](../adr/0048-publish-debian-packages-to-explicit-codenames.md)
+  (migration step 3) named `gchlog` as the separately approved Trixie canary.
+  That canary never ran. gchlog is retired (2026-10-21), and the seven
+  producers above have published to `trixie` through apt-publisher since
+  2026-10-02, each checked from outside.
 
 ## Phase 5 — Move Snosi to `/debian/` `trixie` (done 2026-10-03)
 
