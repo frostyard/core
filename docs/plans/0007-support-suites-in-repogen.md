@@ -8,6 +8,11 @@ or support announcements.
 [ADR-0055](../adr/0055-publish-debian-packages-through-the-apt-publisher.md) and
 [ADR-0056](../adr/0056-rebuild-images-after-apt-publication.md) were Accepted. Kept as a historical record.
 
+On 2026-10-21 `frostyard/gchlog` was retired and archived. The `gchlog`
+Trixie canary in this plan (R5 and the initialize transaction) never ran and
+will not run: seven producers publish to `trixie` through apt-publisher (see
+[Plan 0009](0009-debian-publication-through-apt-publisher.md)).
+
 ## Executive decision
 
 **Historical baseline (2026-09-12), refreshed in Phase 0:** Frostyard did **not** publish an APT suite named `main`. Production exposed only `dists/stable`; its signed Release metadata said `Origin: Repogen Repository`, `Label: Frostyard Repository`, `Suite: stable`, `Codename: stable`, `Components: main`, and `Architectures: all amd64`. It had no `Acquire-By-Hash` or `Valid-Until` field. `main` is the sole APT **component** and, separately, the common Git default branch. Snosi's operating-system base was Debian **Trixie**, but its Frostyard package source still read from APT suite `stable`.
