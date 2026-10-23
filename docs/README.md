@@ -70,6 +70,7 @@ Docs are split by the question they answer:
 - [0055 — Publish Debian packages through the apt-publisher single writer](adr/0055-publish-debian-packages-through-the-apt-publisher.md)
 - [0056 — The APT publisher triggers image rebuilds after packages are live](adr/0056-rebuild-images-after-apt-publication.md)
 - [0057 — Run frostyard's first-party apps behind lodge](adr/0057-run-first-party-apps-behind-lodge.md)
+- [0058 — Ship the suite's desktop apps as Flatpaks and its services as sysexts](adr/0058-ship-suite-desktop-apps-as-flatpaks-and-services-as-sysexts.md)
 
 ### Design
 
@@ -100,6 +101,7 @@ Docs are split by the question they answer:
 - [Support suites in Repogen](plans/0007-support-suites-in-repogen.md) *(superseded by Plan 0009)*
 - [Post-NBC bootc-only transition (Snosi/Firn)](plans/0008-post-nbc-bootc-only-transition.md)
 - [Debian publication through apt-publisher](plans/0009-debian-publication-through-apt-publisher.md)
+- [Suite packaging: Flatpaks and sysexts](plans/0010-suite-packaging.md)
 
 ## Conventions
 
