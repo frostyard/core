@@ -91,6 +91,9 @@ one or the other, or is not shipped.
 
 ### Sysexts
 
+- **Sysexts are for Snosi images.** A server that runs the suite's sysexts
+  runs Floe. A Snosi sysext is built as a delta over Snosi's base image, and
+  only Snosi images test and boot it.
 - **One sysext per service.** Its name is the daemon's name, as in the
   table. Each is built from one `.deb`, `frostyard-<name>`
   ([ADR-0011](0011-frostyard-prefixed-package-names.md)), which is its
@@ -98,33 +101,75 @@ one or the other, or is not shipped.
 - **The `.deb` is a build input, not a published package.** Each service
   repository's release attaches `frostyard-<name>_<version>_amd64.deb`, with
   a build-provenance attestation, to its GitHub release. Snosi downloads it
-  with a pinned checksum, as it does for `frostyard-pilothouse`. The `.deb`
-  is not published to `repository.frostyard.org/debian/`.
+  with `verified_download` and a SHA-256 pinned in
+  `shared/download/sysext-checksums.json`, as it does for
+  `frostyard-pilothouse`. The `.deb` is not registered with apt-publisher
+  and not published to `repository.frostyard.org/debian/`.
+- **The `.deb`'s contents.** It installs only under `/usr`, except an `/etc`
+  file that a `tmpfiles.d` `C` rule restores from `/usr/share/factory/etc/`.
+  Snosi's base image satisfies its `Depends:`.
 - **Versions** come from svu tags (`vX.Y.Z`,
   [ADR-0012](0012-svu-versioning-and-rolling-dev-prerelease.md)). The tag
   gives the `.deb` version, the `version` in each `app.json`, and, through
   `KEYPACKAGE`, the sysext version. Files are named
   `<name>_<version>_13_x86-64.raw.zst` (ADR-0007).
+- **A release reaches Snosi through its checksum pin.** The
+  `check-sysext-updates` job of Snosi's `check-dependencies.yml` finds the
+  new release and opens a checksum pull request; its merge builds and
+  publishes the sysext. A `build` dispatch
+  ([ADR-0056](0056-rebuild-images-after-apt-publication.md)) rebuilds
+  images only, so a suite release does not send one.
 - **Distribution** follows ADR-0008: Snosi builds the images, Repogen
   publishes them under `ext/<name>/` with a signed `SHA256SUMS.gpg`, and
   updex installs them. Each sysext is an updex feature, shipped disabled,
-  with its transfer file.
+  with its transfer file in the base image.
 - **Payloads are `/usr` only.** Binaries are in `/usr/bin`; units in
   `/usr/lib/systemd/system/`; `sysusers.d` and `tmpfiles.d` entries in
   `/usr/lib/`; lodge's example configuration in
   `/usr/share/lodge/config.example.json`. The configuration in `/etc`
   (`/etc/lodge/`, `/etc/porter/`, `/etc/frostread/`) belongs to the host's
   administrator, and no sysext ships it.
-- **A service starts with `Upholds=`,** from a drop-in
-  `/usr/lib/systemd/system/multi-user.target.d/10-<name>.conf`, as snosi's
-  service sysexts do (snosi ADR-0004). An app's socket starts with its
-  service, through the service's `Requires=`.
+- **Units start with `Upholds=`,** from a drop-in
+  `/usr/lib/systemd/system/multi-user.target.d/10-<name>.conf`, and a
+  preset `40-<name>.preset` that enables the same units, as Snosi's service
+  sysexts do (snosi ADR-0004):
+
+  | Sysext | Upheld |
+  | --- | --- |
+  | `lodge` | `lodge.service` |
+  | `notesd` | `frostnotes-lodge.socket` |
+  | `maild` | `frostmail.socket`, `frostmail.service` |
+  | `readd` | `frostread.socket`, `frostread.service` |
+  | `porterd` | `frostporter.socket`, `frostporter.service` |
+
+  An app's socket is upheld, so the socket owns its path and group and
+  starts the service on demand. The service is upheld too when the daemon
+  works without a client: maild's rules and send-later, readd's feed
+  poller and porterd's routines.
+- **Socket units keep their default dependencies,** so they start after
+  `sysinit.target`, when the `sysusers.d` entries of every merged sysext
+  have applied.
 - **An upheld unit has no `Condition*=`** unless it is a
-  `RemainAfterExit=yes` oneshot, and **no shipped unit uses `RequiredBy=`**
-  (ADR-0030). Each service repository's own tests check both, because
-  snosi's guard does not read units a package ships.
-- **An app's sysext needs lodge's:** lodge's sysext creates the groups
-  `lodge`, `lodge-apps` and `lodge-agents`, and `/run/lodge/apps`.
+  `RemainAfterExit=yes` oneshot ([snosi#1100](https://github.com/frostyard/snosi/issues/1100)),
+  and **no shipped unit uses `RequiredBy=`** (ADR-0030). Each service
+  repository's tests check both, and Snosi checks the upheld units in each
+  sysext's delta at build time, the units its `.deb` ships included.
+- **Each app's sysext declares the groups it uses.** Its own `sysusers.d`
+  file (`/usr/lib/sysusers.d/<name>.conf`, never a path that another
+  sysext ships) carries `g lodge -` and the `lodge-apps` and
+  `lodge-agents` memberships it needs, so its socket starts without lodge's
+  sysext. lodge's sysext creates the same groups for lodge.
+- **lodge comes first.** An app is reachable only through lodge, and updex
+  features have no dependencies, so each app's documentation says to
+  enable `lodge` first. Transfers do not use `RequisiteFeatures=` while
+  updex does not enforce it
+  ([updex#455](https://github.com/frostyard/updex/issues/455)).
+- **Updates take effect at the next boot.** At boot Snosi merges the
+  sysexts, then runs `systemd-sysusers`, `systemd-tmpfiles --create` and a
+  daemon reload, and `Upholds=` starts the units. To update without a
+  reboot, the administrator runs the same 3 steps and restarts the units.
+  Each sysext's `extension-release` sets `EXTENSION_RELOAD_MANAGER=1`, so a
+  refresh reloads the unit files.
 
 ### Flatpaks
 
@@ -133,14 +178,24 @@ one or the other, or is not shipped.
   bundle of frostmail ADR-0013 stays a development path.
 - **Published through `frostyard/flatpak-index`:** a release pushes the OCI
   image to `ghcr.io/frostyard/<repo>`, public, tagged `latest`, `vX.Y.Z` and
-  `sha-<commit>`, with a build-provenance attestation. The app is listed in
+  `sha-<commit>`, and attests the image digest
+  (`attest-build-provenance` with `subject-digest`). The app is listed in
   `apps.json`.
+- **The catalogue lists only attested digests.** flatpak-index lists a
+  digest only when `gh attestation verify` passes for it, signed by the
+  app's release workflow on a tag. If one app fails, the catalogue is not
+  deployed, and the last verified catalogue stays live.
 - **Updates** are `flatpak update` from the `frostyard` remote, which serves
   `latest`.
-- **Trust** comes from HTTPS to the catalogue and GHCR, and from the image
-  digests the catalogue lists. An OCI remote has no GPG signature.
+- **Trust** comes from HTTPS to the catalogue and GHCR, from the digests
+  the catalogue lists, and from the attestation check at index time. An OCI
+  remote has no GPG signature. That is acceptable for desktop apps in user
+  scope only: nothing that runs as root or ships a system service is a
+  Flatpak.
 - Each Flatpak ships AppStream metadata and icons, and asks for portals
   rather than broad file-system access where a portal exists.
+- Snosi's images do not preinstall the suite's Flatpaks. Their core set
+  installs from Flathub only.
 
 This supersedes, in part, frostmail
 [ADR-0013](https://github.com/frostyard/frostmail/blob/main/docs/adr/0013-app-as-a-local-flatpak.md)
@@ -155,22 +210,32 @@ packages.
 - Each service repository needs a release pipeline: svu tags, a `.deb`
   built from its staged tree, and an attestation. Each desktop app needs a
   `flatpak-builder` manifest with offline sources.
-- A service release reaches a host through snosi: a checksum bump, a sysext
-  build and a Repogen publication. A fix is not live until snosi rebuilds.
-- Snosi gains 5 sysexts, 5 features and 5 transfer files to maintain.
-- An upheld service restarts when it stops. To stop a service for longer, an
+- A service release reaches a host through Snosi: a checksum pull request,
+  a sysext build, a Repogen publication and a reboot. The weekly check sets
+  the pace unless the check is run by hand or by a release's trigger.
+- Snosi gains 5 sysexts, 5 features and 5 transfer files to maintain, and
+  a build-time check of upheld units in each sysext's delta.
+- An upheld unit restarts when it stops. To stop a service for longer, an
   administrator disables its feature or masks the unit.
-- On a live update, the running daemon keeps its old binary until it
-  restarts. On first enable, the `sysusers.d` and `tmpfiles.d` entries apply
-  at the next boot unless something runs them.
+- Between an update and the next boot, the running daemon keeps its old
+  binary. A first enable without a reboot needs `systemd-sysusers` and
+  `systemd-tmpfiles` by hand, or the app's socket fails on its group.
 - Binaries move from `/usr/local/bin` and `/opt/lodge/bin` to `/usr/bin`.
-  lodge's host needs `systemd-sysext`, updex and frostyard's transfer
-  definitions. Its hand-installed units in `/etc/systemd/system/` override
-  the sysexts' units, and its migration removes them.
-- A private repository's release is not readable by snosi's build without a
-  token. frostread is private.
-- Flatpaks carry a weaker signature story than sysexts: no GPG, only HTTPS,
-  digests and attestations that a client does not check.
+- lodge's host, a Debian 13 virtual machine, uses the sysexts only after a
+  fresh install of Floe; there is no conversion in place. lodge's and the
+  apps' state in `/var/lib/` and their configuration in `/etc/` are carried
+  across. Until then the host keeps its hand-installed services. On Floe,
+  no hand-installed unit in `/etc/systemd/system/` overrides a sysext's
+  unit.
+- A plain Debian host is not supported for the sysexts: there, `/usr` is
+  read-only while a sysext is merged, so `apt` upgrades fail, and the host
+  lacks what Snosi's base image provides.
+- A sysext's release must be public: `verified_download` has no
+  credentials, and the sysext publishes the binaries on
+  `repository.frostyard.org` in any case. frostread's repository, which is
+  private, is made public before its sysext is built.
+- Flatpaks carry a weaker trust story than sysexts: no GPG, and the
+  attestation is checked once, at index time, not by the client.
 - frostnotes' desktop sync runs only while its Flatpak runs notesd, unless
   the app asks the Background portal to start at login.
 - Desktop users who want `notesctl` or `mailctl` in a shell use
@@ -180,7 +245,12 @@ packages.
 
 - **Debian packages through apt-publisher for everything:** rejected.
   Image-based hosts install no packages at runtime, and the apps would need
-  a second path for them.
+  a second path for them. If a plain Debian host needs the services later,
+  the same `.deb` files can be registered with apt-publisher then.
+- **The sysexts on plain Debian 13, with updex:** rejected.
+  Snosi does not test its sysexts there, `apt` cannot upgrade a host whose
+  `/usr` is a merged overlay, and the host would need its own keyring and
+  boot-time setup.
 - **One sysext for the whole suite:** rejected. A sysext's version comes
   from one `KEYPACKAGE` (ADR-0007), and the apps release on their own.
 - **Sysexts built in each app's repository:** rejected. Snosi holds the
@@ -215,6 +285,10 @@ packages.
   [design/sysexts.md](https://github.com/frostyard/snosi/blob/main/docs/design/sysexts.md),
   [`check-upholds-guard.sh`](https://github.com/frostyard/snosi/blob/main/check-upholds-guard.sh)
 - Flatpak remote: [`frostyard/flatpak-index`](https://github.com/frostyard/flatpak-index)
+- Related: [ADR-0056](0056-rebuild-images-after-apt-publication.md);
+  [snosi#1100](https://github.com/frostyard/snosi/issues/1100),
+  [updex#455](https://github.com/frostyard/updex/issues/455),
+  [flatpak-index#2](https://github.com/frostyard/flatpak-index/issues/2)
 - Supersedes in part: frostmail
   [ADR-0013](https://github.com/frostyard/frostmail/blob/main/docs/adr/0013-app-as-a-local-flatpak.md)
   (the release build and install of the app)

@@ -30,7 +30,7 @@ Every artifact of the five suite repositories, and its side.
 | frostmail | a local maild on a Linux desktop, with `maild.service` (user) and `mailctl` | not shipped | **does not fit cleanly:** a desktop daemon outside lodge; development only until a later decision |
 | frostmail | the Windows install | not in this plan | frostmail M7 |
 | frostmail | `tools/lodgeprobe` | not shipped | development only |
-| frostread | `readd`, `readctl`, the `read` web build, `frostread.service`, `frostread.socket`, `sysusers.d` | sysext `readd` | **does not fit cleanly:** the repository is private, so snosi cannot read its release without a token |
+| frostread | `readd`, `readctl`, the `read` web build, `frostread.service`, `frostread.socket`, `sysusers.d` | sysext `readd` | **does not fit cleanly:** the repository is private, and Snosi's `verified_download` has no credentials, so it becomes public before Phase 3 builds `readd` |
 | frostread | `readdev` | not shipped | development only |
 | porter | `porterd`, the `porter` web build, `frostporter.service`, `frostporter.socket`, `sysusers.d` | sysext `porterd` | stages `/usr/local/bin` today; the host runs `/opt/lodge/bin/porterd` |
 
@@ -38,21 +38,25 @@ Two more facts do not fit cleanly:
 
 - **lodge's host** is a Debian 13 virtual machine, not a Snosi image. Its
   services run from `/opt/lodge/bin` and `/usr/local/bin`, with units and
-  `sysusers.d` entries in `/etc`. It has no updex and no frostyard transfer
-  definitions.
+  `sysusers.d` entries in `/etc`. The sysexts are for Snosi images
+  (ADR-0058), so the host uses them only after a fresh install of Floe
+  (Phase 4).
 - **A web app inside lodge** has no package of its own. It ships in its
   daemon's sysext, under `/usr/share/lodge/apps/<id>/`.
 
 ## Phase 0 — Agree the contract (small)
 
+- *Done 2026-10-23:* Lucilla (flatpak-index, updex, apt-publisher) and
+  Murbella (Snosi) answered the first round of questions on
+  [core#159](https://github.com/frostyard/core/pull/159). Their answers are
+  in ADR-0058 and in [Answered](#answered) below.
 - Brian accepts or amends ADR-0058.
-- Lucilla's and Murbella's answers to the [open questions](#open-questions)
-  are recorded here, and each answer that changes ADR-0058 is made in it
-  while it is Proposed.
-- Decide lodge's host: Floe, or Debian 13 with updex (see the open
-  questions).
-- **Done when:** ADR-0058 is Accepted, and every open question that blocks
-  Phase 3 or Phase 5 has an answer in this plan.
+- Brian decides whether lodge's host moves to Floe (Phase 4). Without that
+  move, Phases 1 to 3 still ship, but lodge's host keeps its
+  hand-installed services.
+- Brian makes frostread's repository public before Phase 3 builds `readd`.
+- **Done when:** ADR-0058 is Accepted, and the host decision is recorded
+  here.
 
 ## Phase 1 — The `/usr` layout in each service repository (small)
 
@@ -66,17 +70,25 @@ In lodge, frostnotes, frostmail, frostread and porter:
   host without sysexts.
 - frostnotes: add a staging script like the other apps' `stage.sh`; today
   `make lodge-app` lays out only the manifest and the web build.
+- Each app's own `sysusers.d` file (`/usr/lib/sysusers.d/<user>.conf`)
+  carries `g lodge -` beside its user and its `lodge-apps` and
+  `lodge-agents` memberships, so its socket's `SocketGroup=lodge` resolves
+  without lodge's sysext.
+- Socket units keep their default dependencies.
+- frostnotes: while notesd syncs as a device of the M2 hub (until M4
+  Phase 7), check whether its service must run without a client; if so,
+  its row in ADR-0058's `Upholds=` table gains `frostnotes.service`.
 - Each repository's packaging test (lodge's `internal/packagecheck`,
   frostmail's `internal/lodge/package_test.go`, and a new one where none
   exists) checks the staged tree:
   - every path is under `/usr`;
   - no unit has `RequiredBy=` ([ADR-0030](../adr/0030-no-requiredby-enablement-in-shipped-units.md));
-  - no service that a sysext upholds has a `Condition*=`
+  - no unit that ADR-0058 upholds has a `Condition*=`
     ([snosi#1100](https://github.com/frostyard/snosi/issues/1100));
   - `systemd-analyze verify` passes on the units.
 - Update lodge's app contract (Install layout), its `packaging/README.md`,
-  the new-lodge-app scaffold's `stage.sh`, frostread's `specs/api.md` and
-  porter's roadmap, which name the old paths.
+  the new-lodge-app scaffold's `stage.sh` and `sysusers.d` template,
+  frostread's `specs/api.md` and porter's roadmap, which name the old paths.
 - **Done when:** in each of the 5 repositories, the staging target writes
   only `/usr` paths, and `make check` passes with the new tests.
 
@@ -89,9 +101,13 @@ In lodge, frostnotes, frostmail, frostread and porter:
   - builds the binaries (`CGO_ENABLED=0`, `linux/amd64`) and the web build;
   - stamps the tag's version into `app.json`;
   - builds `frostyard-<name>_<version>_amd64.deb` from the staged tree with
-    nFPM ([ADR-0011](../adr/0011-frostyard-prefixed-package-names.md));
+    nFPM ([ADR-0011](../adr/0011-frostyard-prefixed-package-names.md)),
+    whose `Version:` is the tag without the `v`, and whose `Depends:`
+    Snosi's base image satisfies;
   - attests the `.deb` with `actions/attest-build-provenance`;
   - attaches it to the GitHub release.
+- The `.deb` is not registered with apt-publisher, and the release sends no
+  `publish-deb` or `build` dispatch.
 - Actions are SHA-pinned with `permissions: {}`
   ([ADR-0021](../adr/0021-sha-pinned-actions-and-least-privilege-ci.md)).
 - Package names: `frostyard-lodge`, `frostyard-notesd`, `frostyard-maild`,
@@ -107,47 +123,57 @@ In lodge, frostnotes, frostmail, frostread and porter:
 
 On the pattern of Snosi's `pilothouse` sysext
 ([design/sysexts.md](https://github.com/frostyard/snosi/blob/main/docs/design/sysexts.md),
-[snosi ADR-0004](https://github.com/frostyard/snosi/blob/main/docs/adr/0004-sysext-authoring-rules.md)):
+[snosi ADR-0004](https://github.com/frostyard/snosi/blob/main/docs/adr/0004-sysext-authoring-rules.md)),
+for `lodge`, `notesd`, `maild`, `readd` and `porterd`:
 
-- `mkosi.images/<name>/` for `lodge`, `notesd`, `maild`, `readd` and
-  `porterd`: `KEYPACKAGE=frostyard-<name>`, the `.deb` through
-  `verified_download` with its entry in `shared/download/sysext-checksums.json`,
-  and its version check in the `check-sysext-updates` job.
+- `mkosi.images/<name>/`: `mkosi.conf` with the full `FinalizeScripts=`
+  guard line and `KEYPACKAGE=frostyard-<name>`; `mkosi.postinst.chroot`
+  (`verified_download`, `assert_deb_dependencies_satisfied`, `dpkg -i`);
+  `required-paths.txt` listing the binaries, the units, the `sysusers.d`
+  entry, the manifest, the drop-in and the preset.
 - In each image: the `Upholds=` drop-in
-  `multi-user.target.d/10-<name>.conf`, a preset, and `required-paths.txt`
-  listing the binaries, the units, the `sysusers.d` entry, the manifest and
-  the drop-in.
-- In the base image: `sysupdate.<name>.d/<name>.feature` (`Enabled=false`)
-  and `<name>.transfer`, matching `<name>_@v_%w_%a.raw.zst` (ADR-0007).
-- Repogen publishes each under `ext/<name>/` with a signed `SHA256SUMS.gpg`
-  ([ADR-0014](../adr/0014-single-gpg-trust-root.md)).
-- The update path: a suite release, then Snosi's checksum bump, then a
-  sysext build and publication. Per open question 1, a release can
-  dispatch `build` instead of waiting for the scheduled check.
+  `multi-user.target.d/10-<name>.conf` and the preset `40-<name>.preset`,
+  with the units in ADR-0058's table.
+- `EXTENSION_RELOAD_MANAGER=1` in each sysext's `extension-release`.
+- `shared/download/sysext-checksums.json`: the URL, SHA-256 and version of
+  each `.deb`; and a release-check block for each in the
+  `check-sysext-updates` job of `check-dependencies.yml`.
+- In the base image: `usr/lib/sysupdate.<name>.d/<name>.feature`
+  (`Enabled=false`) and `<name>.transfer`, matching
+  `<name>_@v_%w_%a.raw.zst` (ADR-0007).
+- The build-matrix rows and the rows in `docs/design/sysexts.md`.
+- A build-time check of upheld units in each sysext's delta, the units a
+  `.deb` ships included (a `sysext-upholds-guard` finalize script). Until
+  it lands, the suite repositories' tests from Phase 1 are the only check.
+- Repogen publishes each sysext under `ext/<name>/` with a signed
+  `SHA256SUMS.gpg` ([ADR-0014](../adr/0014-single-gpg-trust-root.md)).
+- The update path: a suite release, then `check-sysext-updates` (weekly, or
+  run by hand), a reviewed checksum pull request, and its merge, which
+  builds and publishes the sysext.
 - **Done when:** `https://repository.frostyard.org/ext/index` lists the 5
-  sysexts with signed checksums, and on a test VM `updex features enable
-  lodge` and `updex features enable porterd`, then a reboot, give a lodge
-  whose `lodgectl apps` shows `porter` up at its release version.
+  sysexts with signed checksums, and on a Floe test VM `updex features
+  enable lodge` and `updex features enable porterd`, then a reboot, give a
+  lodge whose `lodgectl apps` shows `porter` up at its release version.
 
-## Phase 4 — lodge's host runs the sysexts (medium)
+## Phase 4 — lodge's host on Floe (medium; needs Brian's decision)
 
-- Take the rollback archive first: the binaries, units, `sysusers.d`
-  entries and app bundles that are on the host now. The state in
-  `/var/lib/<user>` and the configuration in `/etc` stay; no sysext touches
-  them.
-- Prepare the host as Phase 0 decided: Floe, or Debian 13 with updex and
-  the 5 transfer and feature definitions.
-- Remove the hand-installed units from `/etc/systemd/system/` and the
-  `sysusers.d` entries from `/etc/sysusers.d/`, then the binaries in
-  `/opt/lodge/bin` and `/usr/local/bin` and the app bundles in
-  `/usr/share/lodge/` that a sysext now provides.
-- Enable the features for lodge and the 4 apps, and merge.
-- Coordinate with frostnotes M4 Phase 7, which retires the M2 hub on the
-  same host from 2026-10-26.
-- **Done when:** lodge and the 4 apps run from sysexts; no unit of theirs
-  is in `/etc/systemd/system/`; `lodgectl apps` shows each app at its
-  release version; and `updex features update` moves one app to a newer
-  release, which runs after the update step that open question 3 settles.
+- Take the rollback archive first: lodge's and the apps' state in
+  `/var/lib/`, their configuration in `/etc/` (`/etc/lodge/`,
+  `/etc/porter/`, `/etc/frostread/`, `/etc/lodge/lodge.env`), and the
+  hand-installed binaries, units and app bundles.
+- Install Floe fresh with Firn in a new UEFI virtual machine; there is no
+  conversion in place. Secure Boot is optional.
+- Restore the state and the configuration, enable the features for lodge
+  and the 4 apps, and reboot. lodge keeps its tsnet state, so its 2 nodes
+  keep their names.
+- Keep the old virtual machine stopped, not deleted, until the new one
+  passes its checks.
+- Record the install as Floe fresh-install evidence in lab.
+- Coordinate with frostnotes M4 Phase 7, which retires the M2 hub from
+  2026-10-26: the move happens before Phase 7 or after it, not during it.
+- **Done when:** lodge and the 4 apps run from sysexts on Floe;
+  `lodgectl apps` shows each app at its release version; and after a newer
+  release, `updex features update` and a reboot run the new version.
 
 ## Phase 5 — The Flatpaks (large)
 
@@ -166,7 +192,8 @@ In frostmail and frostnotes:
 - A CI job builds and tests the Flatpak on every pull request, as Igloo's
   workflow does. A `v*` tag pushes the OCI image to
   `ghcr.io/frostyard/frostmail` and `ghcr.io/frostyard/frostnotes`, tagged
-  `latest`, `vX.Y.Z` and `sha-<commit>`, and attests it.
+  `latest`, `vX.Y.Z` and `sha-<commit>`, and attests the image digest
+  (`attest-build-provenance` with `subject-digest`).
 - Brian makes each GHCR package public, and stores
   `FLATPAK_INDEX_DISPATCH_TOKEN` if the remote should refresh at once.
 - **Done when:** on Snow, `flatpak install frostyard org.frostyard.Frostmail`
@@ -176,11 +203,14 @@ In frostmail and frostnotes:
 
 ## Phase 6 — The remote lists the apps (small)
 
-- `frostyard/flatpak-index`: add `frostyard/frostmail` and
-  `frostyard/frostnotes` to `apps.json`, and the two apps to its README.
-- Apply the answer to open question 6 (attestations in the index).
+- First, `frostyard/flatpak-index` lists only attested digests and fails
+  closed, and its `publish.yml` actions are SHA-pinned
+  ([flatpak-index#2](https://github.com/frostyard/flatpak-index/issues/2)).
+- Then add `frostyard/frostmail` and `frostyard/frostnotes` to `apps.json`,
+  and the two apps to its README.
 - **Done when:** `flatpak remote-ls frostyard` lists both apps, with their
-  names and icons from AppStream.
+  names and icons from AppStream, and a test image without an attestation
+  stops the catalogue's deployment.
 
 ## Phase 7 — The records follow (small)
 
@@ -189,6 +219,10 @@ In frostmail and frostnotes:
 - frostmail: an ADR that supersedes ADR-0013's release path; the M6 line
   in its roadmap.
 - frostnotes: M6 in its roadmap (no hub container image, no apt packages).
+- Each app's operations doc: enable `lodge` first; updates take effect at
+  the next boot; without a reboot, run `systemd-sysusers`,
+  `systemd-tmpfiles --create --graceful`, `systemctl daemon-reload` and a
+  restart of the app's units.
 - Each repository's `AGENTS.md` and packaging README: install from the
   sysext or the Flatpak.
 - frostyard.org: a page for each sysext and each Flatpak.
@@ -201,62 +235,83 @@ In frostmail and frostnotes:
   sysexts.
 - A `beta` tag for the Flatpaks, served as a second branch of the remote.
 - A Flatpak or a sysext for a Linux maild outside the owner's tailnet.
+- `EXTENSION_RESTART_UNITS=` in each sysext, when Snosi's systemd is 262 or
+  newer, so a refresh restarts the daemons without a reboot.
+- `RequisiteFeatures=lodge` on each app's transfer, after
+  [updex#455](https://github.com/frostyard/updex/issues/455) is fixed.
+- One combined feature (for example `lodge-suite`) that the 5 transfers
+  list, if one switch for the whole suite is wanted.
+- The suite's Flatpaks in Snow's core set: needs a per-entry remote in the
+  core-set format, the `frostyard` remote in the images and Firn support.
+  A separate decision, after Phase 6.
+- `apt install frostyard-lodge` on a plain Debian host: register the 5
+  repositories with apt-publisher and add the `publish-deb` dispatch
+  (ADR-0055, ADR-0056).
 
 ## Open questions
 
-For Lucilla (flatpak-index, updex, apt-publisher), by Phase 0:
+- **A faster trigger for suite releases** (Murbella, by Phase 3): keep the
+  weekly `check-sysext-updates` run and run it by hand when needed, or add
+  a `repository_dispatch` type (for example `sysext-release`) that a suite
+  release sends (`ORG_PAT`, `continue-on-error: true`) and that starts the
+  check. Either way the pin changes through a reviewed pull request.
+- **`EXTENSION_RELOAD_MANAGER=1`** (Murbella, by Phase 3): confirm that
+  Snosi's sysext build can set it in each suite sysext's
+  `extension-release`.
+- **The delta check of upheld units** (Murbella, by Phase 3): Snosi's
+  `sysext-upholds-guard` finalize script, which reads the units a `.deb`
+  ships.
+- **notesd's service** (frostnotes, by Phase 1): upheld or socket-only,
+  while it syncs as a device of the M2 hub.
+- **Decisions for Brian:** accept ADR-0058 (Phase 0); move lodge's host to
+  Floe (Phase 4); make frostread public (before Phase 3 builds `readd`);
+  make the 2 GHCR packages public (Phase 5).
 
-1. **Releases to Snosi.** Should a suite release dispatch `build` to Snosi
-   ([ADR-0056](../adr/0056-rebuild-images-after-apt-publication.md)'s path
-   for components that publish nothing through apt-publisher), or does
-   Snosi's scheduled checksum check suffice?
-2. **No apt publication.** The `.deb` files are build inputs on GitHub
-   releases only. Does apt-publisher need any registration for them? Or
-   should Snosi read them from `repository.frostyard.org/debian/` with
-   `Packages=` instead?
-3. **Updates to a running service.** After `updex features enable` or
-   `update` and a refresh, does updex run `systemd-sysusers`,
-   `systemd-tmpfiles --create` and a restart of the units that the
-   refreshed sysext ships? If not, what is the supported step: a reboot, or
-   an updex hook?
-4. **Feature dependencies.** Can an updex feature require another (`maild`
-   requires `lodge`)? If not, the app's documentation says so.
-5. **updex on plain Debian 13.** Is `frostyard-updex` with transfer and
-   feature files in `/etc/sysupdate.<name>.d/` a supported install on a
-   host that is not a Snosi image?
-6. **Flatpak trust.** Should `build-index.py` list only images with a valid
-   build-provenance attestation from the app's release workflow, and fail
-   closed otherwise? Is an OCI remote without GPG acceptable, or does the
-   remote need another signature?
+## Answered
 
-For Murbella (Snosi sysexts), by Phase 0:
+On [core#159](https://github.com/frostyard/core/pull/159), 2026-10-23:
 
-1. **The pattern.** Do 5 sysexts on `pilothouse`'s pattern
-   (`verified_download` of a release `.deb`, `sysext-checksums.json`,
-   `check-sysext-updates`) fit Snosi, with the names `lodge`, `notesd`,
-   `maild`, `readd` and `porterd`?
-2. **Socket-activated apps.** Should `Upholds=` name each app's `.service`
-   (which `Requires=` its socket) or its `.socket`? Is a preset file needed
-   besides the drop-in?
-3. **Package-shipped units.** `check-upholds-guard.sh` skips units that a
-   package ships. Is a check in each suite repository enough, or should
-   Snosi also check a sysext's upheld units at build time?
-4. **Plain Debian 13.** Does a Snosi sysext (`BaseTrees=base`, its
-   `extension-release`) merge on a plain Debian 13 host? Or must lodge's
-   host run Floe?
-5. **Boot order.** The app sockets use `SocketGroup=lodge`, a group from
-   lodge's sysext. Do `sysusers.d` entries from merged sysexts always apply
-   before sockets start?
-6. **A private release.** frostread is private. Can `verified_download`
-   use a token, or must frostread's repository be public first?
-7. **Core flatpaks.** Should Snow's `flatpaks/snow.json` list the suite's
-   Flatpaks? They come from the `frostyard` remote, not Flathub.
-
-For Brian, by Phase 4:
-
-- **lodge's host:** move it to Floe, or keep Debian 13 with updex.
-  Recommended: Floe, unless the answer to Murbella's question 4 shows that
-  Snosi sysexts merge cleanly on Debian 13.
+- **Releases to Snosi** (Lucilla, Murbella): a `build` dispatch rebuilds
+  images only. A sysext's `.deb` changes only through its pin in
+  `sysext-checksums.json`, which the `check-sysext-updates` job of
+  `check-dependencies.yml` bumps in a pull request.
+- **apt-publisher** (Lucilla): no registration. The `.deb` files stay on
+  GitHub releases. `Packages=` from `debian/` is not used: it would make the
+  daemons installable with apt, fail for a private repository, and still
+  not rebuild the sysexts.
+- **Updates to a running service** (Lucilla, Murbella): updex runs only
+  `systemd-sysext refresh`, and has no hook. The supported path is a reboot:
+  Snosi's `reload-sysext.service` runs `systemd-sysusers`,
+  `systemd-tmpfiles` and a daemon reload after the boot merge.
+  `EXTENSION_RESTART_UNITS=` needs systemd 262.
+- **Feature dependencies** (Lucilla): none. `RequisiteFeatures=` is parsed
+  but not enforced
+  ([updex#455](https://github.com/frostyard/updex/issues/455)).
+- **updex on plain Debian 13** (Lucilla): updex is supported there, with
+  Frostyard's key as `/etc/systemd/import-pubring.gpg` and a boot-time unit
+  like `reload-sysext.service`. **Snosi sysexts on plain Debian 13**
+  (Murbella): they merge, but Snosi does not support or test it, and `apt`
+  upgrades fail while `/usr` is a merged overlay. So the sysexts are for
+  Snosi images, and lodge's host would run Floe.
+- **Flatpak trust** (Lucilla): list only attested digests, fail closed
+  ([flatpak-index#2](https://github.com/frostyard/flatpak-index/issues/2)).
+  An OCI remote without GPG is acceptable for desktop apps in user scope
+  only.
+- **The pilothouse pattern and the names** (Murbella): they fit; the 5
+  names are free.
+- **`Upholds=`** (Murbella): uphold the socket of a socket-activated app,
+  and the service too for a daemon that works without a client; ship the
+  preset beside the drop-in.
+- **Package-shipped units** (Murbella): the suite repositories' check is
+  not enough alone; Snosi adds a build-time delta check.
+- **Boot order** (Murbella): at boot, `sysusers.d` entries apply before
+  `sockets.target`. At runtime nothing reruns them, and an app's socket
+  needs group `lodge` from its own `sysusers.d` file when lodge's sysext is
+  not enabled.
+- **A private release** (Murbella): `verified_download` has no
+  credentials. frostread's repository becomes public first.
+- **Core Flatpaks** (Murbella): not now; Firn installs the core set from
+  Flathub only.
 
 ## References
 
