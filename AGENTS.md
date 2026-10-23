@@ -4,7 +4,8 @@ The org-wide hub for the [frostyard](https://github.com/frostyard)
 organization: shared agent skills, document and repo templates, org-level
 authority, issues and discussions, and common assets. It contains no product
 application code — other frostyard repos reference or copy what lives here.
-Start at [docs/README.md](docs/README.md).
+Start at [docs/README.md](docs/README.md). Before a packaging, product-shape,
+or priority decision, read [docs/tenets.md](docs/tenets.md).
 
 This file (`AGENTS.md`) is the CANONICAL agent instructions — `CLAUDE.md`,
 `GEMINI.md`, `CONTRIBUTING.md`, `.cursorrules`, and
