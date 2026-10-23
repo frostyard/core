@@ -60,7 +60,7 @@ The software we build keeps users' data in their own hands. We prefer plain, ope
 
 ## If we ship it, we document it
 
-Everything we ship has user documentation on [frostyard.org](https://frostyard.org): what it is, how to install it, update it, and roll it back. A release is not done until its docs are.
+Everything we ship has user documentation on [frostyard.org](https://frostyard.org): what it is, how to install it, update it, and roll it back.
 
 ## Agents do the work; people hold the keys
 
