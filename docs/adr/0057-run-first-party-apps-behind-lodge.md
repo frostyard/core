@@ -124,3 +124,5 @@ The contract between lodge and its apps is lodge's
   [ADR-0013](https://github.com/frostyard/frostmail/blob/main/docs/adr/0013-app-as-a-local-flatpak.md),
   [ADR-0024](https://github.com/frostyard/frostmail/blob/main/docs/adr/0024-rules-run-in-maild-on-new-mail.md),
   [ADR-0025](https://github.com/frostyard/frostmail/blob/main/docs/adr/0025-maild-keeps-send-later-remind-me-and-undo-send.md).
+- Related: [ADR-0058](0058-ship-suite-desktop-apps-as-flatpaks-and-services-as-sysexts.md)
+  (how the suite ships).
