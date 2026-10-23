@@ -51,9 +51,10 @@ Two more facts do not fit cleanly:
   [core#159](https://github.com/frostyard/core/pull/159). Their answers are
   in ADR-0058 and in [Answered](#answered) below.
 - Brian accepts or amends ADR-0058.
-- Brian decides whether lodge's host moves to Floe (Phase 4). Without that
-  move, Phases 1 to 3 still ship, but lodge's host keeps its
-  hand-installed services.
+- *Decided 2026-10-23:* lodge's host does not move to Floe for now. It
+  stays the hand-installed virtual machine, because a sysext deploy is too
+  slow during rapid development. Phase 4 is deferred; Phases 1 to 3 still
+  ship.
 - Brian makes frostread's repository public before Phase 3 builds `readd`.
 - **Done when:** ADR-0058 is Accepted, and the host decision is recorded
   here.
@@ -155,7 +156,11 @@ for `lodge`, `notesd`, `maild`, `readd` and `porterd`:
   enable lodge` and `updex features enable porterd`, then a reboot, give a
   lodge whose `lodgectl apps` shows `porter` up at its release version.
 
-## Phase 4 — lodge's host on Floe (medium; needs Brian's decision)
+## Phase 4 — lodge's host on Floe (medium; deferred)
+
+*Deferred 2026-10-23:* lodge's host stays the hand-installed virtual
+machine while the suite is in rapid development, and the suite keeps
+deploying to it as today. Revisit the move later.
 
 - Take the rollback archive first: lodge's and the apps' state in
   `/var/lib/`, their configuration in `/etc/` (`/etc/lodge/`,
@@ -263,8 +268,7 @@ In frostmail and frostnotes:
   ships.
 - **notesd's service** (frostnotes, by Phase 1): upheld or socket-only,
   while it syncs as a device of the M2 hub.
-- **Decisions for Brian:** accept ADR-0058 (Phase 0); move lodge's host to
-  Floe (Phase 4); make frostread public (before Phase 3 builds `readd`);
+- **Decisions for Brian:** accept ADR-0058 (Phase 0); make frostread public (before Phase 3 builds `readd`);
   make the 2 GHCR packages public (Phase 5).
 
 ## Answered
