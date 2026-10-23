@@ -1,6 +1,6 @@
 # 0057 — Run frostyard's first-party apps behind lodge
 
-- **Status:** Proposed
+- **Status:** Accepted (2026-10-23)
 - **Date:** 2026-10-18
 
 ## Context
