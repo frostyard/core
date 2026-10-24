@@ -1,6 +1,6 @@
 # 0059 — Publish image-only packages in a separate APT component
 
-- **Status:** Proposed
+- **Status:** Accepted (2026-10-24)
 - **Date:** 2026-10-24
 
 ## Context

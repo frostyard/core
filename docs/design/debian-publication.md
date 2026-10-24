@@ -124,5 +124,5 @@ the repository paths that never change under the same name.
   [ADR-0014](../adr/0014-single-gpg-trust-root.md)
 - Contracts: [apt-publisher README](https://github.com/frostyard/apt-publisher/blob/main/README.md)
 - Built in: [Plan 0009](../plans/0009-debian-publication-through-apt-publisher.md)
-- Proposed change: [ADR-0059](../adr/0059-publish-image-only-packages-in-a-separate-apt-component.md)
+- Accepted, not yet built: [ADR-0059](../adr/0059-publish-image-only-packages-in-a-separate-apt-component.md)
   (an `image` component for image-only packages)
