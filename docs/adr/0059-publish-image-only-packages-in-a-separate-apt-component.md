@@ -22,15 +22,20 @@ Two kinds of package share it:
     Debian 13 has no `bootc`.
   - `incus`, `incus-base`, `incus-client`, `incus-extra` and
     `incus-ui-canonical` (frostyard/incus), versions `1:7.5.1-debian13-…`.
-    Debian 13 ships `incus*` `6.0.4-2+deb13u11` through `trixie-security`.
-    The `1:` epoch makes every Frostyard build sort above every Debian
+    Debian 13 ships `incus`, `incus-base`, `incus-client` and `incus-extra`
+    `6.0.4-2+deb13u11` through `trixie-security`; it has no
+    `incus-ui-canonical`. The `1:` epoch makes every Frostyard build sort above every Debian
     version, including future security updates and forky's `7.0.x`.
 
 On 2026-10-24 `trixie` lists 82 files of these 7 packages, about 2.8 GB.
 
-A plain Debian 13 host that adds `main` therefore receives Frostyard's
-`libostree-1-1` and `incus*` on `apt upgrade` whenever it has Debian's, and
-then stops receiving Debian's security updates for them. The frostyard.org
+Without a pin, apt on a plain Debian 13 host that adds `main` selects
+Frostyard's builds as the candidates for `libostree-1-1` and Debian's four
+`incus` packages. `apt upgrade` replaces Debian's `incus` packages, and
+Debian's `libostree-1-1` when neither `ostree` nor `libostree-dev` is
+installed; with either installed, the Conflicts hold the library upgrade back
+and `apt full-upgrade` can remove them to install it. A replaced package no
+longer receives Debian's security updates. The frostyard.org
 [APT repository page](https://frostyard.org/docs/tools/apt-repository/)
 works around this with a pin (`Pin: release o=Frostyard`,
 `Pin-Priority: 100`). A host without the pin is exposed.
@@ -134,9 +139,12 @@ page does not document it.
 - **Plain hosts that installed a Frostyard `libostree-1-1`, `bootc` or
   `incus*`:** the package stays installed and no longer upgrades from
   Frostyard. apt does not replace it with Debian's lower version by itself.
-  The frostyard.org page documents the return to Debian's version
-  (`apt install <package>=<Debian version>`, all `incus*` packages
-  together).
+  The frostyard.org page documents the disposition of each package:
+  - `libostree-1-1` and the installed ones of `incus`, `incus-base`,
+    `incus-client` and `incus-extra` return to Debian's version, the `incus`
+    packages in one command (`apt install <package>=<Debian version> …`);
+  - `bootc` and `incus-ui-canonical` have no Debian package and are removed
+    (`apt remove`).
 - **Clients of the legacy `stable` suite:** nothing changes. `stable` stays
   frozen (ADR-0055), with its old versions of these packages in `main`.
 
@@ -184,8 +192,8 @@ metadata (ADR-0055).
   dimension. Rollback and recovery name one snapshot per component.
 - Snapshots taken before the move cannot be rolled back to.
 - Hosts that already installed a Frostyard build keep it until an operator
-  returns it to Debian's version. Because of the `1:` epoch, returning
-  `incus*` is a downgrade that apt asks to confirm.
+  returns it to Debian's version or removes it. Because of the `1:` epoch,
+  returning the `incus` packages is a downgrade that apt asks to confirm.
 - Snosi depends on the `image` component. A host that enables `image` by
   hand gets the builds without support.
 - The documented key URL moves under `debian/`, where its writer reads it
@@ -196,10 +204,15 @@ metadata (ADR-0055).
 - **Keep one component and require the pin:** rejected. A host without the
   pin is exposed, and the pin also lowers the priority of every Frostyard
   package.
-- **A separate codename or prefix for images (for example
-  `debian-image/`):** rejected. It needs a second aptly publication, a second
-  pool of the same files and a second sources stanza in snosi; a component
-  gives the same separation under one signed `Release`.
+- **A separate prefix for images (for example `debian-image/`):** rejected.
+  It needs a second aptly publication tree with its own pool, signed indexes
+  and reconciliation, and a second sources stanza in snosi.
+- **A separate codename under `debian/` (for example `trixie-image`):**
+  rejected. Each Debian codename gets a second signed publication that the
+  writer must switch, reconcile and roll back in step with the first, and
+  the extra codenames break the rule that a codename names a Debian release
+  (ADR-0055). A component gives the same separation under one signed
+  `Release` per codename.
 - **Name the component `snosi` or `bootc`:** rejected. Products are renamed,
   and `incus` is not bootc.
 - **Version the builds below Debian's:** rejected. Snosi needs them to win
