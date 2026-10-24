@@ -206,7 +206,7 @@ metadata (ADR-0055).
   package.
 - **A separate prefix for images (for example `debian-image/`):** rejected.
   It needs a second aptly publication tree with its own pool, signed indexes
-  and reconciliation, and a second sources stanza in snosi.
+  and reconciliation, and an additional repository URI in snosi.
 - **A separate codename under `debian/` (for example `trixie-image`):**
   rejected. Each Debian codename gets a second signed publication that the
   writer must switch, reconcile and roll back in step with the first, and
