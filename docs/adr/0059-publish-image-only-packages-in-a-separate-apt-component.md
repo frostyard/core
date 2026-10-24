@@ -29,7 +29,10 @@ Two kinds of package share it:
 
 On 2026-10-24 `trixie` lists 82 files of these 7 packages, about 2.8 GB.
 
-Without a pin, apt on a plain Debian 13 host that adds `main` selects
+The repository's intended consumers are Frostyard's images. Plain Debian
+hosts are not a supported use, but the frostyard.org page shows how to add
+the repository for tools such as Updex. Without a pin, apt on a plain
+Debian 13 host that adds `main` selects
 Frostyard's builds as the candidates for `libostree-1-1` and Debian's four
 `incus` packages. `apt upgrade` replaces Debian's `incus` packages, and
 Debian's `libostree-1-1` when neither `ostree` nor `libostree-dev` is
@@ -44,7 +47,10 @@ Snosi is the only consumer of these builds. It installs them at image build
 time from `mkosi.sandbox/etc/apt/sources.list.d/frostyard.sources`
 (`Components: main`), which every snosi image and sysext build shares
 (snosi [ADR-0020](https://github.com/frostyard/snosi/blob/main/docs/adr/0020-scope-third-party-apt-sources.md)).
-Installed images carry no Frostyard APT source: a `snow` image
+The `snow`, `snowfield`, `sundog` and `floe` profiles include
+`shared/packages/bootc/mkosi.conf` (`bootc`, `libostree-1-1`) and write a
+JSON package manifest. The `incus` sysext installs `incus`, `incus-extra`
+and `incus-ui-canonical`. Installed images carry no Frostyard APT source: a `snow` image
 (`IMAGE_VERSION=20261023083815`) has only `trixie.sources` and
 `debian-backports.sources` in `/etc/apt/sources.list.d/`. Images update as a
 whole, not through apt.
@@ -64,7 +70,7 @@ Each component has its own pool path, `pool/<component>/…`.
 
 **Component.** Every codename under `debian/` publishes two components:
 
-- `main`: packages that a plain Debian host of that codename may install.
+- `main`: packages that do not replace a Debian package of that codename.
 - `image`: packages built for Frostyard images that replace or depend on a
   replacement of a Debian package. Only Frostyard image builds enable it.
 
@@ -129,22 +135,20 @@ page does not document it.
 - `/public.key` stays readable and unchanged. It is no longer the documented
   location.
 
-**Migration of hosts and images.**
+**Migration.** The migration covers Frostyard's images and sysexts.
 
-- **Snosi images and sysexts:** the sandbox change above. Package versions do
-  not change, so built images contain the same packages. Installed images
-  need nothing: they have no Frostyard APT source.
-- **Plain hosts with the pin:** nothing changes. The pin is no longer needed
-  and can be deleted.
-- **Plain hosts that installed a Frostyard `libostree-1-1`, `bootc` or
-  `incus*`:** the package stays installed and no longer upgrades from
-  Frostyard. apt does not replace it with Debian's lower version by itself.
-  The frostyard.org page documents the disposition of each package:
-  - `libostree-1-1` and the installed ones of `incus`, `incus-base`,
-    `incus-client` and `incus-extra` return to Debian's version, the `incus`
-    packages in one command (`apt install <package>=<Debian version> …`);
-  - `bootc` and `incus-ui-canonical` have no Debian package and are removed
-    (`apt remove`).
+- **Image and sysext builds:** the sandbox change above. The move changes no
+  package version, so a build after the move contains the same versions of
+  the 7 packages as a build before it.
+- **Installed images:** no APT-source change. They have no Frostyard APT
+  source, and they update to a post-move image as to any other image.
+- **Plain Debian hosts:** no supported migration. A host that installed a
+  Frostyard `libostree-1-1`, `bootc` or `incus*` keeps it, and it no longer
+  receives updates from Frostyard. The frostyard.org page gives a short
+  caveat and no downgrade procedure: a downgrade that apt completes does not
+  make Incus data compatible, and an older Incus daemon can refuse a
+  database that a newer one upgraded
+  ([Incus: upgrade](https://linuxcontainers.org/incus/docs/main/installing/#upgrade-incus)).
 - **Clients of the legacy `stable` suite:** nothing changes. `stable` stays
   frozen (ADR-0055), with its old versions of these packages in `main`.
 
@@ -158,17 +162,25 @@ page does not document it.
 3. apt-publisher, manual run: publish an empty `image` in `trixie` and
    `forky`, and the key at `debian/frostyard.gpg`. Check: each `Release`
    lists `Components: image main`, and the key's bytes match.
-4. snosi: `Components: main image`, and its integration contract. Check: a
-   build passes with `image` empty.
+4. snosi: `Components: main image`, and its integration contract. Check:
+   the `snow`, `snowfield`, `sundog` and `floe` builds and the `incus`
+   sysext build pass with `image` empty.
 5. apt-publisher: register frostyard/bootc-debian and frostyard/incus for
    `image`, then run the move workflow at once. It moves every published
    version whose component differs from its producer's registration. A
    publication request between the merge and the move fails closed on the
-   one-component rule; it is rerun after the move. Check: `main` lists none
-   of the 7 packages, `image` lists all 82 files, and a snosi build passes.
+   one-component rule; it is rerun after the move. The move changes no
+   package version. Checks:
+   - `main` lists none of the 7 packages, and `image` lists all 82 files;
+   - the `snow`, `snowfield`, `sundog` and `floe` builds pass, and their
+     package manifests list the same versions of `bootc` and
+     `libostree-1-1` as the last builds before the move;
+   - the `incus` sysext build passes with the same `incus` versions;
+   - an installed image of each product updates to its post-move image and
+     boots, with no APT-source change.
 6. frostyard.org: the APT page drops the pin, uses
-   `https://repository.frostyard.org/debian/frostyard.gpg`, and documents the
-   return to Debian's version. The core
+   `https://repository.frostyard.org/debian/frostyard.gpg`, and adds the
+   short caveat for plain hosts. The core
    [Debian publication](../design/debian-publication.md) design and the
    apt-publisher README describe both components.
 
@@ -179,10 +191,12 @@ metadata (ADR-0055).
 
 ## Consequences
 
-- A plain Debian host that adds the repository as documented never receives
-  Frostyard's `libostree-1-1`, `bootc` or `incus*`, with or without a pin.
-  Debian's security updates for those packages keep reaching it.
-- The guarantee holds only while `main` follows the rule. The audit reports
+- Image build dependencies are separate from packages for general use. As a
+  side effect, a plain Debian host that adds the repository as documented
+  does not receive Frostyard's `libostree-1-1`, `bootc` or `incus*`, with or
+  without a pin, and Debian's security updates for them keep reaching it.
+  This is not a commitment to support plain hosts.
+- This holds only while `main` follows the rule. The audit reports
   a new Debian name in `main` (for example when Debian adds a package to
   `trixie-backports`) only after the fact, at most one day later.
 - The move uploads about 2.8 GB under `debian/pool/image/`. The copies under
@@ -191,9 +205,8 @@ metadata (ADR-0055).
 - apt-publisher's scripts, tests and recovery procedures grow a component
   dimension. Rollback and recovery name one snapshot per component.
 - Snapshots taken before the move cannot be rolled back to.
-- Hosts that already installed a Frostyard build keep it until an operator
-  returns it to Debian's version or removes it. Because of the `1:` epoch,
-  returning the `incus` packages is a downgrade that apt asks to confirm.
+- Plain hosts that already installed a Frostyard build keep it, with no
+  further Frostyard updates and no supported way back to Debian's version.
 - Snosi depends on the `image` component. A host that enables `image` by
   hand gets the builds without support.
 - The documented key URL moves under `debian/`, where its writer reads it
