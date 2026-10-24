@@ -71,6 +71,7 @@ Docs are split by the question they answer:
 - [0056 — The APT publisher triggers image rebuilds after packages are live](adr/0056-rebuild-images-after-apt-publication.md)
 - [0057 — Run frostyard's first-party apps behind lodge](adr/0057-run-first-party-apps-behind-lodge.md)
 - [0058 — Ship the suite's desktop apps as Flatpaks and its services as sysexts](adr/0058-ship-suite-desktop-apps-as-flatpaks-and-services-as-sysexts.md)
+- [0059 — Publish image-only packages in a separate APT component](adr/0059-publish-image-only-packages-in-a-separate-apt-component.md)
 
 ### Design
 
