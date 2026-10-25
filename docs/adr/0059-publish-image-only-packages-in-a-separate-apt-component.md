@@ -252,6 +252,8 @@ metadata (ADR-0055).
   [ADR-0014](0014-single-gpg-trust-root.md),
   [ADR-0055](0055-publish-debian-packages-through-the-apt-publisher.md),
   snosi [ADR-0020](https://github.com/frostyard/snosi/blob/main/docs/adr/0020-scope-third-party-apt-sources.md)
+- Amended by: [ADR-0061](0061-add-the-image-apt-component-on-the-first-publication-run.md)
+  (step 3: the first publication run adds `image`)
 - Related: repogen
   [ADR-0003](https://github.com/frostyard/repogen/blob/main/docs/adr/0003-single-main-component.md),
   [ADR-0049](0049-retire-omarchy-apps-without-breaking-snosi.md)
