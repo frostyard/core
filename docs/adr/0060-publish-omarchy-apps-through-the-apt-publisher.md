@@ -18,9 +18,10 @@ That path is closed:
   reach only Snosi ([Plan 0009](../plans/0009-debian-publication-through-apt-publisher.md),
   Phase 4).
 - [ADR-0055](0055-publish-debian-packages-through-the-apt-publisher.md) makes
-  `frostyard/apt-publisher` the single Debian writer. It refuses unregistered
-  producers, foreign package names, and codenames or architectures outside a
-  producer's registration before it changes any state.
+  `frostyard/apt-publisher` the single Debian writer. Before it changes any state, it
+  refuses unregistered producers, package names outside a producer's
+  registration, codenames the producer may not publish to, and architectures
+  the target codename does not publish.
 
 Snosi still builds its `voxtype` and `moonlight` sysexts from the
 `voxtype` and `moonlight-qt` packages.
@@ -44,9 +45,8 @@ through the apt-publisher as ADR-0055 describes.
   2026-10-22 by
   [publish run 39712749795](https://github.com/frostyard/apt-publisher/actions/runs/39712749795).
 
-ADR-0049's credential removal stands. Its freeze of new versions, its plan to
-disable Actions and archive the repository, and its later deindexing decision
-no longer apply.
+ADR-0049's credential removal stands. Its freeze of new versions and its plans
+to disable Actions and to archive the repository no longer apply.
 
 ## Consequences
 
