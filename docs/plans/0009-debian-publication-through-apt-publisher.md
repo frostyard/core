@@ -17,9 +17,10 @@ legacy `stable` suite to explicit codenames at
 
 NBC retirement stays with
 [Plan 0008](0008-post-nbc-bootc-only-transition.md). omarchy-apps publishes
-through apt-publisher since 2026-10-22 (Phase 4), although
-[ADR-0049](../adr/0049-retire-omarchy-apps-without-breaking-snosi.md) still
-says to publish no new versions from it (see Open questions).
+through apt-publisher since 2026-10-22 (Phase 4), under
+[ADR-0060](../adr/0060-publish-omarchy-apps-through-the-apt-publisher.md),
+which supersedes
+[ADR-0049](../adr/0049-retire-omarchy-apps-without-breaking-snosi.md).
 
 ## Phase 1 — Writer and infrastructure (done 2026-10-02)
 
@@ -148,7 +149,9 @@ Snosi `dd0def7`, 2026-10-02):
     as `1:7.5.1-debian13-202610032056`.
   - Its epoch makes apt prefer it over Debian's incus, and
     `incus-ui-canonical` exists only here.
-- [x] **omarchy-apps.** Ships twelve Omarchy apps, among them `voxtype` and
+- [x] **omarchy-apps.** Governed by
+  [ADR-0060](../adr/0060-publish-omarchy-apps-through-the-apt-publisher.md).
+  Ships twelve Omarchy apps, among them `voxtype` and
   `moonlight-qt` (Snosi's sysexts) and the flurry desktop's apps.
   - Each push to `main` builds all twelve amd64 packages in `debian:trixie`,
     publishes a GitHub release `main-<UTC time>-<short sha>` of exactly
@@ -247,7 +250,7 @@ until that queue is processed.
 
 ## Phase 7 — Steady state
 
-- [ ] Set apt-publisher's `APT_AUDIT_ENABLED=true` once its producers publish
+- [x] Set apt-publisher's `APT_AUDIT_ENABLED=true` once its producers publish
   through it.
   - All eight registered producers do. A manual
     [audit run 40156591706](https://github.com/frostyard/apt-publisher/actions/runs/40156591706)
@@ -257,7 +260,10 @@ until that queue is processed.
     firn v0.8.0, chairlift v0.11.2, first-setup v0.4.1, bootc-debian
     `bootc-1.16.8-ostree-2026.3-202610040153` and omarchy-apps
     `main-20261023154604-1cbd54d`.
-  - Until the variable is set, the nightly schedule skips the audit.
+  - The variable was set on 2026-10-25 at 08:11 UTC. The first scheduled
+    [audit run 40188675832](https://github.com/frostyard/apt-publisher/actions/runs/40188675832)
+    passed the same day, at apt-publisher `c1696ce`. It found every `.deb`
+    of all eight producers' latest releases, firn now at v0.9.0.
 - [ ] Keep `trixie` readable for at least 90 days after `forky` is promoted,
   and signed `stable` unchanged through at least 2027-09-30.
 - **Done when:** the nightly audit passes, and the retention windows are
@@ -277,10 +283,6 @@ until that queue is processed.
 
 - **What Repogen becomes,** whether it keeps only sysexts or is replaced by a
   small sign-and-upload step. Decide by Phase 7.
-- **Whether ADR-0049 is superseded.** Its decision to publish no new
-  omarchy-apps versions no longer holds: omarchy-apps publishes through
-  apt-publisher since 2026-10-22. Record that in a new ADR or in ADR-0049's
-  status.
 - **What happens to legacy `stable` after 2027-09-30.** Expiry alone
   authorizes no removal; it needs its own decision.
 
@@ -288,7 +290,8 @@ until that queue is processed.
 
 - Implements: [Debian publication](../design/debian-publication.md)
 - Governed by: [ADR-0055](../adr/0055-publish-debian-packages-through-the-apt-publisher.md),
-  [ADR-0056](../adr/0056-rebuild-images-after-apt-publication.md)
+  [ADR-0056](../adr/0056-rebuild-images-after-apt-publication.md);
+  omarchy-apps by [ADR-0060](../adr/0060-publish-omarchy-apps-through-the-apt-publisher.md)
 - Replaces: [Plan 0006](0006-nbc-retirement-and-debian-suite-migration-fast-path.md),
   [Plan 0007](0007-support-suites-in-repogen.md)
 - Coordinates with: [Plan 0008](0008-post-nbc-bootc-only-transition.md)
