@@ -73,6 +73,7 @@ Docs are split by the question they answer:
 - [0058 — Ship the suite's desktop apps as Flatpaks and its services as sysexts](adr/0058-ship-suite-desktop-apps-as-flatpaks-and-services-as-sysexts.md)
 - [0059 — Publish image-only packages in a separate APT component](adr/0059-publish-image-only-packages-in-a-separate-apt-component.md)
 - [0060 — Publish omarchy-apps through the apt-publisher](adr/0060-publish-omarchy-apps-through-the-apt-publisher.md)
+- [0061 — Add the image APT component on the first publication run](adr/0061-add-the-image-apt-component-on-the-first-publication-run.md)
 
 ### Design
 
