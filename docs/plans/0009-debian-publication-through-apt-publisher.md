@@ -15,9 +15,11 @@ legacy `stable` suite to explicit codenames at
 - **What remains:** validating `forky` (Phase 6) and steady state
   (Phase 7).
 
-NBC and omarchy-apps retirement stay with
-[Plan 0008](0008-post-nbc-bootc-only-transition.md) and
-[ADR-0049](../adr/0049-retire-omarchy-apps-without-breaking-snosi.md).
+NBC retirement stays with
+[Plan 0008](0008-post-nbc-bootc-only-transition.md). omarchy-apps publishes
+through apt-publisher since 2026-10-22 (Phase 4), although
+[ADR-0049](../adr/0049-retire-omarchy-apps-without-breaking-snosi.md) still
+says to publish no new versions from it (see Open questions).
 
 ## Phase 1 — Writer and infrastructure (done 2026-10-02)
 
@@ -61,7 +63,7 @@ NBC and omarchy-apps retirement stay with
   - a missing file was `BYPASS` both times;
   - `InRelease` was `DYNAMIC`.
 
-## Phase 4 — Move producers (done for Snosi's producers 2026-10-04)
+## Phase 4 — Move producers (done for Snosi's producers 2026-10-22)
 
 For each producer:
 
@@ -146,10 +148,24 @@ Snosi `dd0def7`, 2026-10-02):
     as `1:7.5.1-debian13-202610032056`.
   - Its epoch makes apt prefer it over Debian's incus, and
     `incus-ui-canonical` exists only here.
-- [ ] **omarchy-apps.** Not migrated
-  ([ADR-0049](../adr/0049-retire-omarchy-apps-without-breaking-snosi.md)).
-  `voxtype` and `moonlight-qt` stay in `trixie` from the seed until Snosi
-  resolves them.
+- [x] **omarchy-apps.** Ships twelve Omarchy apps, among them `voxtype` and
+  `moonlight-qt` (Snosi's sysexts) and the flurry desktop's apps.
+  - Each push to `main` builds all twelve amd64 packages in `debian:trixie`,
+    publishes a GitHub release `main-<UTC time>-<short sha>` of exactly
+    those `.deb` files, then requests `trixie` (frostyard/omarchy-apps#2).
+    The repository holds no signing key and no bucket credentials.
+  - Registered by exact package names, `trixie` only, `attested=no`
+    (frostyard/apt-publisher#12).
+    - Its versions carry no `~deb13` marker.
+    - Its attestations name `refs/heads/main`, not the release tag the
+      writer checks.
+    - `gpu-screen-recorder` is also a Debian package (`forky`, `sid`).
+  - `main-20261022024102-da2ea04` was published on 2026-10-22 by
+    [publish run 39712749795](https://github.com/frostyard/apt-publisher/actions/runs/39712749795)
+    into snapshot
+    `trixie-20261022T024221Z-omarchy-apps-main-20261022024102-da2ea04`.
+    Its apt canary downloaded all twelve packages from `trixie` amd64
+    through the public URL, and the run dispatched `build` to Snosi.
 
 Producers whose packages Snosi does not install from the repository:
 
@@ -175,7 +191,7 @@ ever need APT publication.
   next release through apt-publisher, and none of their workflows calls
   Repogen's `publish-to-r2` with `package-type: deb`.
   - This held on 2026-10-04 for updex, incus, intuneme, firn, first-setup,
-    bootc-debian and chairlift. omarchy-apps is retired.
+    bootc-debian and chairlift, and on 2026-10-22 for omarchy-apps.
   - Each first release was checked from outside: routing, signature, index
     contents, apt canary, attestation where registered, and legacy `stable`
     unchanged.
@@ -233,6 +249,15 @@ until that queue is processed.
 
 - [ ] Set apt-publisher's `APT_AUDIT_ENABLED=true` once its producers publish
   through it.
+  - All eight registered producers do. A manual
+    [audit run 40156591706](https://github.com/frostyard/apt-publisher/actions/runs/40156591706)
+    on 2026-10-25, at apt-publisher `8804052`, passed. It found every
+    `.deb` of each producer's latest release in its codenames:
+    updex v2.1.0, incus `7.5.1-debian13-202610231739`, intuneme v0.20.4,
+    firn v0.8.0, chairlift v0.11.2, first-setup v0.4.1, bootc-debian
+    `bootc-1.16.8-ostree-2026.3-202610040153` and omarchy-apps
+    `main-20261023154604-1cbd54d`.
+  - Until the variable is set, the nightly schedule skips the audit.
 - [ ] Keep `trixie` readable for at least 90 days after `forky` is promoted,
   and signed `stable` unchanged through at least 2027-09-30.
 - **Done when:** the nightly audit passes, and the retention windows are
@@ -252,6 +277,10 @@ until that queue is processed.
 
 - **What Repogen becomes,** whether it keeps only sysexts or is replaced by a
   small sign-and-upload step. Decide by Phase 7.
+- **Whether ADR-0049 is superseded.** Its decision to publish no new
+  omarchy-apps versions no longer holds: omarchy-apps publishes through
+  apt-publisher since 2026-10-22. Record that in a new ADR or in ADR-0049's
+  status.
 - **What happens to legacy `stable` after 2027-09-30.** Expiry alone
   authorizes no removal; it needs its own decision.
 
