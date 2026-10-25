@@ -1,6 +1,6 @@
 # 0049 — Retire omarchy-apps without breaking Snosi
 
-- **Status:** Accepted
+- **Status:** Superseded by [0060](0060-publish-omarchy-apps-through-the-apt-publisher.md)
 - **Date:** 2026-09-09
 
 ## Context

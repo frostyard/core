@@ -61,7 +61,7 @@ Docs are split by the question they answer:
 - [0046 — Rename the cayo server image to floe](adr/0046-rename-cayo-server-image-to-floe.md)
 - [0047 — Retire NBC on a proportional four-user fast path](adr/0047-retire-nbc-on-a-proportional-fast-path.md)
 - [0048 — Publish Debian packages to explicit codenames](adr/0048-publish-debian-packages-to-explicit-codenames.md) *(superseded by 0055)*
-- [0049 — Retire omarchy-apps without breaking Snosi](adr/0049-retire-omarchy-apps-without-breaking-snosi.md)
+- [0049 — Retire omarchy-apps without breaking Snosi](adr/0049-retire-omarchy-apps-without-breaking-snosi.md) *(superseded by 0060)*
 - [0050 — Replace the NBC/native-A/B retention date with a completion condition](adr/0050-replace-nbc-retention-date-with-a-completion-condition.md)
 - [0051 — ADRs state facts only, not the process that produced them](adr/0051-adrs-state-facts-not-process.md)
 - [0052 — Remove NBC/native-A/B artifact retention gates](adr/0052-remove-nbc-artifact-retention-gates.md)
@@ -72,6 +72,7 @@ Docs are split by the question they answer:
 - [0057 — Run frostyard's first-party apps behind lodge](adr/0057-run-first-party-apps-behind-lodge.md)
 - [0058 — Ship the suite's desktop apps as Flatpaks and its services as sysexts](adr/0058-ship-suite-desktop-apps-as-flatpaks-and-services-as-sysexts.md)
 - [0059 — Publish image-only packages in a separate APT component](adr/0059-publish-image-only-packages-in-a-separate-apt-component.md)
+- [0060 — Publish omarchy-apps through the apt-publisher](adr/0060-publish-omarchy-apps-through-the-apt-publisher.md)
 
 ### Design
 
