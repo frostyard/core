@@ -50,14 +50,14 @@ Two more facts do not fit cleanly:
   Murbella (Snosi) answered the first round of questions on
   [core#159](https://github.com/frostyard/core/pull/159). Their answers are
   in ADR-0058 and in [Answered](#answered) below.
-- Brian accepts or amends ADR-0058.
+- *Done 2026-10-26:* ADR-0058 is Accepted.
 - *Decided 2026-10-23:* lodge's host does not move to Floe for now. It
   stays the hand-installed virtual machine, because a sysext deploy is too
   slow during rapid development. Phase 4 is deferred; Phases 1 to 3 still
   ship.
 - Brian makes frostread's repository public before Phase 3 builds `readd`.
 - **Done when:** ADR-0058 is Accepted, and the host decision is recorded
-  here.
+  here. ✅ 2026-10-26: both hold.
 
 ## Phase 1 — The `/usr` layout in each service repository (small)
 
@@ -268,7 +268,7 @@ In frostmail and frostnotes:
   ships.
 - **notesd's service** (frostnotes, by Phase 1): upheld or socket-only,
   while it syncs as a device of the M2 hub.
-- **Decisions for Brian:** accept ADR-0058 (Phase 0); make frostread public (before Phase 3 builds `readd`);
+- **Decisions for Brian:** make frostread public (before Phase 3 builds `readd`);
   make the 2 GHCR packages public (Phase 5).
 
 ## Answered

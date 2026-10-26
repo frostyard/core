@@ -1,6 +1,6 @@
 # 0058 — Ship the suite's desktop apps as Flatpaks and its services as sysexts
 
-- **Status:** Proposed
+- **Status:** Accepted (2026-10-26)
 - **Date:** 2026-10-23
 
 ## Context
