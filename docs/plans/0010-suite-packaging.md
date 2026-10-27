@@ -2,15 +2,20 @@
 
 This plan ships frostyard's suite as
 [ADR-0058](../adr/0058-ship-suite-desktop-apps-as-flatpaks-and-services-as-sysexts.md)
-decides: frostmail's and frostnotes' desktop apps as Flatpaks from
-`frostyard/flatpak-index`, and lodge and its app daemons as sysexts that
-Snosi builds, Repogen publishes and updex installs. It builds on lodge's
-platform ([ADR-0057](../adr/0057-run-first-party-apps-behind-lodge.md)) and
+decides, as
+[ADR-0062](../adr/0062-make-desktop-suite-apps-standalone-flatpaks-with-opt-in-lodge.md)
+amends it: each desktop suite app (frostnotes, frostmail, frostread) is a
+standalone Flatpak from `frostyard/flatpak-index` that carries its UI, its
+daemon and its helpers, with lodge as an opt-in mode per app. Porter stays
+lodge's app `porter`, with no Flatpak. lodge and its app daemons are
+sysexts that Snosi builds, Repogen publishes and updex installs. It builds
+on lodge's platform ([ADR-0057](../adr/0057-run-first-party-apps-behind-lodge.md)) and
 on the sysext contract ([ADR-0007](../adr/0007-frostyard-sysext-filename-pattern.md),
 [ADR-0008](../adr/0008-sysext-distribution-and-update-contract.md)). It
 answers lodge's open packaging question and replaces frostnotes' and
-frostmail's M6 packaging lines. The Flatpak track (Phases 5 and 6) does not
-depend on the sysext track (Phases 1 to 4); they can run side by side.
+frostmail's M6 packaging lines. The Flatpak track (Phases 5a to 5c and 6)
+does not depend on the sysext track (Phases 1 to 4); they can run side by
+side.
 
 ## Inventory
 
@@ -22,17 +27,18 @@ Every artifact of the five suite repositories, and its side.
 | lodge | `kit/`, `client/`, `ui/` | not shipped | libraries, pinned by git tag |
 | lodge | `dev/fakeapp`, the `e2e` build | not shipped | development only |
 | frostnotes | `notesd -lodge`, `notesctl`, the `notes` web build, `frostnotes.service`, `frostnotes-lodge.socket`, `sysusers.d` | sysext `notesd` | already stages `/usr/bin` |
-| frostnotes | the Tauri app | Flatpak `org.frostyard.Frostnotes` | **does not fit cleanly:** it needs its own notesd, which ships inside the Flatpak |
+| frostnotes | the Tauri app | Flatpak `org.frostyard.Frostnotes` | notesd ships inside the Flatpak, in the app's own sandbox ([frostnotes ADR-0031](https://github.com/frostyard/frostnotes/blob/main/docs/adr/0031-the-desktop-app-ships-as-a-flatpak-with-its-own-notesd.md)) |
 | frostnotes | `notesctl` on a desktop (`notesctl mcp` for an agent, `notesctl sync`) | inside the Flatpak | **does not fit cleanly:** run with `flatpak run --command=notesctl` |
 | frostnotes | the M2 hub (`notesd -hub`, user `notes`) | not shipped | retired by frostnotes M4 Phase 7 |
 | frostmail | `maild --lodge`, `mailctl`, the `mail` web build, `frostmail.service`, `frostmail.socket`, `sysusers.d` | sysext `maild` | stages `/usr/local/bin` today |
-| frostmail | the Tauri app | Flatpak `org.frostyard.Frostmail` | a lodge client on the tailnet ([frostmail ADR-0041](https://github.com/frostyard/frostmail/blob/main/docs/adr/0041-maild-runs-as-a-lodge-app.md)) |
-| frostmail | a local maild on a Linux desktop, with `maild.service` (user) and `mailctl` | not shipped | **does not fit cleanly:** a desktop daemon outside lodge; development only until a later decision |
+| frostmail | the Tauri app | Flatpak `org.frostyard.Frostmail` | carries the UI, maild and `mailctl`; lodge connection mode ([frostmail ADR-0041](https://github.com/frostyard/frostmail/blob/main/docs/adr/0041-maild-runs-as-a-lodge-app.md)); [ADR-0062](../adr/0062-make-desktop-suite-apps-standalone-flatpaks-with-opt-in-lodge.md) |
+| frostmail | maild and `mailctl` on a desktop | inside the Flatpak | ADR-0062: no user unit ships |
 | frostmail | the Windows install | not in this plan | frostmail M7 |
 | frostmail | `tools/lodgeprobe` | not shipped | development only |
 | frostread | `readd`, `readctl`, the `read` web build, `frostread.service`, `frostread.socket`, `sysusers.d` | sysext `readd` | **does not fit cleanly:** the repository is private, and Snosi's `verified_download` has no credentials, so it becomes public before Phase 3 builds `readd` |
 | frostread | `readdev` | not shipped | development only |
-| porter | `porterd`, the `porter` web build, `frostporter.service`, `frostporter.socket`, `sysusers.d` | sysext `porterd` | stages `/usr/local/bin` today; the host runs `/opt/lodge/bin/porterd` |
+| frostread | the desktop UI, readd, `readctl` | Flatpak (its ID set in a frostread ADR, per [ADR-0016](../adr/0016-reverse-dns-org-frostyard-identifiers.md)) | **not designed yet:** the desktop shell, content isolation and the lodge mode are open (ADR-0062) |
+| porter | `porterd`, the `porter` web build, `frostporter.service`, `frostporter.socket`, `sysusers.d` | sysext `porterd` | stages `/usr/local/bin` today; the host runs `/opt/lodge/bin/porterd`; no Flatpak (ADR-0062) |
 
 Two more facts do not fit cleanly:
 
@@ -135,7 +141,7 @@ for `lodge`, `notesd`, `maild`, `readd` and `porterd`:
   entry, the manifest, the drop-in and the preset.
 - In each image: the `Upholds=` drop-in
   `multi-user.target.d/10-<name>.conf` and the preset `40-<name>.preset`,
-  with the units in ADR-0058's table.
+  with the units in ADR-0058's table, as ADR-0063 amends it.
 - `EXTENSION_RELOAD_MANAGER=1` in each sysext's `extension-release`.
 - `shared/download/sysext-checksums.json`: the URL, SHA-256 and version of
   each `.deb`; and a release-check block for each in the
@@ -160,8 +166,9 @@ for `lodge`, `notesd`, `maild`, `readd` and `porterd`:
 ### Phase 3 brief (2026-10-27)
 
 The facts below were checked on 2026-10-27 against the `v0.1.0` releases
-and Snosi's `main`. Two points need a decision before Snosi builds
-`notesd` and `maild`; the other 3 sysexts can be built now.
+and Snosi's `main`. Brian decided both points on 2026-10-27. `lodge`,
+`notesd`, `readd` and `porterd` can be built now from `v0.1.0`. `maild`
+waits for frostmail `v0.1.1` (point (b)).
 
 Facts that shape both points:
 
@@ -189,18 +196,11 @@ versions at start and every 24 h (`internal/vault/watch.go`,
 fresh host has none. Its unit has no `Condition*=` and needs nothing in
 `/etc`.
 
-- *A1 — uphold both,* `frostnotes-lodge.socket` and `frostnotes.service`.
-  The vault work runs from boot, whether lodge is enabled or not. A new
-  ADR amends ADR-0058's table (one row), as ADR-0061 amends ADR-0059.
-- *A2 — keep the socket only,* as ADR-0058 has it. notesd starts only on
-  the first connection: lodge's poll makes one within 15 s of lodge's
-  start. Once started, notesd stays up, also if lodge stops later. Without
-  lodge, or before its first poll, the vault work does not run. No record
-  changes.
-
-**Recommendation: A1.** It meets ADR-0058's own rule ("the service is
-upheld too when the daemon works without a client"), costs one line, and
-does not make notesd's housekeeping depend on another sysext.
+**Decided 2026-10-27: uphold both**
+([ADR-0063](../adr/0063-uphold-notesds-service-as-well-as-its-socket.md)).
+The `notesd` sysext upholds `frostnotes-lodge.socket` and
+`frostnotes.service`, and its preset enables both. The vault work then
+runs from boot, and it does not depend on lodge.
 
 **(b) maild: the secrets key before the service.** `frostmail.service` has
 `LoadCredentialEncrypted=frostmail-secrets-key:/etc/credstore.encrypted/frostmail-secrets-key`.
@@ -212,35 +212,30 @@ ADR-0058 upholds the service. With no key, maild then fails every 2 s
 until the key exists. With only the socket upheld, lodge's first poll
 starts the same loop through `Restart=on-failure`.
 
-- *B1 — make the key at first start.* frostmail's `.deb` ships a oneshot
-  `frostmail-secrets-key.service` with
-  `ConditionPathExists=!/etc/credstore.encrypted/frostmail-secrets-key`
-  that seals 32 random bytes with `systemd-creds encrypt --with-key=auto`,
-  as `scripts/seal-mail-secrets.sh --apply` already does.
-  `frostmail.service` gets `Requires=` and `After=` on it. The oneshot is
-  pulled, not upheld, so its condition is a clean skip. The table stays.
-  Needs a frostmail ADR that amends ADR-0044 (the key is made on the host
-  at first start, not by hand) and a `v0.1.1` release; `maild` then builds
-  from `v0.1.1`.
-- *B2 — uphold a setup oneshot.* Snosi's `maild` sysext upholds
-  `frostmail-sysext-setup.service` (`Type=oneshot`, `RemainAfterExit=yes`,
-  no condition, `Wants=frostmail.socket frostmail.service`), the pattern of
-  `k3s` and `himmelblau`, and ships drop-ins that give the socket and the
-  service `ConditionPathExists=/etc/credstore.encrypted/frostmail-secrets-key`.
-  Without the key, neither starts, and lodge shows mail down. After root
-  makes the key, `systemctl start frostmail.socket` or a reboot starts it.
-  No frostmail release; ADR-0058's table changes for `maild`.
-- *B3 — keep the table, document the order.* Uphold both units as ADR-0058
-  has it; the operations doc says to make the key before `updex features
-  enable maild`. Without the key, the journal gets about 53 lines a minute;
-  when root makes the key, the next retry starts maild, with no reboot. A
-  drop-in with `RestartSec=30s` cuts the noise to about 12 lines a minute.
+**Decided 2026-10-27: frostmail's `.deb` makes the key at first start.**
+The `.deb` ships a oneshot `frostmail-secrets-key.service` with
+`ConditionPathExists=!/etc/credstore.encrypted/frostmail-secrets-key`
+that seals 32 random bytes with `systemd-creds encrypt --with-key=auto
+--name=frostmail-secrets-key`, as `scripts/seal-mail-secrets.sh --apply`
+does. `frostmail.service` gets `Requires=` and `After=` on it. The
+oneshot is pulled, not upheld, so its condition is a clean skip.
+ADR-0058's `maild` row stays (`frostmail.socket`, `frostmail.service`).
+A restored `secrets.sealed` under another host's key still fails, as
+frostmail ADR-0044 records; the operations doc covers that case.
 
-**Recommendation: B1.** The sysext works with no hand step, nothing loops
-on a fresh host, and the unit contract stays in frostmail, where it also
-serves the hand-installed host. A restored `secrets.sealed` under another
-host's key still fails, as ADR-0044 records; the operations doc covers that
-case.
+**Follow-up for Irulan (frostmail):**
+
+- A frostmail ADR that amends frostmail ADR-0044: the key is made on the
+  host at first start, not by hand.
+- The oneshot unit in the `.deb`, and the `Requires=` and `After=` in
+  `frostmail.service`.
+- frostmail's packaging test covers the new unit: no `RequiredBy=`, and
+  `systemd-analyze verify` passes.
+- A `v0.1.1` release with an attested `.deb`. Brian pushes the tag.
+
+Snosi builds `maild` from `v0.1.1`, and it lists
+`/usr/lib/systemd/system/frostmail-secrets-key.service` in its
+`required-paths.txt`.
 
 **Build spec for Snosi.** Common to all 5, on the `pilothouse` pattern:
 
@@ -281,14 +276,16 @@ case.
 | Sysext | Repository | `.deb` (`v0.1.0`) | SHA-256 | Upheld and preset | `sysusers.d` | `tmpfiles.d` |
 | --- | --- | --- | --- | --- | --- | --- |
 | `lodge` | `frostyard/lodge` | [`frostyard-lodge_0.1.0_amd64.deb`](https://github.com/frostyard/lodge/releases/download/v0.1.0/frostyard-lodge_0.1.0_amd64.deb) | `0841d7376b0fbdc1e0f0f36987c516995bd92d70722118ef38ab850450243a3e` | `lodge.service` | `lodge.conf`: user `lodge`, groups `lodge-apps`, `lodge-agents` | `lodge.conf`: `/run/lodge`, `/run/lodge/apps` (root), `/var/lib/lodge` |
-| `notesd` | `frostyard/frostnotes` | [`frostyard-notesd_0.1.0_amd64.deb`](https://github.com/frostyard/frostnotes/releases/download/v0.1.0/frostyard-notesd_0.1.0_amd64.deb) | `5d064b6295ffae653ad034a01d8c8caf7d21e47217a5f68396a95a09af0f3685` | `frostnotes-lodge.socket`; with A1 also `frostnotes.service` | `frostnotes.conf`: user `frostnotes`, `g lodge`, in `lodge-apps` | none (`StateDirectory=`, `RuntimeDirectory=`) |
-| `maild` | `frostyard/frostmail` | [`frostyard-maild_0.1.0_amd64.deb`](https://github.com/frostyard/frostmail/releases/download/v0.1.0/frostyard-maild_0.1.0_amd64.deb) | `edb2af7fc74b677865fa2dea2fe86ae8e324e1770186df43152fa67078675968` | per (b): B1 and B3 `frostmail.socket`, `frostmail.service`; B2 only `frostmail-sysext-setup.service` (the socket and the service carry the condition and are never upheld) | `frostmail.conf`: user `frostmail`, `g lodge`, in `lodge-apps` | none |
+| `notesd` | `frostyard/frostnotes` | [`frostyard-notesd_0.1.0_amd64.deb`](https://github.com/frostyard/frostnotes/releases/download/v0.1.0/frostyard-notesd_0.1.0_amd64.deb) | `5d064b6295ffae653ad034a01d8c8caf7d21e47217a5f68396a95a09af0f3685` | `frostnotes-lodge.socket`, `frostnotes.service` (ADR-0063) | `frostnotes.conf`: user `frostnotes`, `g lodge`, in `lodge-apps` | none (`StateDirectory=`, `RuntimeDirectory=`) |
+| `maild` | `frostyard/frostmail` | `frostyard-maild_0.1.1_amd64.deb` (not released yet; `v0.1.0` lacks the key unit) | pin from the `v0.1.1` release | `frostmail.socket`, `frostmail.service` | `frostmail.conf`: user `frostmail`, `g lodge`, in `lodge-apps` | none |
 | `readd` | `frostyard/frostread` | [`frostyard-readd_0.1.0_amd64.deb`](https://github.com/frostyard/frostread/releases/download/v0.1.0/frostyard-readd_0.1.0_amd64.deb) | `d879d6fd345ff374d63562cb9080f5075c669574e75e1bf4d8411ead88e1beff` | `frostread.socket`, `frostread.service` | `frostread.conf`: user `frostread`, `g lodge`, in `lodge-apps`, `lodge-agents` | none |
 | `porterd` | `frostyard/porter` | [`frostyard-porterd_0.1.0_amd64.deb`](https://github.com/frostyard/porter/releases/download/v0.1.0/frostyard-porterd_0.1.0_amd64.deb) | `f541a649275b767e644eaf58bc476b01adc7261cd6bbbf8afc2f317ae274acd7` | `frostporter.socket`, `frostporter.service` | `frostporter.conf`: user `frostporter`, `g lodge`, in `lodge-apps`, `lodge-agents` | none |
 
-Each SHA-256 matches the release asset's `digest` and a download on
-2026-10-27, and goes in `sysext-checksums.json`. No upheld unit in the 5
-`.deb` files has a `Condition*=`, so `sysext-upholds-guard` passes them.
+Each of the 4 pinned SHA-256 values matches the release asset's `digest`
+and a download on 2026-10-27, and goes in `sysext-checksums.json`.
+`maild`'s `.deb` gets its attestation check and its SHA-256 at `v0.1.1`.
+No upheld unit in the 5 `.deb` files has a `Condition*=`, so
+`sysext-upholds-guard` passes them.
 The configuration in
 `/etc` (`/etc/lodge/config.json`, `/etc/porter/porter.json`,
 `/etc/frostread/frostread.json`) is optional: each daemon starts with
@@ -318,49 +315,105 @@ deploying to it as today. Revisit the move later.
   `lodgectl apps` shows each app at its release version; and after a newer
   release, `updex features update` and a reboot run the new version.
 
-## Phase 5 — The Flatpaks (large)
+## Phase 5 — Common rules (small)
 
-In frostmail and frostnotes:
+The rules below hold for each app in Phases 5a to 5c:
 
-- A `flatpak-builder` manifest, `org.frostyard.Frostmail.json` and
-  `org.frostyard.Frostnotes.json`, on `org.gnome.Platform//51`, with
-  vendored crates (`flatpak-cargo-generator`) and an offline pnpm store.
-  The build runs in CI and needs no host tools.
-- AppStream metadata (`/app/share/metainfo/<id>.metainfo.xml`) and icons.
-- Permissions: frostmail as frostmail ADR-0041 has it (`--share=network`,
-  the portals for notifications, OpenURI and files; the file chooser
-  portal instead of read-only home access). frostnotes: notesd inside the
-  Flatpak, file-system access to the vaults' folders, and the Background
-  portal for sync at login.
-- A CI job builds and tests the Flatpak on every pull request, as Igloo's
-  workflow does. A `v*` tag pushes the OCI image to
-  `ghcr.io/frostyard/frostmail` and `ghcr.io/frostyard/frostnotes`, tagged
-  `latest`, `vX.Y.Z` and `sha-<commit>`, and attests the image digest
-  (`attest-build-provenance` with `subject-digest`).
+- A `flatpak-builder` manifest, on `org.gnome.Platform//51`, built in CI
+  inside the SDK with offline sources: vendored crates
+  (`flatpak-cargo-generator`), an offline pnpm store, and offline Go
+  sources for an app with a Go module. The build needs no host tools.
+- AppStream metadata (`/app/share/metainfo/<id>.metainfo.xml`), icons and
+  the portals.
+- A CI job builds the Flatpak on every pull request. A `v*` tag pushes the
+  OCI image to `ghcr.io/frostyard/<repo>`, tagged `latest`, `vX.Y.Z` and
+  `sha-<commit>`, and attests the digest (`attest-build-provenance` with
+  `subject-digest`).
 - Brian makes each GHCR package public, and stores
   `FLATPAK_INDEX_DISPATCH_TOKEN` if the remote should refresh at once.
-- **Done when:** on Snow, `flatpak install frostyard org.frostyard.Frostmail`
-  installs the app and it opens mail through lodge; `flatpak install
-  frostyard org.frostyard.Frostnotes` opens a vault with its own notesd;
-  and `flatpak update` moves each to a newer release.
+- A Flatpak ships no system unit and no user unit ([ADR-0062](../adr/0062-make-desktop-suite-apps-standalone-flatpaks-with-opt-in-lodge.md)).
+  A CLI runs as `flatpak run --command=<cli> <app-id>`.
+
+**The standalone check** (ADR-0062). The app's repository records a test on
+a fresh desktop with real portals and no other frostyard installation. The
+test installs the release's attested OCI image by its digest, from a
+staged catalogue that lists that digest. It covers the app's core local
+work, a restart and a new login, an update that keeps the data, and each
+lodge mode the app offers, with a mode change that moves no data. Then
+`flatpak-index` lists the same digest. A test in the build sandbox does
+not count: that sandbox has no portals.
+
+## Phase 5a — Notes as a standalone Flatpak (medium)
+
+`org.frostyard.Frostnotes` already carries the UI, notesd and `notesctl`,
+and notesd runs in its own sandbox (frostnotes ADR-0031). What is left:
+
+- Publication: the OCI image to `ghcr.io/frostyard/frostnotes`, and the
+  `flatpak-index` listing.
+- App settings for background activity, and for lodge sync.
+- Permissions: file-system access to the vaults' folders, and the
+  Background portal for sync at login.
+- The clean-install record.
+- **Done when:** Notes passes the standalone check, with its core local
+  work: open a vault, edit, and background sync at login.
+
+## Phase 5b — Mail as a standalone Flatpak (large)
+
+`org.frostyard.Frostmail` comes to carry the UI, maild and `mailctl`
+(ADR-0062):
+
+- maild in the Flatpak: build with a Go module and offline Go sources; its
+  lifecycle in its own sandbox; its data; its secrets; its permissions,
+  including write access where it writes.
+- First launch, with local account setup.
+- One engine per account in lodge connection mode (frostmail ADR-0041).
+- Save As inside the sandbox.
+- Permissions: `--share=network`, the portals for notifications, OpenURI
+  and files (the file chooser portal, not read-only access to the home
+  directory), and write access where maild writes.
+- An optional, explicit move from a host maild, which the user confirms.
+- frostmail's own ADR, which records the reversal of parts of its
+  ADR-0013, ADR-0041 and ADR-0045.
+- **Done when:** Mail passes the standalone check, with its core local
+  work: add an account and read, send, rules and send-later.
+
+## Phase 5c — Read as a standalone Flatpak (large)
+
+This phase depends on frostread's ADR for the desktop design and its app
+ID. Nothing else waits for it.
+
+- frostread's ADR: the desktop design and the app's ID
+  ([ADR-0016](../adr/0016-reverse-dns-org-frostyard-identifiers.md)).
+- The desktop shell.
+- Isolation of untrusted article content without `lodge-content`.
+- The lodge mode: sync or connection.
+- Save as note, as an optional link to Notes.
+- **Done when:** Read passes the standalone check, with its core local
+  work: add a source, read and poll.
+
+Porter has no Phase 5 item: it stays lodge's app `porter` (ADR-0062,
+porter ADR-0003).
 
 ## Phase 6 — The remote lists the apps (small)
 
 - First, `frostyard/flatpak-index` lists only attested digests and fails
   closed, and its `publish.yml` actions are SHA-pinned
   ([flatpak-index#2](https://github.com/frostyard/flatpak-index/issues/2)).
-- Then add `frostyard/frostmail` and `frostyard/frostnotes` to `apps.json`,
-  and the two apps to its README.
-- **Done when:** `flatpak remote-ls frostyard` lists both apps, with their
-  names and icons from AppStream, and a test image without an attestation
-  stops the catalogue's deployment.
+- Then add `frostyard/frostnotes`, `frostyard/frostmail` and
+  `frostyard/frostread` to `apps.json`, and the 3 apps to its README. Each
+  app goes in only after its Phase 5 check passes, with the same digest.
+- A staged catalogue, apart from the public one, lists a candidate digest
+  for a Phase 5 test (ADR-0062).
+- **Done when:** `flatpak remote-ls frostyard` lists the 3 apps, each one
+  after its check, with their names and icons from AppStream, and a test
+  image without an attestation still stops the catalogue's deployment.
 
 ## Phase 7 — The records follow (small)
 
 - lodge's roadmap: the packaging question answered, with a link to
   ADR-0058.
-- frostmail: an ADR that supersedes ADR-0013's release path; the M6 line
-  in its roadmap.
+- frostmail: an ADR that supersedes ADR-0013's release path (its ADR for
+  ADR-0062, with maild in the Flatpak); the M6 line in its roadmap.
 - frostnotes: M6 in its roadmap (no hub container image, no apt packages).
 - Each app's operations doc: enable `lodge` first; updates take effect at
   the next boot; without a reboot, run `systemd-sysusers`,
@@ -377,7 +430,6 @@ In frostmail and frostnotes:
 - An `arm64` build of each `.deb` and sysext, when Snosi builds `arm64`
   sysexts.
 - A `beta` tag for the Flatpaks, served as a second branch of the remote.
-- A Flatpak or a sysext for a Linux maild outside the owner's tailnet.
 - `EXTENSION_RESTART_UNITS=` in each sysext, when Snosi's systemd is 262 or
   newer, so a refresh restarts the daemons without a reboot.
 - `RequisiteFeatures=lodge` on each app's transfer. updex v2.1.1 and later
@@ -402,10 +454,11 @@ In frostmail and frostnotes:
 - **`EXTENSION_RELOAD_MANAGER=1`** (Murbella, by Phase 3): confirm the
   shipped `extension-release` file that the
   [Phase 3 brief](#phase-3-brief-2026-10-27) proposes.
-- **notesd's service** and **maild's secrets key** (Brian, before Phase 3
-  builds `notesd` and `maild`): points (a) and (b) of the
-  [Phase 3 brief](#phase-3-brief-2026-10-27).
-- **Decisions for Brian:** make the 2 GHCR packages public (Phase 5).
+- **maild's secrets key** (Irulan, before Phase 3 builds `maild`): the
+  frostmail ADR and the `v0.1.1` release that decision (b) of the
+  [Phase 3 brief](#phase-3-brief-2026-10-27) needs.
+- **Decisions for Brian:** make each app's GHCR package public (Phase 5a
+  to 5c).
 
 ## Answered
 
@@ -464,9 +517,19 @@ On [core#159](https://github.com/frostyard/core/pull/159), 2026-10-23:
 - **Core Flatpaks** (Murbella): not now; Firn installs the core set from
   Flathub only.
 
+On the Phase 3 brief ([core#169](https://github.com/frostyard/core/pull/169)),
+after its merge, 2026-10-27:
+
+- **notesd's service** (Brian): upheld with its socket
+  ([ADR-0063](../adr/0063-uphold-notesds-service-as-well-as-its-socket.md)).
+- **maild's secrets key** (Brian): frostmail's `.deb` makes it at first
+  start; frostmail records it in an ADR and releases `v0.1.1`.
+
 ## References
 
-- Implements: [ADR-0058](../adr/0058-ship-suite-desktop-apps-as-flatpaks-and-services-as-sysexts.md);
+- Implements: [ADR-0058](../adr/0058-ship-suite-desktop-apps-as-flatpaks-and-services-as-sysexts.md),
+  [ADR-0062](../adr/0062-make-desktop-suite-apps-standalone-flatpaks-with-opt-in-lodge.md),
+  [ADR-0063](../adr/0063-uphold-notesds-service-as-well-as-its-socket.md);
   lodge's [app contract](https://github.com/frostyard/lodge/blob/main/docs/specs/app-contract.md)
   (Install layout); snosi's
   [design/sysexts.md](https://github.com/frostyard/snosi/blob/main/docs/design/sysexts.md)
