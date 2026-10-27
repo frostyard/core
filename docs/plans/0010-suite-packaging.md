@@ -242,8 +242,9 @@ In frostmail and frostnotes:
 - A Flatpak or a sysext for a Linux maild outside the owner's tailnet.
 - `EXTENSION_RESTART_UNITS=` in each sysext, when Snosi's systemd is 262 or
   newer, so a refresh restarts the daemons without a reboot.
-- `RequisiteFeatures=lodge` on each app's transfer, after
-  [updex#455](https://github.com/frostyard/updex/issues/455) is fixed.
+- `RequisiteFeatures=lodge` on each app's transfer. updex v2.1.1 and later
+  enforce it ([updex#469](https://github.com/frostyard/updex/pull/469)),
+  which fixed [updex#455](https://github.com/frostyard/updex/issues/455).
 - One combined feature (for example `lodge-suite`) that the 5 transfers
   list, if one switch for the whole suite is wanted.
 - The suite's Flatpaks in Snow's core set: needs a per-entry remote in the
@@ -287,10 +288,21 @@ On [core#159](https://github.com/frostyard/core/pull/159), 2026-10-23:
   `systemd-sysext refresh`, and has no hook. The supported path is a reboot:
   Snosi's `reload-sysext.service` runs `systemd-sysusers`,
   `systemd-tmpfiles` and a daemon reload after the boot merge.
-  `EXTENSION_RESTART_UNITS=` needs systemd 262.
-- **Feature dependencies** (Lucilla): none. `RequisiteFeatures=` is parsed
-  but not enforced
-  ([updex#455](https://github.com/frostyard/updex/issues/455)).
+  `EXTENSION_RESTART_UNITS=` needs systemd 262. Since updex v2.1.2, a
+  scheduled `updex features update` run (`updex-update.service`) whose
+  sources are all unreachable is a skip: it logs 1 line and exits 0, so
+  an offline host does not stay `degraded`. An interactive run and every
+  other failure still fail
+  ([updex#472](https://github.com/frostyard/updex/pull/472),
+  [updex ADR-0018](https://github.com/frostyard/updex/blob/main/docs/adr/0018-skip-an-update-run-when-every-source-is-unreachable.md)).
+- **Feature dependencies** (Lucilla): none in the transfers; each app's
+  documentation says to enable `lodge` first (ADR-0058). On 2026-10-23
+  `RequisiteFeatures=` was parsed but not enforced
+  ([updex#455](https://github.com/frostyard/updex/issues/455)). updex
+  v2.1.1 and later enforce it as an AND gate in every feature path
+  ([updex#469](https://github.com/frostyard/updex/pull/469),
+  [updex ADR-0017](https://github.com/frostyard/updex/blob/main/docs/adr/0017-apply-the-feature-activation-rule-in-every-feature-path.md)),
+  so `RequisiteFeatures=lodge` is now possible: see Later / ideas.
 - **updex on plain Debian 13** (Lucilla): updex is supported there, with
   Frostyard's key as `/etc/systemd/import-pubring.gpg` and a boot-time unit
   like `reload-sysext.service`. **Snosi sysexts on plain Debian 13**
