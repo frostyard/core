@@ -21,8 +21,9 @@ fsnotify and a 5-minute rescan, and it prunes versions at start and every
 With only the socket upheld, notesd starts on the first connection. lodge
 polls each app's socket every 15 s
 ([lodge `internal/apps/apps.go`](https://github.com/frostyard/lodge/blob/v0.1.0/internal/apps/apps.go),
-`PollEvery`). So notesd starts after lodge does, and it does not start
-while lodge is not running. No suite daemon exits when idle.
+`PollEvery`). So, with no other client, notesd starts at lodge's first
+poll, and not from boot: socket activation does not run the vault work
+until a connection comes. No suite daemon exits when idle.
 
 ## Decision
 
@@ -48,8 +49,9 @@ ADR-0058 do not change.
 ## Alternatives considered
 
 - **Socket only, as ADR-0058's row has it:** rejected. The vault work then
-  depends on lodge running and polling, and one sysext's housekeeping
-  should not depend on another sysext.
+  does not run from boot: it waits for a first connection, which, with no
+  other client, is lodge's poll. One sysext's housekeeping should not wait
+  for another sysext.
 
 ## References
 

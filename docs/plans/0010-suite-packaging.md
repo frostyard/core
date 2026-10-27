@@ -269,11 +269,12 @@ Snosi builds `maild` from `v0.1.1`, and it lists
   (`Enabled=false`) and `<name>.transfer` (`Features=<name>`, `Verify=true`,
   source `https://repository.frostyard.org/ext/<name>/`, `MatchPattern=`
   `<name>_@v_%w_%a.raw.zst` and the 3 other suffixes, `CurrentSymlink=<name>.raw`).
-  The `v0.1.0` builds publish `<name>_0.1.0_13_x86-64.raw.zst`.
+  The first builds publish `<name>_0.1.0_13_x86-64.raw.zst`, and
+  `maild_0.1.1_13_x86-64.raw.zst` for `maild`.
 - The root `mkosi.conf` `Dependencies=`, the build-matrix rows, and the rows
   in `docs/design/sysexts.md`.
 
-| Sysext | Repository | `.deb` (`v0.1.0`) | SHA-256 | Upheld and preset | `sysusers.d` | `tmpfiles.d` |
+| Sysext | Repository | `.deb` | SHA-256 | Upheld and preset | `sysusers.d` | `tmpfiles.d` |
 | --- | --- | --- | --- | --- | --- | --- |
 | `lodge` | `frostyard/lodge` | [`frostyard-lodge_0.1.0_amd64.deb`](https://github.com/frostyard/lodge/releases/download/v0.1.0/frostyard-lodge_0.1.0_amd64.deb) | `0841d7376b0fbdc1e0f0f36987c516995bd92d70722118ef38ab850450243a3e` | `lodge.service` | `lodge.conf`: user `lodge`, groups `lodge-apps`, `lodge-agents` | `lodge.conf`: `/run/lodge`, `/run/lodge/apps` (root), `/var/lib/lodge` |
 | `notesd` | `frostyard/frostnotes` | [`frostyard-notesd_0.1.0_amd64.deb`](https://github.com/frostyard/frostnotes/releases/download/v0.1.0/frostyard-notesd_0.1.0_amd64.deb) | `5d064b6295ffae653ad034a01d8c8caf7d21e47217a5f68396a95a09af0f3685` | `frostnotes-lodge.socket`, `frostnotes.service` (ADR-0063) | `frostnotes.conf`: user `frostnotes`, `g lodge`, in `lodge-apps` | none (`StateDirectory=`, `RuntimeDirectory=`) |
@@ -325,7 +326,8 @@ The rules below hold for each app in Phases 5a to 5c:
   sources for an app with a Go module. The build needs no host tools.
 - AppStream metadata (`/app/share/metainfo/<id>.metainfo.xml`), icons and
   the portals.
-- A CI job builds the Flatpak on every pull request. A `v*` tag pushes the
+- A CI job builds and tests the Flatpak on every pull request, as
+  Igloo's workflow does. This is apart from the standalone check below. A `v*` tag pushes the
   OCI image to `ghcr.io/frostyard/<repo>`, tagged `latest`, `vX.Y.Z` and
   `sha-<commit>`, and attests the digest (`attest-build-provenance` with
   `subject-digest`).
