@@ -170,14 +170,17 @@ Facts that shape both points:
   `PollEvery`). So while lodge runs, an upheld socket starts its service
   within 15 s, and no app daemon exits when idle. A socket-only uphold does
   not keep a service down.
-- **The start limit does not stop `Upholds=`.** In a test on systemd 257
-  (a Debian 13 container; Snosi runs 262, which was not tested), an upheld
-  service that fails at start restarts every `RestartSec=`, forever.
-  frostmail's unit (`RestartSec=2`) made 80 attempts in 3 minutes, about 53
-  journal lines a minute, and never reached `start-limit-hit`. An upheld
-  unit whose condition fails is retried in bursts about every 10 s, also
-  forever (snosi#1100). An upheld `RemainAfterExit=yes` oneshot that
-  `Wants=` the unit runs once, with no loop.
+- **The default start limit does not stop this failure loop.** In a test
+  on systemd 257 (a Debian 13 container; Snosi runs 262, which was not
+  tested), an upheld service that fails at start restarts every
+  `RestartSec=`. frostmail's unit (`RestartSec=2`) made 80 attempts in 3
+  minutes, about 53 journal lines a minute, and never reached
+  `start-limit-hit`: the default limit is 5 starts in 10 s, and starts
+  about 2.25 s apart never put more than 5 in one 10 s window. A failed condition is a different case: a skipped
+  start does not count toward the limit, so an upheld unit whose condition
+  fails is retried in bursts about every 10 s, forever (snosi#1100). An
+  upheld `RemainAfterExit=yes` oneshot that `Wants=` the unit runs once,
+  with no loop.
 
 **(a) notesd: uphold `frostnotes.service` too?** notesd works without a
 client: it watches each vault (fsnotify and a 5-minute rescan) and prunes
@@ -187,12 +190,13 @@ fresh host has none. Its unit has no `Condition*=` and needs nothing in
 `/etc`.
 
 - *A1 — uphold both,* `frostnotes-lodge.socket` and `frostnotes.service`.
-  The vault work runs from boot, also while lodge is stopped or not
-  enabled. A new ADR amends ADR-0058's table (one row), as ADR-0061 amends
-  ADR-0059.
-- *A2 — keep the socket only,* as ADR-0058 has it. lodge's poll starts
-  notesd within 15 s of lodge's start, and notesd then stays up. The vault
-  work stops while lodge is down. No record changes.
+  The vault work runs from boot, whether lodge is enabled or not. A new
+  ADR amends ADR-0058's table (one row), as ADR-0061 amends ADR-0059.
+- *A2 — keep the socket only,* as ADR-0058 has it. notesd starts only on
+  the first connection: lodge's poll makes one within 15 s of lodge's
+  start. Once started, notesd stays up, also if lodge stops later. Without
+  lodge, or before its first poll, the vault work does not run. No record
+  changes.
 
 **Recommendation: A1.** It meets ADR-0058's own rule ("the service is
 upheld too when the daemon works without a client"), costs one line, and
@@ -278,7 +282,7 @@ case.
 | --- | --- | --- | --- | --- | --- | --- |
 | `lodge` | `frostyard/lodge` | [`frostyard-lodge_0.1.0_amd64.deb`](https://github.com/frostyard/lodge/releases/download/v0.1.0/frostyard-lodge_0.1.0_amd64.deb) | `0841d7376b0fbdc1e0f0f36987c516995bd92d70722118ef38ab850450243a3e` | `lodge.service` | `lodge.conf`: user `lodge`, groups `lodge-apps`, `lodge-agents` | `lodge.conf`: `/run/lodge`, `/run/lodge/apps` (root), `/var/lib/lodge` |
 | `notesd` | `frostyard/frostnotes` | [`frostyard-notesd_0.1.0_amd64.deb`](https://github.com/frostyard/frostnotes/releases/download/v0.1.0/frostyard-notesd_0.1.0_amd64.deb) | `5d064b6295ffae653ad034a01d8c8caf7d21e47217a5f68396a95a09af0f3685` | `frostnotes-lodge.socket`; with A1 also `frostnotes.service` | `frostnotes.conf`: user `frostnotes`, `g lodge`, in `lodge-apps` | none (`StateDirectory=`, `RuntimeDirectory=`) |
-| `maild` | `frostyard/frostmail` | [`frostyard-maild_0.1.0_amd64.deb`](https://github.com/frostyard/frostmail/releases/download/v0.1.0/frostyard-maild_0.1.0_amd64.deb) | `edb2af7fc74b677865fa2dea2fe86ae8e324e1770186df43152fa67078675968` | per (b): B1 and B3 `frostmail.socket`, `frostmail.service`; B2 `frostmail.socket`, `frostmail-sysext-setup.service` | `frostmail.conf`: user `frostmail`, `g lodge`, in `lodge-apps` | none |
+| `maild` | `frostyard/frostmail` | [`frostyard-maild_0.1.0_amd64.deb`](https://github.com/frostyard/frostmail/releases/download/v0.1.0/frostyard-maild_0.1.0_amd64.deb) | `edb2af7fc74b677865fa2dea2fe86ae8e324e1770186df43152fa67078675968` | per (b): B1 and B3 `frostmail.socket`, `frostmail.service`; B2 only `frostmail-sysext-setup.service` (the socket and the service carry the condition and are never upheld) | `frostmail.conf`: user `frostmail`, `g lodge`, in `lodge-apps` | none |
 | `readd` | `frostyard/frostread` | [`frostyard-readd_0.1.0_amd64.deb`](https://github.com/frostyard/frostread/releases/download/v0.1.0/frostyard-readd_0.1.0_amd64.deb) | `d879d6fd345ff374d63562cb9080f5075c669574e75e1bf4d8411ead88e1beff` | `frostread.socket`, `frostread.service` | `frostread.conf`: user `frostread`, `g lodge`, in `lodge-apps`, `lodge-agents` | none |
 | `porterd` | `frostyard/porter` | [`frostyard-porterd_0.1.0_amd64.deb`](https://github.com/frostyard/porter/releases/download/v0.1.0/frostyard-porterd_0.1.0_amd64.deb) | `f541a649275b767e644eaf58bc476b01adc7261cd6bbbf8afc2f317ae274acd7` | `frostporter.socket`, `frostporter.service` | `frostporter.conf`: user `frostporter`, `g lodge`, in `lodge-apps`, `lodge-agents` | none |
 
