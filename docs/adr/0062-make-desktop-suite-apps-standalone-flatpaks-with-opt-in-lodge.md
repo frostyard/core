@@ -1,6 +1,6 @@
 # 0062 — Make each desktop suite app a standalone Flatpak, with lodge as an opt-in mode
 
-- **Status:** Proposed
+- **Status:** Accepted (2026-10-27)
 - **Date:** 2026-10-27
 
 ## Context
