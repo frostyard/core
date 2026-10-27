@@ -80,17 +80,22 @@ it:
   Flathub, and the desktop portals are requirements. A service intrinsic to
   the app, such as a mail account's IMAP and SMTP servers or a model
   provider the user configures, is not a frostyard installation.
-- **A daemon that must work without a window** asks the Background portal
-  to start at login, as notesd does. When the user refuses, the app says
-  that its background work stops when the app's last sandbox stops.
+- **A daemon that must work without a window** runs in its own sandbox
+  of the app, as notesd does, so it keeps running after the last window
+  closes, until logout. It asks the Background portal to start it at
+  login. When the user refuses, only the start at login stops: the app
+  says that the daemon then runs from the app's next launch, not from
+  login.
 - **Each app keeps its data in its own Flatpak data directory,** or in
   folders the user picks, such as a Notes vault. It reads no other app's
   database or files directly.
 - **A real desktop shows it.** The app's repository records a test on a
-  fresh desktop with real portals and no other frostyard installation:
-  install from the `frostyard` remote, the app's core local work, a
-  restart and a new login, an update that keeps the data, and each lodge
-  mode the app offers. A test in the build sandbox does not count, because
+  fresh desktop with real portals and no other frostyard installation. The
+  test installs the release's attested OCI image by its digest, from a
+  staged catalogue that lists that digest, and covers the app's core local
+  work, a restart and a new login, an update that keeps the data, and each
+  lodge mode the app offers. `flatpak-index` then lists the same digest
+  that the test used. A test in the build sandbox does not count, because
   that sandbox has no portals. The per-app checks go in Plan 0010.
 
 ### The lodge modes
@@ -183,10 +188,10 @@ it:
   through lodge, has 2 separate stores and engines for the same account,
   each with its own rules and send-later. The connection mode avoids that;
   it is the user's choice.
-- Background work runs only when the Background portal allows it. On a
-  desktop without the portal, or after a refusal, maild's rules and
-  send-later, readd's poller and Porter's routines run only while the app's
-  sandbox runs.
+- A start at login needs the Background portal's permission. After a
+  refusal, maild's rules and send-later, readd's poller and Porter's
+  routines run from the app's first launch in a session until logout, and
+  not between login and that launch.
 - The Flatpak trust story of ADR-0058 now covers more code: each daemon's
   network access and the user's secrets are inside a Flatpak whose OCI
   remote has no GPG signature. The attestation check at index time stays
