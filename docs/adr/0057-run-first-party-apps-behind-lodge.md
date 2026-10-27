@@ -126,3 +126,5 @@ The contract between lodge and its apps is lodge's
   [ADR-0025](https://github.com/frostyard/frostmail/blob/main/docs/adr/0025-maild-keeps-send-later-remind-me-and-undo-send.md).
 - Related: [ADR-0058](0058-ship-suite-desktop-apps-as-flatpaks-and-services-as-sysexts.md)
   (how the suite ships).
+- Amended in part by: [ADR-0062](0062-make-desktop-suite-apps-standalone-flatpaks-with-opt-in-lodge.md)
+  (local is the default mode of every desktop app; lodge is opt-in).
