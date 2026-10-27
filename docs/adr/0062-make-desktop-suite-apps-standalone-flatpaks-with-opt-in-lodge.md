@@ -196,6 +196,8 @@ it:
   network access and the user's secrets are inside a Flatpak whose OCI
   remote has no GPG signature. The attestation check at index time stays
   the control.
+- `flatpak-index` needs a staged catalogue, apart from the public one,
+  that lists a candidate digest for the test.
 - Each listing waits for a test on a real desktop. That costs a VM run per
   app, as frostnotes' Snow test did on 2026-10-26.
 - Plan 0010 needs a scope correction: the per-app milestones and checks
