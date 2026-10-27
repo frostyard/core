@@ -74,6 +74,7 @@ Docs are split by the question they answer:
 - [0059 — Publish image-only packages in a separate APT component](adr/0059-publish-image-only-packages-in-a-separate-apt-component.md)
 - [0060 — Publish omarchy-apps through the apt-publisher](adr/0060-publish-omarchy-apps-through-the-apt-publisher.md)
 - [0061 — Add the image APT component on the first publication run](adr/0061-add-the-image-apt-component-on-the-first-publication-run.md)
+- [0062 — Make each desktop suite app a standalone Flatpak, with lodge as an opt-in mode](adr/0062-make-desktop-suite-apps-standalone-flatpaks-with-opt-in-lodge.md)
 
 ### Design
 

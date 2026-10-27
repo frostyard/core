@@ -289,6 +289,8 @@ packages.
   [snosi#1100](https://github.com/frostyard/snosi/issues/1100),
   [updex#455](https://github.com/frostyard/updex/issues/455),
   [flatpak-index#2](https://github.com/frostyard/flatpak-index/issues/2)
+- Amended in part by: [ADR-0062](0062-make-desktop-suite-apps-standalone-flatpaks-with-opt-in-lodge.md)
+  (the desktop side: each app is a standalone Flatpak with its daemon)
 - Supersedes in part: frostmail
   [ADR-0013](https://github.com/frostyard/frostmail/blob/main/docs/adr/0013-app-as-a-local-flatpak.md)
   (the release build and install of the app)
