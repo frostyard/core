@@ -64,6 +64,11 @@ The suite's repositories are at these points on 2026-10-27:
 that the user opts into, per app.** This amends ADR-0058's desktop side in
 part. ADR-0058's server side stays as it is.
 
+**Porter is not in this scope.** It stays lodge's app `porter`, as porter
+ADR-0003 decides. No Porter Flatpak ships, and no Porter desktop work is
+planned. "Suite desktop app" in this ADR means frostnotes, frostmail and
+frostread.
+
 ### The standalone contract
 
 Every suite desktop app meets this contract before `flatpak-index` lists
@@ -115,7 +120,7 @@ it:
   Leaving a mode, or losing lodge, leaves the local data where it is.
 - **One engine per data set on a desktop.** In lodge connection mode, the
   bundled daemon does not also run background work (rules, sends,
-  fetches, routines) for the same account or data set.
+  fetches) for the same account or data set.
 - **Each lodge mode is a supported and tested path,** with the same
   standing as standalone. It needs what lodge needs (Tailscale on the
   host, and the app on lodge).
@@ -127,23 +132,21 @@ it:
 | frostnotes | the UI, notesd, `notesctl` | sync, through lodge's `/device/notes/` (frostnotes ADR-0026) | the bundle, notesd's sandbox and lock, the Background portal, the socket path (frostnotes ADR-0031) | publication to GHCR and the `flatpak-index` listing; app settings for background activity and for lodge sync; the clean-install record |
 | frostmail | the UI, maild, `mailctl` | connection, through the bridge to `wss://LODGE/app/mail/api` (frostmail ADR-0041) | the UI's Flatpak build and publication (frostmail ADR-0045); maild's lodge mode (frostmail ADR-0041) | maild in the Flatpak (build, lifecycle, data, secrets and permissions); first launch with local account setup; how the app keeps one engine per account; Save As in the sandbox; an optional, explicit move from a host maild |
 | frostread | the desktop UI, readd, `readctl` | not decided: sync or connection | readd and its web UI as lodge's `read` app | the desktop shell; isolation of untrusted article content without `lodge-content`; the lodge mode; save as note as an optional link to Notes |
-| Porter | the desktop UI, porterd | connection to the Porter behind lodge (not yet designed) | Porter as lodge's `porter` app that owns no data (porter ADR-0003) | model access without lodge's inference socket; permissioned links to Mail, Notes and Read on the desktop; where memory and routines live without Notes |
 
 - frostmail's change reverses part of its own ADR-0013, ADR-0041 and
   ADR-0045. frostmail records that in its own new ADR, as frostnotes did in
-  ADR-0031. frostread and Porter record their desktop designs in their own
-  repositories.
+  ADR-0031. frostread records its desktop design in its own repository.
 - An app links to another suite app only through a connection that the
   user permits, and only to that app's daemon interface. Each app stays
   useful when the other app is absent.
 - A Flatpak's application ID follows
-  [ADR-0016](0016-reverse-dns-org-frostyard-identifiers.md); frostread and
-  Porter set theirs in their ADRs.
+  [ADR-0016](0016-reverse-dns-org-frostyard-identifiers.md); frostread
+  sets its ID in its ADR.
 
 ### What ADR-0058 says that this changes
 
 - In ADR-0058's table, frostmail's Flatpak carries maild and `mailctl`,
-  and frostread and Porter each gain a Flatpak.
+  and frostread gains a Flatpak. porterd stays a sysext only.
 - ADR-0058's "Not shipped: a maild for a Linux desktop outside the owner's
   tailnet" no longer holds. A desktop maild ships inside frostmail's
   Flatpak, for every desktop, the owner's included.
@@ -178,9 +181,9 @@ it:
   and its permissions. maild uses the network access that the manifest
   already has, and needs write access where it writes. Its packaging work is not a new mail
   engine.
-- frostread and Porter need desktop architecture work before a Flatpak
-  exists. Porter's design depends on lodge for models and for app access
-  today, so it ships last.
+- frostread needs desktop architecture work before its Flatpak exists.
+- Porter works only behind lodge. A desktop user who wants Porter needs
+  lodge, Tailscale and the other apps on lodge.
 - Each app now has up to 3 tested paths: standalone, and one or 2 lodge
   modes. Each lodge mode needs its own tests, and mode changes need tests
   that show that no data moves.
@@ -189,8 +192,7 @@ it:
   each with its own rules and send-later. The connection mode avoids that;
   it is the user's choice.
 - A start at login needs the Background portal's permission. After a
-  refusal, maild's rules and send-later, readd's poller and Porter's
-  routines run from the app's first launch in a session until logout, and
+  refusal, maild's rules and send-later and readd's poller run from the app's first launch in a session until logout, and
   not between login and that launch.
 - The Flatpak trust story of ADR-0058 now covers more code: each daemon's
   network access and the user's secrets are inside a Flatpak whose OCI
@@ -201,8 +203,8 @@ it:
 - Each listing waits for a test on a real desktop. That costs a VM run per
   app, as frostnotes' Snow test did on 2026-10-26.
 - Plan 0010 needs a scope correction: the per-app milestones and checks
-  of this contract, and its inventory rows for a desktop maild, frostread
-  and Porter.
+  of this contract, and its inventory rows for a desktop maild and
+  frostread.
 
 ## Alternatives considered
 
@@ -219,6 +221,10 @@ it:
   app works.
 - **Switch to lodge automatically when lodge is reachable:** rejected. It
   moves the user's data and backend without a choice.
+- **A standalone Porter Flatpak:** rejected. Porter thinks through lodge's
+  inference layer and reaches the other apps only through lodge's MCP
+  endpoints (porter ADR-0003). Without lodge it has no model and no apps
+  to act on, and it owns no data of its own.
 - **Rewrite ADR-0058:** rejected. Accepted ADRs are immutable; a new ADR
   amends it.
 
