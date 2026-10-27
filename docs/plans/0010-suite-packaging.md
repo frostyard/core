@@ -56,6 +56,7 @@ Two more facts do not fit cleanly:
   slow during rapid development. Phase 4 is deferred; Phases 1 to 3 still
   ship.
 - Brian makes frostread's repository public before Phase 3 builds `readd`.
+  ✅ 2026-10-27: it is public.
 - **Done when:** ADR-0058 is Accepted, and the host decision is recorded
   here. ✅ 2026-10-26: both hold.
 
@@ -144,8 +145,8 @@ for `lodge`, `notesd`, `maild`, `readd` and `porterd`:
   `<name>_@v_%w_%a.raw.zst` (ADR-0007).
 - The build-matrix rows and the rows in `docs/design/sysexts.md`.
 - A build-time check of upheld units in each sysext's delta, the units a
-  `.deb` ships included (a `sysext-upholds-guard` finalize script). Until
-  it lands, the suite repositories' tests from Phase 1 are the only check.
+  `.deb` ships included (a `sysext-upholds-guard` finalize script). It
+  landed on 2026-10-23 ([snosi#1113](https://github.com/frostyard/snosi/issues/1113)).
 - Repogen publishes each sysext under `ext/<name>/` with a signed
   `SHA256SUMS.gpg` ([ADR-0014](../adr/0014-single-gpg-trust-root.md)).
 - The update path: a suite release, then `check-sysext-updates` (weekly, or
@@ -155,6 +156,139 @@ for `lodge`, `notesd`, `maild`, `readd` and `porterd`:
   sysexts with signed checksums, and on a Floe test VM `updex features
   enable lodge` and `updex features enable porterd`, then a reboot, give a
   lodge whose `lodgectl apps` shows `porter` up at its release version.
+
+### Phase 3 brief (2026-10-27)
+
+The facts below were checked on 2026-10-27 against the `v0.1.0` releases
+and Snosi's `main`. Two points need a decision before Snosi builds
+`notesd` and `maild`; the other 3 sysexts can be built now.
+
+Facts that shape both points:
+
+- **lodge polls every app's socket.** lodge asks each installed app's
+  `/health` on `/run/lodge/apps/<id>.sock` every 15 s (`internal/apps/apps.go`,
+  `PollEvery`). So while lodge runs, an upheld socket starts its service
+  within 15 s, and no app daemon exits when idle. A socket-only uphold does
+  not keep a service down.
+- **The start limit does not stop `Upholds=`.** In a test on systemd 257
+  (a Debian 13 container; Snosi runs 262, which was not tested), an upheld
+  service that fails at start restarts every `RestartSec=`, forever.
+  frostmail's unit (`RestartSec=2`) made 80 attempts in 3 minutes, about 53
+  journal lines a minute, and never reached `start-limit-hit`. An upheld
+  unit whose condition fails is retried in bursts about every 10 s, also
+  forever (snosi#1100). An upheld `RemainAfterExit=yes` oneshot that
+  `Wants=` the unit runs once, with no loop.
+
+**(a) notesd: uphold `frostnotes.service` too?** notesd works without a
+client: it watches each vault (fsnotify and a 5-minute rescan) and prunes
+versions at start and every 24 h (`internal/vault/watch.go`,
+`internal/vault/manager.go`). It syncs only a vault that has a remote; a
+fresh host has none. Its unit has no `Condition*=` and needs nothing in
+`/etc`.
+
+- *A1 — uphold both,* `frostnotes-lodge.socket` and `frostnotes.service`.
+  The vault work runs from boot, also while lodge is stopped or not
+  enabled. A new ADR amends ADR-0058's table (one row), as ADR-0061 amends
+  ADR-0059.
+- *A2 — keep the socket only,* as ADR-0058 has it. lodge's poll starts
+  notesd within 15 s of lodge's start, and notesd then stays up. The vault
+  work stops while lodge is down. No record changes.
+
+**Recommendation: A1.** It meets ADR-0058's own rule ("the service is
+upheld too when the daemon works without a client"), costs one line, and
+does not make notesd's housekeeping depend on another sysext.
+
+**(b) maild: the secrets key before the service.** `frostmail.service` has
+`LoadCredentialEncrypted=frostmail-secrets-key:/etc/credstore.encrypted/frostmail-secrets-key`.
+Until root makes that file, systemd fails the unit before maild runs, and
+maild refuses a key that does not open `secrets.sealed`
+([frostmail ADR-0044](https://github.com/frostyard/frostmail/blob/main/docs/adr/0044-seal-the-servers-secrets-with-a-systemd-credential.md)).
+maild works without a client (IMAP IDLE, rules, send-later, reminders), so
+ADR-0058 upholds the service. With no key, maild then fails every 2 s
+until the key exists. With only the socket upheld, lodge's first poll
+starts the same loop through `Restart=on-failure`.
+
+- *B1 — make the key at first start.* frostmail's `.deb` ships a oneshot
+  `frostmail-secrets-key.service` with
+  `ConditionPathExists=!/etc/credstore.encrypted/frostmail-secrets-key`
+  that seals 32 random bytes with `systemd-creds encrypt --with-key=auto`,
+  as `scripts/seal-mail-secrets.sh --apply` already does.
+  `frostmail.service` gets `Requires=` and `After=` on it. The oneshot is
+  pulled, not upheld, so its condition is a clean skip. The table stays.
+  Needs a frostmail ADR that amends ADR-0044 (the key is made on the host
+  at first start, not by hand) and a `v0.1.1` release; `maild` then builds
+  from `v0.1.1`.
+- *B2 — uphold a setup oneshot.* Snosi's `maild` sysext upholds
+  `frostmail-sysext-setup.service` (`Type=oneshot`, `RemainAfterExit=yes`,
+  no condition, `Wants=frostmail.socket frostmail.service`), the pattern of
+  `k3s` and `himmelblau`, and ships drop-ins that give the socket and the
+  service `ConditionPathExists=/etc/credstore.encrypted/frostmail-secrets-key`.
+  Without the key, neither starts, and lodge shows mail down. After root
+  makes the key, `systemctl start frostmail.socket` or a reboot starts it.
+  No frostmail release; ADR-0058's table changes for `maild`.
+- *B3 — keep the table, document the order.* Uphold both units as ADR-0058
+  has it; the operations doc says to make the key before `updex features
+  enable maild`. Without the key, the journal gets about 53 lines a minute;
+  when root makes the key, the next retry starts maild, with no reboot. A
+  drop-in with `RestartSec=30s` cuts the noise to about 12 lines a minute.
+
+**Recommendation: B1.** The sysext works with no hand step, nothing loops
+on a fresh host, and the unit contract stays in frostmail, where it also
+serves the hand-installed host. A restored `secrets.sealed` under another
+host's key still fails, as ADR-0044 records; the operations doc covers that
+case.
+
+**Build spec for Snosi.** Common to all 5, on the `pilothouse` pattern:
+
+- `mkosi.images/<name>/mkosi.conf` with `KEYPACKAGE=frostyard-<name>`,
+  `CompressOutput=zstd`, `CompressLevel=19`, and pilothouse's full
+  `FinalizeScripts=` line (`sysext-usr-only`, `sysext-required-paths`,
+  `sysext-strip-icon-cache`, `sysext-no-private-keys`,
+  `sysext-no-base-owned`, `sysext-upholds-guard`). Base-built, not
+  `gui-base`.
+- `mkosi.postinst.chroot`: `verified_download "<name>"`,
+  `assert_deb_dependencies_satisfied`, `dpkg -i`. Each `.deb` declares only
+  `Depends: systemd`. No `mkosi.finalize`: no `.deb` ships `/etc`.
+- `shared/download/sysext-checksums.json`, key `<name>`: the URL, SHA-256
+  and version below. The `check-sysext-updates` block for each runs, before
+  it writes a pin, `gh attestation verify "$TMP" --repo frostyard/<repo>
+  --signer-workflow frostyard/<repo>/.github/workflows/release.yml
+  --source-ref refs/tags/v${VER} --deny-self-hosted-runners`, and fails
+  closed. Today that job pins any download by its SHA-256 alone. All 5
+  `v0.1.0` assets passed this check on 2026-10-27. Whether the job's token
+  needs `attestations: read` for it is not yet checked.
+- `mkosi.extra/usr/lib/extension-release.d/extension-release.<name>` with
+  `EXTENSION_RELOAD_MANAGER=1`. mkosi at Snosi's pin (`5ca453a`) keeps the
+  keys of a shipped `extension-release` file and adds only the missing ones
+  (`configure_extension_release` runs after the extra trees).
+- The drop-in `multi-user.target.d/10-<name>.conf` and the preset
+  `40-<name>.preset` with the same units (table below).
+- `required-paths.txt`: the binaries, the units, the `sysusers.d` file, the
+  `app.json` (apps) or the shell's `index.html` (lodge), the drop-in, the
+  preset and the `extension-release` file.
+- In the base image: `usr/lib/sysupdate.<name>.d/<name>.feature`
+  (`Enabled=false`) and `<name>.transfer` (`Features=<name>`, `Verify=true`,
+  source `https://repository.frostyard.org/ext/<name>/`, `MatchPattern=`
+  `<name>_@v_%w_%a.raw.zst` and the 3 other suffixes, `CurrentSymlink=<name>.raw`).
+  The `v0.1.0` builds publish `<name>_0.1.0_13_x86-64.raw.zst`.
+- The root `mkosi.conf` `Dependencies=`, the build-matrix rows, and the rows
+  in `docs/design/sysexts.md`.
+
+| Sysext | Repository | `.deb` (`v0.1.0`) | SHA-256 | Upheld and preset | `sysusers.d` | `tmpfiles.d` |
+| --- | --- | --- | --- | --- | --- | --- |
+| `lodge` | `frostyard/lodge` | [`frostyard-lodge_0.1.0_amd64.deb`](https://github.com/frostyard/lodge/releases/download/v0.1.0/frostyard-lodge_0.1.0_amd64.deb) | `0841d7376b0fbdc1e0f0f36987c516995bd92d70722118ef38ab850450243a3e` | `lodge.service` | `lodge.conf`: user `lodge`, groups `lodge-apps`, `lodge-agents` | `lodge.conf`: `/run/lodge`, `/run/lodge/apps` (root), `/var/lib/lodge` |
+| `notesd` | `frostyard/frostnotes` | [`frostyard-notesd_0.1.0_amd64.deb`](https://github.com/frostyard/frostnotes/releases/download/v0.1.0/frostyard-notesd_0.1.0_amd64.deb) | `5d064b6295ffae653ad034a01d8c8caf7d21e47217a5f68396a95a09af0f3685` | `frostnotes-lodge.socket`; with A1 also `frostnotes.service` | `frostnotes.conf`: user `frostnotes`, `g lodge`, in `lodge-apps` | none (`StateDirectory=`, `RuntimeDirectory=`) |
+| `maild` | `frostyard/frostmail` | [`frostyard-maild_0.1.0_amd64.deb`](https://github.com/frostyard/frostmail/releases/download/v0.1.0/frostyard-maild_0.1.0_amd64.deb) | `edb2af7fc74b677865fa2dea2fe86ae8e324e1770186df43152fa67078675968` | per (b): B1 and B3 `frostmail.socket`, `frostmail.service`; B2 `frostmail.socket`, `frostmail-sysext-setup.service` | `frostmail.conf`: user `frostmail`, `g lodge`, in `lodge-apps` | none |
+| `readd` | `frostyard/frostread` | [`frostyard-readd_0.1.0_amd64.deb`](https://github.com/frostyard/frostread/releases/download/v0.1.0/frostyard-readd_0.1.0_amd64.deb) | `d879d6fd345ff374d63562cb9080f5075c669574e75e1bf4d8411ead88e1beff` | `frostread.socket`, `frostread.service` | `frostread.conf`: user `frostread`, `g lodge`, in `lodge-apps`, `lodge-agents` | none |
+| `porterd` | `frostyard/porter` | [`frostyard-porterd_0.1.0_amd64.deb`](https://github.com/frostyard/porter/releases/download/v0.1.0/frostyard-porterd_0.1.0_amd64.deb) | `f541a649275b767e644eaf58bc476b01adc7261cd6bbbf8afc2f317ae274acd7` | `frostporter.socket`, `frostporter.service` | `frostporter.conf`: user `frostporter`, `g lodge`, in `lodge-apps`, `lodge-agents` | none |
+
+Each SHA-256 matches the release asset's `digest` and a download on
+2026-10-27, and goes in `sysext-checksums.json`. No upheld unit in the 5
+`.deb` files has a `Condition*=`, so `sysext-upholds-guard` passes them.
+The configuration in
+`/etc` (`/etc/lodge/config.json`, `/etc/porter/porter.json`,
+`/etc/frostread/frostread.json`) is optional: each daemon starts with
+defaults when it is missing.
 
 ## Phase 4 — lodge's host on Floe (medium; deferred)
 
@@ -260,16 +394,13 @@ In frostmail and frostnotes:
   a `repository_dispatch` type (for example `sysext-release`) that a suite
   release sends (`ORG_PAT`, `continue-on-error: true`) and that starts the
   check. Either way the pin changes through a reviewed pull request.
-- **`EXTENSION_RELOAD_MANAGER=1`** (Murbella, by Phase 3): confirm that
-  Snosi's sysext build can set it in each suite sysext's
-  `extension-release`.
-- **The delta check of upheld units** (Murbella, by Phase 3): Snosi's
-  `sysext-upholds-guard` finalize script, which reads the units a `.deb`
-  ships.
-- **notesd's service** (frostnotes, by Phase 1): upheld or socket-only,
-  while it syncs as a device of the M2 hub.
-- **Decisions for Brian:** make frostread public (before Phase 3 builds `readd`);
-  make the 2 GHCR packages public (Phase 5).
+- **`EXTENSION_RELOAD_MANAGER=1`** (Murbella, by Phase 3): confirm the
+  shipped `extension-release` file that the
+  [Phase 3 brief](#phase-3-brief-2026-10-27) proposes.
+- **notesd's service** and **maild's secrets key** (Brian, before Phase 3
+  builds `notesd` and `maild`): points (a) and (b) of the
+  [Phase 3 brief](#phase-3-brief-2026-10-27).
+- **Decisions for Brian:** make the 2 GHCR packages public (Phase 5).
 
 ## Answered
 
