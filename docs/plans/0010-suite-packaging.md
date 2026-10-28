@@ -163,12 +163,39 @@ for `lodge`, `notesd`, `maild`, `readd` and `porterd`:
   enable lodge` and `updex features enable porterd`, then a reboot, give a
   lodge whose `lodgectl apps` shows `porter` up at its release version.
 
+*Progress 2026-10-28:* 2 of the 5 sysexts are in Snosi's `main`
+([snosi#1169](https://github.com/frostyard/snosi/pull/1169), merged
+2026-10-28):
+
+- `notesd` from frostnotes `v0.2.0`
+  (`frostyard-notesd_0.2.0_amd64.deb`, SHA-256
+  `b2f768d0d9ac48aad86d490e98d3c08f2efa9c9cf068f25f1a6ea1bd90481fd6`), not
+  the `v0.1.0` of the brief's table. It upholds and presets both units
+  (ADR-0063).
+- `maild` from frostmail `v0.2.0` (`frostyard-maild_0.2.0_amd64.deb`,
+  SHA-256 `2c7b698f1495108207fde3020c961a724edde449726b573cb2a781933833ab4a`),
+  which ships `frostmail-secrets-key.service`. `frostmail.service` pulls it;
+  nothing upholds or enables it.
+- Snosi verifies each `.deb`'s build-provenance attestation when it pins the
+  `.deb` and before every build
+  ([snosi ADR-0024](https://github.com/frostyard/snosi/blob/main/docs/adr/0024-verify-attestations-of-first-party-sysext-debs.md)).
+- Each ships `EXTENSION_RELOAD_MANAGER=1`. Each feature ships disabled.
+  Each transfer has `Verify=true` and no `RequisiteFeatures=`, as ADR-0058
+  says.
+
+Left for Phase 3: the `lodge`, `readd` and `porterd` sysexts, and the first
+publication. On 2026-10-28 `https://repository.frostyard.org/ext/index`
+does not list `notesd` or `maild` yet.
+
 ### Phase 3 brief (2026-10-27)
 
 The facts below were checked on 2026-10-27 against the `v0.1.0` releases
 and Snosi's `main`. Brian decided both points on 2026-10-27. `lodge`,
 `notesd`, `readd` and `porterd` can be built now from `v0.1.0`. `maild`
-waits for frostmail `v0.1.1` (point (b)).
+waits for frostmail's next release, `v0.2.0` (point (b)). This brief first
+named it `v0.1.1`; the release that carries the key unit is `v0.2.0`
+([frostmail#129](https://github.com/frostyard/frostmail/pull/129)).
+The brief below names `v0.2.0`.
 
 Facts that shape both points:
 
@@ -231,9 +258,12 @@ frostmail ADR-0044 records; the operations doc covers that case.
   `frostmail.service`.
 - frostmail's packaging test covers the new unit: no `RequiredBy=`, and
   `systemd-analyze verify` passes.
-- A `v0.1.1` release with an attested `.deb`. Brian pushes the tag.
+- A `v0.2.0` release with an attested `.deb`. Brian pushes the tag.
+  ✅ 2026-10-28: frostmail ADR-0047 and
+  [frostmail#129](https://github.com/frostyard/frostmail/pull/129) are
+  merged, and `v0.2.0` is released.
 
-Snosi builds `maild` from `v0.1.1`, and it lists
+Snosi builds `maild` from `v0.2.0`, and it lists
 `/usr/lib/systemd/system/frostmail-secrets-key.service` in its
 `required-paths.txt`.
 
@@ -270,7 +300,7 @@ Snosi builds `maild` from `v0.1.1`, and it lists
   source `https://repository.frostyard.org/ext/<name>/`, `MatchPattern=`
   `<name>_@v_%w_%a.raw.zst` and the 3 other suffixes, `CurrentSymlink=<name>.raw`).
   The first builds publish `<name>_0.1.0_13_x86-64.raw.zst`, and
-  `maild_0.1.1_13_x86-64.raw.zst` for `maild`.
+  `maild_0.2.0_13_x86-64.raw.zst` for `maild`.
 - The root `mkosi.conf` `Dependencies=`, the build-matrix rows, and the rows
   in `docs/design/sysexts.md`.
 
@@ -278,13 +308,13 @@ Snosi builds `maild` from `v0.1.1`, and it lists
 | --- | --- | --- | --- | --- | --- | --- |
 | `lodge` | `frostyard/lodge` | [`frostyard-lodge_0.1.0_amd64.deb`](https://github.com/frostyard/lodge/releases/download/v0.1.0/frostyard-lodge_0.1.0_amd64.deb) | `0841d7376b0fbdc1e0f0f36987c516995bd92d70722118ef38ab850450243a3e` | `lodge.service` | `lodge.conf`: user `lodge`, groups `lodge-apps`, `lodge-agents` | `lodge.conf`: `/run/lodge`, `/run/lodge/apps` (root), `/var/lib/lodge` |
 | `notesd` | `frostyard/frostnotes` | [`frostyard-notesd_0.1.0_amd64.deb`](https://github.com/frostyard/frostnotes/releases/download/v0.1.0/frostyard-notesd_0.1.0_amd64.deb) | `5d064b6295ffae653ad034a01d8c8caf7d21e47217a5f68396a95a09af0f3685` | `frostnotes-lodge.socket`, `frostnotes.service` (ADR-0063) | `frostnotes.conf`: user `frostnotes`, `g lodge`, in `lodge-apps` | none (`StateDirectory=`, `RuntimeDirectory=`) |
-| `maild` | `frostyard/frostmail` | `frostyard-maild_0.1.1_amd64.deb` (not released yet; `v0.1.0` lacks the key unit) | pin from the `v0.1.1` release | `frostmail.socket`, `frostmail.service` | `frostmail.conf`: user `frostmail`, `g lodge`, in `lodge-apps` | none |
+| `maild` | `frostyard/frostmail` | [`frostyard-maild_0.2.0_amd64.deb`](https://github.com/frostyard/frostmail/releases/download/v0.2.0/frostyard-maild_0.2.0_amd64.deb) (`v0.1.0` lacks the key unit) | `2c7b698f1495108207fde3020c961a724edde449726b573cb2a781933833ab4a` (the `v0.2.0` release, 2026-10-28) | `frostmail.socket`, `frostmail.service` | `frostmail.conf`: user `frostmail`, `g lodge`, in `lodge-apps` | none |
 | `readd` | `frostyard/frostread` | [`frostyard-readd_0.1.0_amd64.deb`](https://github.com/frostyard/frostread/releases/download/v0.1.0/frostyard-readd_0.1.0_amd64.deb) | `d879d6fd345ff374d63562cb9080f5075c669574e75e1bf4d8411ead88e1beff` | `frostread.socket`, `frostread.service` | `frostread.conf`: user `frostread`, `g lodge`, in `lodge-apps`, `lodge-agents` | none |
 | `porterd` | `frostyard/porter` | [`frostyard-porterd_0.1.0_amd64.deb`](https://github.com/frostyard/porter/releases/download/v0.1.0/frostyard-porterd_0.1.0_amd64.deb) | `f541a649275b767e644eaf58bc476b01adc7261cd6bbbf8afc2f317ae274acd7` | `frostporter.socket`, `frostporter.service` | `frostporter.conf`: user `frostporter`, `g lodge`, in `lodge-apps`, `lodge-agents` | none |
 
 Each of the 4 pinned SHA-256 values matches the release asset's `digest`
 and a download on 2026-10-27, and goes in `sysext-checksums.json`.
-`maild`'s `.deb` gets its attestation check and its SHA-256 at `v0.1.1`.
+`maild`'s `.deb` gets its attestation check and its SHA-256 at `v0.2.0`.
 No upheld unit in the 5 `.deb` files has a `Condition*=`, so
 `sysext-upholds-guard` passes them.
 The configuration in
@@ -432,11 +462,19 @@ porter ADR-0003).
 - An `arm64` build of each `.deb` and sysext, when Snosi builds `arm64`
   sysexts.
 - A `beta` tag for the Flatpaks, served as a second branch of the remote.
-- `EXTENSION_RESTART_UNITS=` in each sysext, when Snosi's systemd is 262 or
-  newer, so a refresh restarts the daemons without a reboot.
+- `EXTENSION_RESTART_UNITS=` in each sysext, so a refresh restarts the
+  daemons without a reboot. It needs systemd 262; Snosi has shipped Forky's
+  systemd 262-1 since 2026-10-26 (Snosi's `AGENTS.md`).
 - `RequisiteFeatures=lodge` on each app's transfer. updex v2.1.1 and later
   enforce it ([updex#469](https://github.com/frostyard/updex/pull/469)),
   which fixed [updex#455](https://github.com/frostyard/updex/issues/455).
+  With it, `updex features disable lodge --now` also removes the app's
+  sysext, and `enable <app> --now` installs nothing while `lodge` is
+  disabled
+  ([updex ADR-0017](https://github.com/frostyard/updex/blob/main/docs/adr/0017-apply-the-feature-activation-rule-in-every-feature-path.md)).
+  `notesd` and `maild` run without lodge (ADR-0063, and ADR-0058's
+  `Upholds=` rule), so they are not candidates; `porterd`, which works only
+  behind lodge (porter ADR-0003), is.
 - One combined feature (for example `lodge-suite`) that the 5 transfers
   list, if one switch for the whole suite is wanted.
 - The suite's Flatpaks in Snow's core set: needs a per-entry remote in the
@@ -453,12 +491,6 @@ porter ADR-0003).
   a `repository_dispatch` type (for example `sysext-release`) that a suite
   release sends (`ORG_PAT`, `continue-on-error: true`) and that starts the
   check. Either way the pin changes through a reviewed pull request.
-- **`EXTENSION_RELOAD_MANAGER=1`** (Murbella, by Phase 3): confirm the
-  shipped `extension-release` file that the
-  [Phase 3 brief](#phase-3-brief-2026-10-27) proposes.
-- **maild's secrets key** (Irulan, before Phase 3 builds `maild`): the
-  frostmail ADR and the `v0.1.1` release that decision (b) of the
-  [Phase 3 brief](#phase-3-brief-2026-10-27) needs.
 - **Decisions for Brian:** make each app's GHCR package public (Phase 5a
   to 5c).
 
@@ -525,7 +557,23 @@ after its merge, 2026-10-27:
 - **notesd's service** (Brian): upheld with its socket
   ([ADR-0063](../adr/0063-uphold-notesds-service-as-well-as-its-socket.md)).
 - **maild's secrets key** (Brian): frostmail's `.deb` makes it at first
-  start; frostmail records it in an ADR and releases `v0.1.1`.
+  start; frostmail records it in an ADR and releases it (`v0.2.0`).
+
+On [snosi#1169](https://github.com/frostyard/snosi/pull/1169), 2026-10-28:
+
+- **`EXTENSION_RELOAD_MANAGER=1`** (Murbella, Lucilla): `notesd` and `maild`
+  ship it in their `extension-release` file. updex runs `systemd-sysext
+  refresh` with no `--no-reload` (updex `sysext/runner.go`), so after a
+  refresh that merges such a sysext, systemd 262 reloads PID 1. It
+  does not run `systemd-sysusers` or `systemd-tmpfiles`, so a first enable
+  without a reboot still needs them and a start of the units by hand.
+  updex refreshes on `enable --now`, `disable --now`, `rollback --now` and an
+  interactive `features update`. Its scheduled update never refreshes, so
+  that update takes effect at the next boot (updex `updex/daemon.go`).
+- **maild's secrets key** (Irulan): frostmail
+  [ADR-0047](https://github.com/frostyard/frostmail/blob/main/docs/adr/0047-make-the-secrets-key-at-first-start.md)
+  and [frostmail#129](https://github.com/frostyard/frostmail/pull/129),
+  released in `v0.2.0` on 2026-10-28.
 
 ## References
 
