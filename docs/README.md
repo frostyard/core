@@ -9,6 +9,9 @@ Docs are split by the question they answer:
 | [specs/](specs/) | **What exactly** is the contract? | Precise, testable interface definitions |
 | [plans/](plans/) | **When/in what order** do we build? | Roadmaps and phase plans; updated as work lands |
 
+[Tenets](tenets.md) sit above the four categories: they guide decisions that
+no ADR, spec, or plan covers yet.
+
 ## Index
 
 ### Decisions (ADRs)
