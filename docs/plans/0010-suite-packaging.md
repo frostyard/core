@@ -177,8 +177,10 @@ for `lodge`, `notesd`, `maild`, `readd` and `porterd`:
   which ships `frostmail-secrets-key.service`. `frostmail.service` pulls it;
   nothing upholds or enables it.
 - Snosi verifies each `.deb`'s build-provenance attestation when it pins the
-  `.deb` and before every build
+  `.deb` (`check-dependencies.yml`) and before every CI build (`build.yml`)
   ([snosi ADR-0024](https://github.com/frostyard/snosi/blob/main/docs/adr/0024-verify-attestations-of-first-party-sysext-debs.md)).
+  A local `just sysexts` build does not check it; run
+  `shared/download/verify-attestations.sh` for that.
 - Each ships `EXTENSION_RELOAD_MANAGER=1`. Each feature ships disabled.
   Each transfer has `Verify=true` and no `RequisiteFeatures=`, as ADR-0058
   says.
