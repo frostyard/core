@@ -88,6 +88,9 @@ one or the other, or is not shipped.
   the development tools (`readdev`, `lodgeprobe`, `dev/fakeapp`); the
   libraries `lodge/kit`, `@frostyard/lodge-client` and `@frostyard/lodge-ui`,
   which stay git tags. frostmail's Windows install is outside this decision.
+  *Amended: a desktop maild now ships inside frostmail's Flatpak
+  ([ADR-0062](0062-make-desktop-suite-apps-standalone-flatpaks-with-opt-in-lodge.md);
+  frostmail [ADR-0046](https://github.com/frostyard/frostmail/blob/main/docs/adr/0046-the-desktop-flatpak-carries-its-own-maild.md)).*
 
 ### Sysexts
 
@@ -293,6 +296,10 @@ packages.
   (the desktop side: each app is a standalone Flatpak with its daemon)
 - Amended in part by: [ADR-0063](0063-uphold-notesds-service-as-well-as-its-socket.md)
   (the `notesd` row: its service is upheld too)
+- Amended in part, on frostmail's side, by: frostmail
+  [ADR-0046](https://github.com/frostyard/frostmail/blob/main/docs/adr/0046-the-desktop-flatpak-carries-its-own-maild.md)
+  (Accepted 2026-10-28: maild and `mailctl` ship inside frostmail's Flatpak,
+  as ADR-0062 decides)
 - Supersedes in part: frostmail
   [ADR-0013](https://github.com/frostyard/frostmail/blob/main/docs/adr/0013-app-as-a-local-flatpak.md)
   (the release build and install of the app)

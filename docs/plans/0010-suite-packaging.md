@@ -31,8 +31,8 @@ Every artifact of the five suite repositories, and its side.
 | frostnotes | `notesctl` on a desktop (`notesctl mcp` for an agent, `notesctl sync`) | inside the Flatpak | **does not fit cleanly:** run with `flatpak run --command=notesctl` |
 | frostnotes | the M2 hub (`notesd -hub`, user `notes`) | not shipped | retired by frostnotes M4 Phase 7 |
 | frostmail | `maild --lodge`, `mailctl`, the `mail` web build, `frostmail.service`, `frostmail.socket`, `sysusers.d` | sysext `maild` | stages `/usr/local/bin` today |
-| frostmail | the Tauri app | Flatpak `org.frostyard.Frostmail` | carries the UI, maild and `mailctl`; lodge connection mode ([frostmail ADR-0041](https://github.com/frostyard/frostmail/blob/main/docs/adr/0041-maild-runs-as-a-lodge-app.md)); [ADR-0062](../adr/0062-make-desktop-suite-apps-standalone-flatpaks-with-opt-in-lodge.md) |
-| frostmail | maild and `mailctl` on a desktop | inside the Flatpak | ADR-0062: no user unit ships |
+| frostmail | the Tauri app | Flatpak `org.frostyard.Frostmail` | carries the UI, maild and `mailctl` ([frostmail ADR-0046](https://github.com/frostyard/frostmail/blob/main/docs/adr/0046-the-desktop-flatpak-carries-its-own-maild.md)); lodge connection mode ([frostmail ADR-0041](https://github.com/frostyard/frostmail/blob/main/docs/adr/0041-maild-runs-as-a-lodge-app.md)); [ADR-0062](../adr/0062-make-desktop-suite-apps-standalone-flatpaks-with-opt-in-lodge.md) |
+| frostmail | maild and `mailctl` on a desktop | inside the Flatpak | ADR-0062 and frostmail [ADR-0046](https://github.com/frostyard/frostmail/blob/main/docs/adr/0046-the-desktop-flatpak-carries-its-own-maild.md): maild runs in its own sandbox of the app, and no user unit ships |
 | frostmail | the Windows install | not in this plan | frostmail M7 |
 | frostmail | `tools/lodgeprobe` | not shipped | development only |
 | frostread | `readd`, `readctl`, the `read` web build, `frostread.service`, `frostread.socket`, `sysusers.d` | sysext `readd` | **does not fit cleanly:** the repository is private, and Snosi's `verified_download` has no credentials, so it becomes public before Phase 3 builds `readd` |
@@ -404,12 +404,25 @@ and notesd runs in its own sandbox (frostnotes ADR-0031). What is left:
 - Save As inside the sandbox.
 - Permissions: `--share=network`, the portals for notifications, OpenURI
   and files (the file chooser portal, not read-only access to the home
-  directory), and write access where maild writes.
+  directory), and write access where maild writes. frostmail ADR-0046 keeps
+  `--filesystem=home:ro` for the move note from a host maild (Brian,
+  2026-10-28); Save As and attaching use the portals.
 - An optional, explicit move from a host maild, which the user confirms.
 - frostmail's own ADR, which records the reversal of parts of its
-  ADR-0013, ADR-0041 and ADR-0045.
+  ADR-0013, ADR-0041 and ADR-0045. ✅ 2026-10-28: frostmail
+  [ADR-0046](https://github.com/frostyard/frostmail/blob/main/docs/adr/0046-the-desktop-flatpak-carries-its-own-maild.md)
+  is Accepted.
 - **Done when:** Mail passes the standalone check, with its core local
   work: add an account and read, send, rules and send-later.
+
+*Progress 2026-10-29:* frostmail
+[plan 0013](https://github.com/frostyard/frostmail/blob/main/docs/plans/0013-m6-the-standalone-desktop-flatpak.md)
+carries this phase and its standalone check. Its Phases 2 to 7 are built
+(frostmail #126, #130, #131, #132, #135, #136, #137, #138). Phases 2 and 3
+pass in CI, and the checks of Phases 4 to 7 on a Snow desktop VM passed on
+2026-10-28 and 2026-10-29, the OAuth sign-in included. Left: a release candidate on a test remote (plan 0013
+Phase 8), the clean-install gate (Phase 9), and the release and the
+listing (Phase 10).
 
 ## Phase 5c — Read as a standalone Flatpak (large)
 
@@ -437,7 +450,11 @@ porter ADR-0003).
   `frostyard/frostread` to `apps.json`, and the 3 apps to its README. Each
   app goes in only after its Phase 5 check passes, with the same digest.
 - A staged catalogue, apart from the public one, lists a candidate digest
-  for a Phase 5 test (ADR-0062).
+  for a Phase 5 test (ADR-0062). flatpak-index's
+  [Stage a candidate](https://github.com/frostyard/flatpak-index#stage-a-candidate)
+  steps build it and serve it on the test machine only; frostnotes used
+  them on 2026-10-27, and frostmail's release candidates use them
+  (frostmail plan 0013 Phase 8).
 - **Done when:** `flatpak remote-ls frostyard` lists the 3 apps, each one
   after its check, with their names and icons from AppStream, and a test
   image without an attestation still stops the catalogue's deployment.
@@ -448,6 +465,10 @@ porter ADR-0003).
   ADR-0058.
 - frostmail: an ADR that supersedes ADR-0013's release path (its ADR for
   ADR-0062, with maild in the Flatpak); the M6 line in its roadmap.
+  ✅ 2026-10-28: frostmail
+  [ADR-0046](https://github.com/frostyard/frostmail/blob/main/docs/adr/0046-the-desktop-flatpak-carries-its-own-maild.md)
+  is Accepted, and frostmail's roadmap M6 row points to its
+  [plan 0013](https://github.com/frostyard/frostmail/blob/main/docs/plans/0013-m6-the-standalone-desktop-flatpak.md).
 - frostnotes: M6 in its roadmap (no hub container image, no apt packages).
 - Each app's operations doc: enable `lodge` first; updates take effect at
   the next boot; without a reboot, run `systemd-sysusers`,
@@ -601,4 +622,8 @@ On [snosi#1169](https://github.com/frostyard/snosi/pull/1169), 2026-10-28:
   lodge's [roadmap](https://github.com/frostyard/lodge/blob/main/docs/plans/0001-roadmap.md);
   frostnotes' [roadmap](https://github.com/frostyard/frostnotes/blob/main/docs/plans/0002-roadmap.md);
   frostmail's [roadmap](https://github.com/frostyard/frostmail/blob/main/docs/plans/0002-roadmap.md);
-  [`frostyard/flatpak-index`](https://github.com/frostyard/flatpak-index)
+  [`frostyard/flatpak-index`](https://github.com/frostyard/flatpak-index);
+  frostmail
+  [ADR-0046](https://github.com/frostyard/frostmail/blob/main/docs/adr/0046-the-desktop-flatpak-carries-its-own-maild.md)
+  and
+  [plan 0013](https://github.com/frostyard/frostmail/blob/main/docs/plans/0013-m6-the-standalone-desktop-flatpak.md)

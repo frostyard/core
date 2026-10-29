@@ -248,7 +248,10 @@ it:
 - frostmail:
   [ADR-0013](https://github.com/frostyard/frostmail/blob/main/docs/adr/0013-app-as-a-local-flatpak.md),
   [ADR-0041](https://github.com/frostyard/frostmail/blob/main/docs/adr/0041-maild-runs-as-a-lodge-app.md),
-  [ADR-0045](https://github.com/frostyard/frostmail/blob/main/docs/adr/0045-the-desktop-app-builds-as-a-flatpak-in-ci.md)
+  [ADR-0045](https://github.com/frostyard/frostmail/blob/main/docs/adr/0045-the-desktop-app-builds-as-a-flatpak-in-ci.md);
+  frostmail's own ADR for this change:
+  [ADR-0046](https://github.com/frostyard/frostmail/blob/main/docs/adr/0046-the-desktop-flatpak-carries-its-own-maild.md)
+  (Accepted 2026-10-28)
 - frostread:
   [ADR-0004](https://github.com/frostyard/frostread/blob/main/docs/adr/0004-save-as-note-goes-through-notes-mcp-on-the-agent-socket.md)
 - Porter:
