@@ -564,14 +564,25 @@ after its merge, 2026-10-27:
 On [snosi#1169](https://github.com/frostyard/snosi/pull/1169), 2026-10-28:
 
 - **`EXTENSION_RELOAD_MANAGER=1`** (Murbella, Lucilla): `notesd` and `maild`
-  ship it in their `extension-release` file. updex runs `systemd-sysext
-  refresh` with no `--no-reload` (updex `sysext/runner.go`), so after a
-  refresh that merges such a sysext, systemd 262 reloads PID 1. It
-  does not run `systemd-sysusers` or `systemd-tmpfiles`, so a first enable
-  without a reboot still needs them and a start of the units by hand.
-  updex refreshes on `enable --now`, `disable --now`, `rollback --now` and an
-  interactive `features update`. Its scheduled update never refreshes, so
-  that update takes effect at the next boot (updex `updex/daemon.go`).
+  ship it in their `extension-release` file. Since updex `v2.1.3`
+  ([updex#474](https://github.com/frostyard/updex/pull/474), updex
+  [ADR-0019](https://github.com/frostyard/updex/blob/main/docs/adr/0019-apply-merged-sysusers-and-tmpfiles-on-a-live-refresh.md)),
+  a live refresh runs the boot order (updex `sysext/runner.go`):
+  `systemd-sysext refresh --no-reload`, `systemd-sysusers`,
+  `systemd-tmpfiles --create --graceful`, then a last refresh
+  (`--always-refresh=yes` on systemd 260 and newer) that reloads PID 1. A
+  unit that the reload starts through `Upholds=` thus finds the accounts and
+  paths of the merged `sysusers.d` and `tmpfiles.d`. updex refreshes on
+  `enable --now`, `disable --now`, `rollback --now` and an interactive
+  `features update`. Its scheduled update still never refreshes, so that
+  update takes effect at the next boot (updex `updex/daemon.go`).
+- **User `lodge` in each suite `.deb`** (Brian, snosi T401a): each app's
+  `sysusers.d` entry also declares user `lodge`, with the line of lodge's
+  own entry ([lodge#41](https://github.com/frostyard/lodge/pull/41), lodge's
+  [app contract](https://github.com/frostyard/lodge/blob/main/docs/specs/app-contract.md)),
+  so an app's daemon finds `lodge` when lodge's sysext is not enabled.
+  Released in frostnotes `v0.3.0`, frostmail `v0.3.0`, frostread `v0.2.0`
+  and porter `v0.1.1` on 2026-10-28.
 - **maild's secrets key** (Irulan): frostmail
   [ADR-0047](https://github.com/frostyard/frostmail/blob/main/docs/adr/0047-make-the-secrets-key-at-first-start.md)
   and [frostmail#129](https://github.com/frostyard/frostmail/pull/129),
