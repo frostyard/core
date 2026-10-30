@@ -31,7 +31,7 @@ Every artifact of the five suite repositories, and its side.
 | frostnotes | `notesctl` on a desktop (`notesctl mcp` for an agent, `notesctl sync`) | inside the Flatpak | **does not fit cleanly:** run with `flatpak run --command=notesctl` |
 | frostnotes | the M2 hub (`notesd -hub`, user `notes`) | not shipped | retired by frostnotes M4 Phase 7 |
 | frostmail | `maild --lodge`, `mailctl`, the `mail` web build, `frostmail.service`, `frostmail.socket`, `sysusers.d` | sysext `maild` | stages `/usr/local/bin` today |
-| frostmail | the Tauri app | Flatpak `org.frostyard.Frostmail` | carries the UI, maild and `mailctl` ([frostmail ADR-0046](https://github.com/frostyard/frostmail/blob/main/docs/adr/0046-the-desktop-flatpak-carries-its-own-maild.md)); lodge connection mode ([frostmail ADR-0041](https://github.com/frostyard/frostmail/blob/main/docs/adr/0041-maild-runs-as-a-lodge-app.md)); [ADR-0062](../adr/0062-make-desktop-suite-apps-standalone-flatpaks-with-opt-in-lodge.md) |
+| frostmail | the Tauri app | Flatpak `org.frostyard.Frostmail` | carries the UI, maild and `mailctl` ([frostmail ADR-0046](https://github.com/frostyard/frostmail/blob/main/docs/adr/0046-the-desktop-flatpak-carries-its-own-maild.md)); lodge connection mode ([frostmail ADR-0041](https://github.com/frostyard/frostmail/blob/main/docs/adr/0041-maild-runs-as-a-lodge-app.md)); [ADR-0062](../adr/0062-make-desktop-suite-apps-standalone-flatpaks-with-opt-in-lodge.md). Released as `v0.4.0` on 2026-10-29: `ghcr.io/frostyard/frostmail@sha256:89980a48d4492400636022d8db44ef64dcc16e3c405f501617d4357f7b90cf2a`, the attested candidate `v0.4.0-rc.2` (commit `32d764c`) that passed the standalone check; listed in the `frostyard` remote ([flatpak-index#6](https://github.com/frostyard/flatpak-index/pull/6)) and installed from it on a clean Snow VM ([frostmail#150](https://github.com/frostyard/frostmail/pull/150)) |
 | frostmail | maild and `mailctl` on a desktop | inside the Flatpak | ADR-0062 and frostmail [ADR-0046](https://github.com/frostyard/frostmail/blob/main/docs/adr/0046-the-desktop-flatpak-carries-its-own-maild.md): maild runs in its own sandbox of the app, and no user unit ships |
 | frostmail | the Windows install | not in this plan | frostmail M7 |
 | frostmail | `tools/lodgeprobe` | not shipped | development only |
@@ -423,6 +423,44 @@ pass in CI, and the checks of Phases 4 to 7 on a Snow desktop VM passed on
 2026-10-28 and 2026-10-29, the OAuth sign-in included. Left: a release candidate on a test remote (plan 0013
 Phase 8), the clean-install gate (Phase 9), and the release and the
 listing (Phase 10).
+
+*Done 2026-10-29:* Mail passed the standalone check, and `v0.4.0` is
+released and listed. The sources are frostmail plan 0013's Phase 8, 9 and
+10 checks, and the tags and runs they name.
+
+- The check (plan 0013 Phase 9, the clean-install gate): a clean Snow VM
+  installed the candidate from flatpak-index's staged catalogue by its
+  attested digest. Items 1 to 4, 6 and 7 passed, and item 5 passed with an
+  update of the same schema. Items 1 to 4 ran on
+  `v0.4.0-rc.1` and items 6 and 7 on `v0.4.0-rc.2`; item 5 updated rc.1
+  to rc.2. rc.2 differs from rc.1 only by a test file, so no single digest
+  ran all 7. Brian decided that rc.2 counts as tested as it is, that an
+  update with the same schema satisfies item 5 for this release, and that
+  maild's end with the last window when the Background portal is refused
+  is the accepted behaviour (T491a to T491c). One finding stays open:
+  [frostmail#149](https://github.com/frostyard/frostmail/issues/149), a
+  click on the old build's notification after an update.
+- The release (plan 0013 Phase 10): the tag `v0.4.0` is commit `32d764c`,
+  the commit of `v0.4.0-rc.2`. Promote (run 40951117442) copied rc.2's
+  attested digest
+  `sha256:89980a48d4492400636022d8db44ef64dcc16e3c405f501617d4357f7b90cf2a`
+  to `v0.4.0` and `latest`, with no new build. Release (run 40950765175)
+  made `frostyard-maild_0.4.0_amd64.deb` from the same commit
+  (frostmail [ADR-0048](https://github.com/frostyard/frostmail/blob/main/docs/adr/0048-tag-each-release-on-its-tested-candidates-commit.md)).
+  `ghcr.io/frostyard/frostmail` answers anonymous pulls.
+- The listing (Phase 6):
+  [flatpak-index#6](https://github.com/frostyard/flatpak-index/pull/6),
+  merged 2026-10-29 (`ec8b85e`), adds `frostyard/frostmail` to
+  `apps.json`. The public catalogue lists `org.frostyard.Frostmail` at
+  that digest.
+- The install: on 2026-10-29 a clean Snow VM ran flatpak-index's README
+  commands and installed `org.frostyard.Frostmail` from the `frostyard`
+  remote, with no credentials. `flatpak info` shows that digest as its
+  Alt-id, and the app started with its own maild
+  ([frostmail#150](https://github.com/frostyard/frostmail/pull/150),
+  plan 0013's Phase 10 check). A finding for flatpak-index's README: Snow's
+  clean image already has a user remote `frostyard`, so the README's system
+  remote makes a second one, and `flatpak install` asks which to use.
 
 ## Phase 5c — Read as a standalone Flatpak (large)
 
