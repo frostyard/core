@@ -194,7 +194,8 @@ it:
   it is the user's choice.
 - A start at login needs the Background portal's permission. After a
   refusal, maild's rules and send-later and readd's poller run from the app's first launch in a session until logout, and
-  not between login and that launch.
+  not between login and that launch. *Amended: they may stop with the last
+  window ([ADR-0065](0065-let-a-suite-daemon-end-with-the-last-window-when-the-portal-is-refused.md)).*
 - The Flatpak trust story of ADR-0058 now covers more code: each daemon's
   network access and the user's secrets are inside a Flatpak whose OCI
   remote has no GPG signature. The attestation check at index time stays

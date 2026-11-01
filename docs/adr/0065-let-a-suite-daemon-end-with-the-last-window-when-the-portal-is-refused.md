@@ -27,7 +27,10 @@ behaviour in
 [frostmail ADR-0046](https://github.com/frostyard/frostmail/blob/main/docs/adr/0046-the-desktop-flatpak-carries-its-own-maild.md)
 and its
 [design/desktop.md](https://github.com/frostyard/frostmail/blob/main/docs/design/desktop.md).
-The 2 records disagree.
+Frostnotes' notesd behaves the same on GNOME 48: with the permission off,
+the desktop ends notesd about 45 seconds after the last window closes
+([frostnotes design/app.md](https://github.com/frostyard/frostnotes/blob/main/docs/design/app.md)).
+ADR-0062 and the 2 apps' records disagree.
 
 ## Decision
 
@@ -39,18 +42,28 @@ ADR-0062's rule for a refused Background portal is replaced:
   run only while a window of the app is open: it may end with the last
   window, and the next window starts it again. An app may keep its daemon
   running until logout instead; either behaviour meets the contract.
-- **The app says which.** After a refusal, the app tells the user that its
-  background work (for example rules, send-later, a feed poller) runs only
-  while a window is open, or until logout, whichever it does.
+- **The app tells the user.** After a refusal, the app says 2 things: when
+  its background work (for example rules, send-later, sync, a feed poller)
+  runs (only while a window is open, or until logout, whichever it does),
+  and where the user can allow background running.
 - **The clean-install gate checks it** on a second VM with the portal
   refused, and records the behaviour it observed.
 
-Every other part of ADR-0062 stands.
+This replaces ADR-0062's sentence "the app says that the daemon then runs
+from the app's next launch, not from login" and its Consequences bullet
+that background work runs "from the app's first launch in a session until
+logout". Every other part of ADR-0062 stands.
 
 ## Consequences
 
-- Frostmail's current behaviour meets the contract; frostmail needs no
-  change.
+- Frostmail's and frostnotes' daemons meet the contract as they behave
+  today. Frostnotes already tells the user (its settings text names the
+  stop after the last window and how to allow background running).
+  Frostmail shows no such text yet, so it needs one.
+- Records that still state the old rule change in their own repositories:
+  frostnotes ADR-0031 (notesd after the last window), and frostread
+  ADR-0008 and its plan 0002 (readd's poller, whose desktop shell is not
+  built yet).
 - With the portal refused, background work such as maild's rules and
   send-later and readd's poller can stop between the last window and the
   next launch, not only between login and the first launch. A user who wants
