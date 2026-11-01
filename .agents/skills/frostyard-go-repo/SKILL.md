@@ -106,15 +106,19 @@ Rules:
    instruction-surface convention): build commands, architecture map,
    code-pattern rules — mirror updex's CLAUDE.md sections.
 5. **Verify**: `make check` passes locally; push and confirm the test
-   workflow is green; `git tag v0.1.0 && git push origin v0.1.0` (or `make
-   bump`, which runs build/test/fmt/lint, requires a clean tree, then tags
-   `svu next` and pushes the tag) produces a GoReleaser release.
+   workflow is green. The first release is a maintainer's step, not an
+   agent's: a maintainer runs `make bump` (build/test/fmt/lint, a clean
+   tree, then tags `svu next` and pushes the tag), and the tag push produces
+   the GoReleaser release.
 
 ## Releasing day-to-day
 
 - Use conventional commits (`feat:`, `fix:`, `docs:`, …) — the changelog
   groups by them and svu derives the next version from them.
-- `make bump` is the release command; never hand-craft versions.
+- `make bump` is the release command; never hand-craft versions. A
+  maintainer runs it: agents never tag, push a tag, or publish a release.
+  An agent that finds a release due proposes the version (`svu next` is
+  read-only) and asks the maintainer to tag.
 - The `dev` pre-release is the rolling snapshot; real releases are svu tags.
 
 ## Pitfalls

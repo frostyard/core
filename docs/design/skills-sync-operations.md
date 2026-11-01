@@ -96,6 +96,11 @@ The workflow maps the core Actions secret `ORG_PAT` to the script's required
 The workflow grants no permissions to its `GITHUB_TOKEN` and checkout does not
 persist credentials.
 
+The token's owner is the author GitHub shows on every sync PR (the commit
+author stays `frostyard-core[bot]`). A consumer ruleset that requires an
+approving review therefore needs a reviewer other than that owner, or an
+administrator's bypass, before the PR can merge.
+
 ### Expiry and rotation
 
 `ORG_PAT`'s expiry is declared in
