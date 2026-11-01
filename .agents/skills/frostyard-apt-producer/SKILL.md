@@ -131,10 +131,14 @@ rollback). The machine account never tags, releases, or changes secrets.
      checkout (use `trixie/image` for the image component). It downloads
      the package with apt in a temporary root; it does not install it.
    - Installation check, in a disposable container or VM only (never on a
-     shared host): add the Frostyard source and keyring as in apt-publisher's
-     README "Clients" block, then `apt-get update && apt-get install -y
-     NAME=VERSION`, and run the package's own smoke command (for example
-     `NAME --version`). This proves dependencies and maintainer scripts.
+     shared host), of the tested codename (for example `debian:trixie`):
+     add the keyring and a sources entry as in apt-publisher's README
+     "Clients" block, with `Suites:` set to that codename and `Components:`
+     set to the producer's registered component (`main`, or `main image`
+     for an `image` producer: the README block enables `main` only). Then
+     `apt-get update && apt-get install -y NAME=VERSION`, and run the
+     package's own smoke command (for example `NAME --version`). This
+     proves dependencies and maintainer scripts.
    - The next nightly `audit` run (06:17 UTC) does not list the release as
      missing.
    Report the run URLs, the downloaded version, and the installation result
