@@ -57,7 +57,13 @@ Promote, or change package visibility or secrets.
    GitHub-hosted runner: flatpak-index rejects self-hosted attestations). A
    candidate never moves `latest`. Record the run URL and the digest:
    `skopeo inspect --no-creds --format '{{.Digest}}' docker://ghcr.io/frostyard/APP:vX.Y.Z-rc.N`.
-3. **Gate on a clean desktop.** Take the VM's lease first
+3. **Gate on a clean desktop.** The gate is required before an app's
+   **first listing** (ADR-0062; flatpak-index "Stage a candidate"). For a
+   later release, run it when the app's own release plan requires it:
+   frostmail's plan 0013 gates each candidate. Whether every release of
+   every app must pass the gate is not decided yet; until it is, follow the
+   app's plan and say in the release PR which applies. Take the VM's lease
+   first
    (`~/.pi/agent/bin/lease take RESOURCE THREAD "gate APP vX.Y.Z-rc.N"`,
    renew at least every 30 minutes, release at the end) and restore it to
    its clean snapshot. Build a staged catalogue that lists only the
