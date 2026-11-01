@@ -53,6 +53,28 @@ the sync lifecycle and recovery procedures.
 The `.claude/skills` path is a symlink to `.agents/skills`; edit and link the
 canonical `.agents/skills` path so all supported agents see the same content.
 
+### Handling a sync pull request
+
+A sync pull request (`chore: sync agent skills from frostyard/core`, branch
+`chore/sync-core-skills`) carries content that was already reviewed in core.
+The repository's owner handles it with a tree check, not a cross-review:
+
+1. Every file the pull request changes is under a managed skill directory
+   (`.agents/skills/<name>/`, or the physical path an `.agents` symlink
+   points to).
+2. Each managed file's blob SHA at the pull request's head equals the blob
+   SHA of the same file under `.agents/skills/` at core's current `main`
+   (the `.synced-from-core` markers excepted). For example, compare
+   `gh api repos/frostyard/core/git/trees/main?recursive=1` with the same
+   call on the consumer at the head SHA.
+3. The repository's CI is green at that head.
+
+When all 3 hold, the owner adds `ready-for-human`. A new push to the sync
+branch (each core skill change force-updates it) means the label comes off
+until the check passes again at the new head. A pull request that fails the
+check is not edited on the reserved branch: fix core, or dispatch the sync
+again. Do not close a needed sync pull request; the next run reopens it.
+
 ## References
 
 - Rationale:
