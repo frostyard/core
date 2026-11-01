@@ -143,5 +143,7 @@ tag ruleset it creates lets repository admins bypass, so a maintainer's
   [ADR-0040](../adr/0040-publish-the-repository-settings-contract.md)
   (repository settings contract),
   [ADR-0042](../adr/0042-adopt-a-merge-queue-on-the-default-branch.md)
-  (required merge queue)
+  (required merge queue),
+  [ADR-0064](../adr/0064-retire-snowcat.md) (Snowcat retired; no service
+  imports declarations)
 - Context: [organization authority](../design/organization-authority.md)

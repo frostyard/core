@@ -79,6 +79,7 @@ no ADR, spec, or plan covers yet.
 - [0061 — Add the image APT component on the first publication run](adr/0061-add-the-image-apt-component-on-the-first-publication-run.md)
 - [0062 — Make each desktop suite app a standalone Flatpak, with lodge as an opt-in mode](adr/0062-make-desktop-suite-apps-standalone-flatpaks-with-opt-in-lodge.md)
 - [0063 — Uphold notesd's service as well as its socket](adr/0063-uphold-notesds-service-as-well-as-its-socket.md)
+- [0064 — Retire Snowcat](adr/0064-retire-snowcat.md)
 
 ### Design
 
