@@ -90,7 +90,8 @@ it:
   closes, until logout. It asks the Background portal to start it at
   login. When the user refuses, only the start at login stops: the app
   says that the daemon then runs from the app's next launch, not from
-  login.
+  login. *Amended: with the portal refused, the daemon may end with the
+  last window ([ADR-0065](0065-let-a-suite-daemon-end-with-the-last-window-when-the-portal-is-refused.md)).*
 - **Each app keeps its data in its own Flatpak data directory,** or in
   folders the user picks, such as a Notes vault. It reads no other app's
   database or files directly.
@@ -235,6 +236,8 @@ it:
   [design/app.md](https://github.com/frostyard/frostnotes/blob/main/docs/design/app.md);
   frostmail's
   [design/desktop.md](https://github.com/frostyard/frostmail/blob/main/docs/design/desktop.md)
+- Amended in part by: [ADR-0065](0065-let-a-suite-daemon-end-with-the-last-window-when-the-portal-is-refused.md)
+  (the daemon after a refused Background portal)
 - Amends in part: [ADR-0058](0058-ship-suite-desktop-apps-as-flatpaks-and-services-as-sysexts.md)
   (the desktop side) and
   [ADR-0057](0057-run-first-party-apps-behind-lodge.md) (the scope of the
