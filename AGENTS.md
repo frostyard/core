@@ -54,6 +54,12 @@ Start from .agents/skills/TEMPLATE/SKILL.md. -->
   — socratic interview first, umbrella issue + `depends-on:` slice issues,
   evidence-shaped criteria, release slices at version boundaries, human
   approval before any issue is created (snowcat ADR-0066).
+- **Releasing a suite app (frostnotes, frostmail, frostread, lodge,
+  porter): Flatpak candidate, clean-desktop gate, promotion and listing;
+  the daemon's attested `.deb` and its snosi sysext** →
+  [.agents/skills/frostyard-suite-app-release/SKILL.md](.agents/skills/frostyard-suite-app-release/SKILL.md)
+  ([ADR-0058](docs/adr/0058-ship-suite-desktop-apps-as-flatpaks-and-services-as-sysexts.md),
+  [ADR-0062](docs/adr/0062-make-desktop-suite-apps-standalone-flatpaks-with-opt-in-lodge.md)).
 - **Scaffolding or updating a repo's docs/ tree, or retiring a legacy
   `yeti/`/`cairn/` tree** →
   [.agents/skills/frostyard-repo-docs/SKILL.md](.agents/skills/frostyard-repo-docs/SKILL.md)
