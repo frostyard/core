@@ -27,15 +27,20 @@ digest and date; `flatpak remote-ls frostyard` lists the new version with
 that same digest; and, for a daemon, snosi's checksum pin for the new
 version is merged and its sysext published.
 
-The app's own `AGENTS.md` section "Releases and dependencies" and its
-release plan are the reference for that app. When they and this skill
-disagree, the app wins. Today frostmail runs the full candidate flow below
-(its plan 0013, Phases 8 to 10). frostnotes' `flatpak.yml` still publishes
-straight from the `vX.Y.Z` tag and moves `latest` after the attestation,
-with no candidate and no gate before the listing; whether it moves to the
-candidate flow is Brian's decision. Repositories without a candidate flow
-(frostnotes, lodge, porter, frostread today) release with `make bump`,
-which Brian runs: it tags `svu next` and pushes the tag.
+**What ADR-0062 requires.** The digest that flatpak-index lists is the
+digest that a clean-desktop test installed from a staged catalogue. The
+candidate flow below meets it: the candidate's digest is gated, and
+Promote copies exactly that digest to `vX.Y.Z` and `latest`. A workflow
+that moves `latest` to a digest no gate tested does not meet it for that
+listing; raise it with the app's owner.
+
+The core ADRs win over this skill and over an app's documents. For the
+app-specific mechanics (make targets, workflow names, the per-app check
+list), the app's `AGENTS.md` section "Releases and dependencies" and its
+release plan are the reference. frostmail runs the candidate flow (its
+plan 0013, Phases 8 to 10). Repositories without a candidate flow (lodge
+and porter, which have no Flatpak) release with `make bump`, which Brian
+runs: it tags `svu next` and pushes the tag.
 
 **Division of labour (fixed).** Brian pushes every tag (candidate and
 release), runs `make bump`, and runs `promote.yml`. Agents prepare the
@@ -57,13 +62,10 @@ Promote, or change package visibility or secrets.
    GitHub-hosted runner: flatpak-index rejects self-hosted attestations). A
    candidate never moves `latest`. Record the run URL and the digest:
    `skopeo inspect --no-creds --format '{{.Digest}}' docker://ghcr.io/frostyard/APP:vX.Y.Z-rc.N`.
-3. **Gate on a clean desktop.** The gate is required before an app's
-   **first listing** (ADR-0062; flatpak-index "Stage a candidate"). For a
-   later release, run it when the app's own release plan requires it:
-   frostmail's plan 0013 gates each candidate. Whether every release of
-   every app must pass the gate is not decided yet; until it is, follow the
-   app's plan and say in the release PR which applies. Take the VM's lease
-   first
+3. **Gate on a clean desktop.** Gate every candidate that is to be listed:
+   the listed digest must be a tested digest (ADR-0062). The first listing
+   of an app always needs it (flatpak-index "Stage a candidate"). Take the
+   VM's lease first
    (`~/.pi/agent/bin/lease take RESOURCE THREAD "gate APP vX.Y.Z-rc.N"`,
    renew at least every 30 minutes, release at the end) and restore it to
    its clean snapshot. Build a staged catalogue that lists only the
