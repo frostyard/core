@@ -62,10 +62,19 @@ evidence; and the whole-plan verification passed.
      published tag, a measured value. Never intentions ("works well"). They
      are the contract the verification checks; the task's instructions are
      advisory, because the code will have moved when the task runs.
-   - **A version-boundary edge gets a release task** in the producing
-     repository: it prepares the release (notes, version proposal); Brian
-     tags; its acceptance line is the published release. A merge alone
-     never satisfies a consumer that pins a version.
+   - **A version-boundary edge gets 2 tasks** in the producing repository,
+     because a task with a pull request is done when the pull request
+     merges, not when a tag exists:
+     - a **release-preparation task** (a pull request: notes, version
+       proposal, anything the repository's release process needs);
+     - a **release-observation task** with no pull request, depending on
+       the preparation task. Its acceptance line is the published release
+       ("Brian tagged vX.Y.Z; the release workflow is green"). Its agent
+       asks Brian to tag, then records the release URL and the run URL with
+       `plan nochange` once the release exists.
+
+     Every consumer that pins the version depends on the observation task.
+     A merge alone never satisfies a consumer that pins a version.
    - **Deps form no cycle,** every dep is a task of the same graph, and the
      graph has 1 to 30 tasks. A plan with no code has 1 check task that ends
      as "no change" with evidence.
@@ -110,8 +119,9 @@ evidence; and the whole-plan verification passed.
 
 - **Writing instructions as if earlier tasks already landed.** Say "after
   t2 merges, …" and keep the acceptance lines load-bearing.
-- **A version-consumer edge with no release task:** the consumer waits for
-  a tag nobody planned.
+- **A version-consumer edge with no release-observation task:** the
+  consumer either waits for a tag nobody planned, or, if it depends only on
+  the preparation PR, starts before the release exists.
 - **A decision buried in prose.** If Brian has to choose, it is an ask,
   anchored to its section, with options.
 - **An answer not written back.** The gate counts it as open until a write
