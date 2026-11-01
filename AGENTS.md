@@ -61,6 +61,12 @@ Start from .agents/skills/TEMPLATE/SKILL.md. -->
   a task graph of one-PR tasks with evidence-shaped acceptance and release
   tasks at version boundaries, Brian's approval of one revision, then
   delivery and a whole-plan verification.
+- **Releasing a suite app (frostnotes, frostmail, frostread, lodge,
+  porter): Flatpak candidate, clean-desktop gate, promotion and listing;
+  the daemon's attested `.deb` and its snosi sysext** →
+  [.agents/skills/frostyard-suite-app-release/SKILL.md](.agents/skills/frostyard-suite-app-release/SKILL.md)
+  ([ADR-0058](docs/adr/0058-ship-suite-desktop-apps-as-flatpaks-and-services-as-sysexts.md),
+  [ADR-0062](docs/adr/0062-make-desktop-suite-apps-standalone-flatpaks-with-opt-in-lodge.md)).
 - **Writing, accepting, amending or superseding an ADR (core or
   repository-local)** →
   [.agents/skills/frostyard-write-adr/SKILL.md](.agents/skills/frostyard-write-adr/SKILL.md)

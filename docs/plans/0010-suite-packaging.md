@@ -437,7 +437,9 @@ released and listed. The sources are frostmail plan 0013's Phase 8, 9 and
   ran all 7. Brian decided that rc.2 counts as tested as it is, that an
   update with the same schema satisfies item 5 for this release, and that
   maild's end with the last window when the Background portal is refused
-  is the accepted behaviour (T491a to T491c). One finding stays open:
+  is the accepted behaviour (T491a to T491c;
+  [ADR-0065](../adr/0065-let-a-suite-daemon-end-with-the-last-window-when-the-portal-is-refused.md)
+  makes it the suite's rule). One finding stays open:
   [frostmail#149](https://github.com/frostyard/frostmail/issues/149), a
   click on the old build's notification after an update.
 - The release (plan 0013 Phase 10): the tag `v0.4.0` is commit `32d764c`,
@@ -651,7 +653,8 @@ On [snosi#1169](https://github.com/frostyard/snosi/pull/1169), 2026-10-28:
 
 - Implements: [ADR-0058](../adr/0058-ship-suite-desktop-apps-as-flatpaks-and-services-as-sysexts.md),
   [ADR-0062](../adr/0062-make-desktop-suite-apps-standalone-flatpaks-with-opt-in-lodge.md),
-  [ADR-0063](../adr/0063-uphold-notesds-service-as-well-as-its-socket.md);
+  [ADR-0063](../adr/0063-uphold-notesds-service-as-well-as-its-socket.md),
+  [ADR-0065](../adr/0065-let-a-suite-daemon-end-with-the-last-window-when-the-portal-is-refused.md);
   lodge's [app contract](https://github.com/frostyard/lodge/blob/main/docs/specs/app-contract.md)
   (Install layout); snosi's
   [design/sysexts.md](https://github.com/frostyard/snosi/blob/main/docs/design/sysexts.md)
