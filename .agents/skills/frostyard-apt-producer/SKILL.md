@@ -12,7 +12,8 @@ A producer builds `.deb` files, attaches them to a GitHub release, and asks
 apt-publisher to publish that release. The producer holds no signing key and
 no R2 credential. Done looks like: the producer is registered, its release
 workflow sends the dispatch, one real release ran apt-publisher's `publish`
-workflow green, and `apt-get` installs the new version from the public URL.
+workflow green, and `apt-get` installs the new version from the public URL
+in a disposable container.
 
 apt-publisher's
 [README](https://github.com/frostyard/apt-publisher#readme) is the reference
@@ -91,9 +92,11 @@ rollback). The machine account never tags, releases, or changes secrets.
      the request fails, nothing was published and the release run must fail.
    - Leave `codenames` out of the payload unless one release targets fewer
      codenames than the registration; the registration is the default.
-   - Remove any old publication step: repogen's `publish-to-r2` Debian path,
-     a direct R2 upload, a `build` dispatch to snosi (apt-publisher sends it
-     after the packages are live), and the signing or R2 secrets they used.
+   - Remove any old publication step and its secret references from the
+     workflow: repogen's `publish-to-r2` Debian path, a direct R2 upload, a
+     `build` dispatch to snosi (apt-publisher sends it after the packages
+     are live). Deleting the now unused signing or R2 secrets is Brian's
+     step: name them in an ask.
    - The `.deb` must be attached to the release before the dispatch runs;
      apt-publisher downloads the release's assets, nothing else.
 
@@ -123,13 +126,19 @@ rollback). The machine account never tags, releases, or changes secrets.
      (`gh run list -R frostyard/apt-publisher -w publish -L 5`). Its summary
      names the producer, the tag and the new snapshot per codename; its log
      shows the read-back and the canary passing.
-   - Install check through the public URL, read-only:
+   - Publication and download check through the public URL:
      `scripts/apt-canary.sh trixie amd64 NAME=VERSION` in an apt-publisher
-     checkout (use `trixie/image` for the image component), or `apt-get
-     update && apt-cache policy NAME` on a host with the Frostyard source.
+     checkout (use `trixie/image` for the image component). It downloads
+     the package with apt in a temporary root; it does not install it.
+   - Installation check, in a disposable container or VM only (never on a
+     shared host): add the Frostyard source and keyring as in apt-publisher's
+     README "Clients" block, then `apt-get update && apt-get install -y
+     NAME=VERSION`, and run the package's own smoke command (for example
+     `NAME --version`). This proves dependencies and maintainer scripts.
    - The next nightly `audit` run (06:17 UTC) does not list the release as
      missing.
-   Report the run URLs and the installed version.
+   Report the run URLs, the downloaded version, and the installation result
+   with its container image.
 
 ## Changing an existing registration
 
@@ -150,8 +159,8 @@ rollback). The machine account never tags, releases, or changes secrets.
   in a later job than the dispatch makes apt-publisher fetch a release with
   no packages. Dispatch last.
 - **Attestation from the wrong ref.** An attestation made by a run on a
-  branch or by `workflow_dispatch` does not match `refs/tags/TAG`; with
-  `attested=yes` the publication is refused.
+  branch (a push to `main`, or a manual run on `main`) does not match
+  `refs/tags/TAG`; with `attested=yes` the publication is refused.
 - **Rebuilt bytes under an existing version.** Republishing a version with
   different bytes is refused. Fix by releasing a new version, never by
   replacing release assets.
