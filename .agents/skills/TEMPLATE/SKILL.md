@@ -1,6 +1,7 @@
 ---
 name: skill-name
 description: One sentence saying what this skill produces and one sentence saying when to use it ("Use whenever asked to …"). Agents pick skills by this description alone — make the trigger unmistakable.
+disable-model-invocation: true
 ---
 
 # Imperative title (e.g. "Build a new widget")
@@ -8,7 +9,10 @@ description: One sentence saying what this skill produces and one sentence sayin
 <!--
 A skill is a repeatable procedure an agent should follow instead of
 improvising. Copy this directory, rename it, and register the skill with a
-bullet in AGENTS.md's Skills section. Keep steps concrete: name the commands,
+bullet in AGENTS.md's Skills section. In your copy, set `name` to the new
+directory name and delete the `disable-model-invocation: true` line: it is
+there only so agents that scan `.agents/skills/` do not offer this template
+as a skill. Keep steps concrete: name the commands,
 files, and checks. Link the design docs/specs that govern the steps rather
 than restating them.
 -->

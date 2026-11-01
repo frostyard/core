@@ -51,8 +51,11 @@ skills, but edits within a managed skill are replaced on the next sync.
 
 Only keys present in `repos` are consumers. The live file is authoritative;
 it includes `chairlift`, `clix`, `firn`, `intuneme`, `lab`, `pilothouse`,
-`repogen`, `snosi`, `std`, and `updex`. Firn receives the
-`frostyard-go-repo` extra in addition to the default skills. A regular
+`repogen`, `snosi`, `std`, and `updex`. Every one except `lab` and `snosi`
+receives the `frostyard-go-repo` extra in addition to the default skills.
+`snowcat` and `snowcat-cockpit` left the list when Snowcat was retired and
+both repositories were archived
+([ADR-0064](../adr/0064-retire-snowcat.md)). A regular
 `.agents/` directory and a `.agents` symlink are both supported: the script
 resolves the physical target before writing or staging files.
 
@@ -96,6 +99,11 @@ The workflow maps the core Actions secret `ORG_PAT` to the script's required
 The workflow grants no permissions to its `GITHUB_TOKEN` and checkout does not
 persist credentials.
 
+The token's owner is the author GitHub shows on every sync PR (the commit
+author stays `frostyard-core[bot]`). A consumer ruleset that requires an
+approving review therefore needs a reviewer other than that owner, or an
+administrator's bypass, before the PR can merge.
+
 ### Expiry and rotation
 
 `ORG_PAT`'s expiry is declared in
@@ -134,7 +142,9 @@ exercises push and pull-request access.
   but requires a separate consumer PR to delete the old directory.
 - **Offboard a repository:** remove its `repos` entry, then use a consumer PR
   to remove managed directories that should no longer remain. Close any open
-  sync PR and delete the reserved branch separately.
+  sync PR and delete the reserved branch separately. An archived repository
+  accepts none of these: leave its directories, sync PR, and branch as they
+  are.
 
 ## Operational notes
 
@@ -163,7 +173,9 @@ error that exits immediately.
   [ADR-0026](../adr/0026-distribute-core-skills-via-sync-prs.md),
   [ADR-0019](../adr/0019-governance-as-code-and-risk-tiers.md),
   [ADR-0021](../adr/0021-sha-pinned-actions-and-least-privilege-ci.md),
-  [ADR-0045](../adr/0045-guard-actions-secret-expiry-in-the-repository.md)
+  [ADR-0045](../adr/0045-guard-actions-secret-expiry-in-the-repository.md),
+  [ADR-0064](../adr/0064-retire-snowcat.md) (snowcat and snowcat-cockpit
+  offboarded)
 - Contributor guide: [Shared skills](shared-skills.md)
 - Executable contracts:
   [skills-sync.json](../../.github/skills-sync.json),

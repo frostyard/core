@@ -60,40 +60,50 @@ skills_sync_run_repo() {
     return 1
   fi
   local skills_root rel_root
-  skills_root=$(realpath -m "${dir}/.agents")/skills
-  rel_root=$(realpath -m --relative-to="$dir" "$skills_root")
+  if ! skills_root=$(realpath -m "${dir}/.agents") ||
+    ! rel_root=$(realpath -m --relative-to="$dir" "${skills_root}/skills"); then
+    echo "::error::sync failed for frostyard/${repo}" >&2
+    return 1
+  fi
 
-  # Run the per-repo git/PR work in a subshell whose exit status we read
-  # AFTER it finishes — `( ... ) || return 1` would put the subshell in a
-  # tested context, where bash suspends `set -e` and failures fall through.
-  set +e
+  # Run the per-repo git/PR work in a subshell where every step checks its
+  # own status. `set -e` cannot be the guard here: sync-skills.sh calls this
+  # function as an `if` condition, and bash ignores `set -e` for every
+  # command inside a function run in that context — even in a subshell that
+  # sets -e again — so a failed push or `gh` call would fall through and
+  # report the repository synced (a green run that pushed nothing). The
+  # `|| rc=$?` keeps a caller that runs with `set -e` from exiting here.
+  local rc=0
   (
-    set -e
-    cd "$dir"
-    git add -A "$rel_root"
-    if git diff --cached --quiet; then
+    cd "$dir" || exit 1
+    git add -A "$rel_root" || exit 1
+    # 0: nothing staged; 1: a change; anything else is a git error.
+    diff_rc=0
+    git diff --cached --quiet || diff_rc=$?
+    if [ "$diff_rc" -eq 0 ]; then
       echo "== ${repo}: up to date"
       exit 0
+    elif [ "$diff_rc" -ne 1 ]; then
+      exit 1
     fi
-    git checkout -q -B "$branch"
+    git checkout -q -B "$branch" || exit 1
     git -c user.name="$git_name" -c user.email="$git_email" \
-      commit -q -m "chore: sync agent skills from frostyard/core@${src_sha}"
-    git -c credential.helper="$cred_helper" push -qf origin "$branch"
+      commit -q -m "chore: sync agent skills from frostyard/core@${src_sha}" || exit 1
+    git -c credential.helper="$cred_helper" push -qf origin "$branch" || exit 1
     # Check-then-create, with no fallback masking: a create failure (e.g.
     # token missing pull-requests:write) must fail the run loudly.
     existing=$(gh pr list --repo "frostyard/${repo}" --head "$branch" --state open \
-      --json number --jq '.[].number')
+      --json number --jq '.[].number') || exit 1
     if [ -n "$existing" ]; then
       echo "== ${repo}: PR #${existing} already open — branch force-updated"
     else
       gh pr create --repo "frostyard/${repo}" --head "$branch" \
         --title "chore: sync agent skills from frostyard/core" \
-        --body "$(printf 'Automated skill sync from [frostyard/core](https://github.com/frostyard/core) @ %s per [ADR-0026](https://github.com/frostyard/core/blob/main/docs/adr/0026-distribute-core-skills-via-sync-prs.md).\n\nSynced skills: %s\n\nThese directories are managed in core — edit them there, not here. Local edits are overwritten by the next sync.\n\nRisk tier: 1 — documentation/skills only, no code or workflow changes.' "$src_sha" "${skills[*]}")"
+        --body "$(printf 'Automated skill sync from [frostyard/core](https://github.com/frostyard/core) @ %s per [ADR-0026](https://github.com/frostyard/core/blob/main/docs/adr/0026-distribute-core-skills-via-sync-prs.md).\n\nSynced skills: %s\n\nThese directories are managed in core — edit them there, not here. Local edits are overwritten by the next sync.\n\nRisk tier: 1 — documentation/skills only, no code or workflow changes.' "$src_sha" "${skills[*]}")" \
+        || exit 1
     fi
     echo "== ${repo}: synced"
-  )
-  local rc=$?
-  set -e
+  ) || rc=$?
   if [ "$rc" -ne 0 ]; then
     echo "::error::sync failed for frostyard/${repo}" >&2
     return 1

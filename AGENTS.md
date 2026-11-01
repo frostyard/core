@@ -30,6 +30,13 @@ Start from .agents/skills/TEMPLATE/SKILL.md. -->
   — canonical aliases per
   [ADR-0029](docs/adr/0029-acmm-conformance-via-canonical-aliases.md), real
   trees for directory criteria, docs-integrity gate.
+- **Publishing a repository's `.deb` packages to repository.frostyard.org
+  (register a producer, attest, `publish-deb` dispatch, component and
+  codenames, prove installability)** →
+  [.agents/skills/frostyard-apt-producer/SKILL.md](.agents/skills/frostyard-apt-producer/SKILL.md)
+  — apt-publisher is the single writer
+  ([ADR-0055](docs/adr/0055-publish-debian-packages-through-the-apt-publisher.md),
+  [ADR-0059](docs/adr/0059-publish-image-only-packages-in-a-separate-apt-component.md)).
 - **Designing any Frostyard-branded interface, page, mock, or asset** →
   [.agents/skills/frostyard-design/SKILL.md](.agents/skills/frostyard-design/SKILL.md)
   — brand law, tokens, guidelines, components, UI kits, hero art.
@@ -54,6 +61,13 @@ Start from .agents/skills/TEMPLATE/SKILL.md. -->
   a task graph of one-PR tasks with evidence-shaped acceptance and release
   tasks at version boundaries, Brian's approval of one revision, then
   delivery and a whole-plan verification.
+- **Writing, accepting, amending or superseding an ADR (core or
+  repository-local)** →
+  [.agents/skills/frostyard-write-adr/SKILL.md](.agents/skills/frostyard-write-adr/SKILL.md)
+  — next free number, TEMPLATE, facts-only voice
+  ([ADR-0051](docs/adr/0051-adrs-state-facts-not-process.md)), two-way
+  links, index line, link-only maintenance
+  ([ADR-0033](docs/adr/0033-link-maintenance-in-immutable-adrs.md)).
 - **Scaffolding or updating a repo's docs/ tree, or retiring a legacy
   `yeti/`/`cairn/` tree** →
   [.agents/skills/frostyard-repo-docs/SKILL.md](.agents/skills/frostyard-repo-docs/SKILL.md)

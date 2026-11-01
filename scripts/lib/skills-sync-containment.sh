@@ -22,8 +22,17 @@ set -euo pipefail
 skills_sync_require_contained() {
   local root="$1" path="$2" label="$3"
   local root_real path_real
-  root_real=$(realpath -m -- "$root")
-  path_real=$(realpath -m -- "$path")
+  # Each resolution checks its own status: callers run this in an `if`
+  # condition, where bash ignores `set -e`, and an empty root_real would
+  # make every absolute path look contained.
+  root_real=$(realpath -m -- "$root") && [ -n "$root_real" ] || {
+    echo "::error::cannot resolve the cloned repository root ${root}" >&2
+    return 1
+  }
+  path_real=$(realpath -m -- "$path") && [ -n "$path_real" ] || {
+    echo "::error::cannot resolve ${label} (${path})" >&2
+    return 1
+  }
   case "$path_real" in
     "$root_real"/*)
       return 0
@@ -50,7 +59,8 @@ skills_sync_sync_repo() {
   shift 2
 
   local skills_root
-  skills_root=$(realpath -m "${dir}/.agents")/skills
+  skills_root=$(realpath -m "${dir}/.agents") || return 1
+  skills_root="${skills_root}/skills"
   skills_sync_require_contained "$dir" "$skills_root" ".agents/skills root" || return 1
 
   # Validate every destination before any mutation: with multiple skills, an
@@ -66,12 +76,15 @@ skills_sync_sync_repo() {
   for skill in "$@"; do
     src="${core_root}/.agents/skills/${skill}"
     dst="${skills_root}/${skill}"
-    mkdir -p "$dst"
-    rsync -a --delete "$src/" "$dst/"
+    # Each step checks its own status: the caller runs this function as an
+    # `if` condition, where bash ignores `set -e`, so a failed copy would
+    # otherwise stage a partial mirror.
+    mkdir -p "$dst" || return 1
+    rsync -a --delete "$src/" "$dst/" || return 1
     # No commit SHA in the marker: a SHA would make every core commit dirty
     # every consumer (marker-only diff PRs). Provenance detail lives in the
     # sync commit message instead.
     printf 'Managed by frostyard/core — edit there, not here (ADR-0026).\nSource: https://github.com/frostyard/core/tree/main/.agents/skills/%s\n' \
-      "$skill" > "$dst/.synced-from-core"
+      "$skill" > "$dst/.synced-from-core" || return 1
   done
 }
