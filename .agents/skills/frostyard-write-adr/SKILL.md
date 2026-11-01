@@ -82,9 +82,14 @@ specs and plans in the same change, and passes the repository's docs gate
    that implements it: if the code comes later, the spec change comes with
    it, and the ADR's Consequences say so.
 
-7. **Index it.** Add one line to `docs/README.md` under Decisions:
-   `- [NNNN — Title](adr/NNNN-title.md)`. Core's AGENTS.md skill index does
-   not list ADRs.
+7. **Index it.** Add one line to `docs/README.md` under Decisions, in the
+   form of its neighbours:
+
+   ```text
+   - [NNNN — Title](adr/NNNN-title.md)
+   ```
+
+   Core's AGENTS.md skill index does not list ADRs.
 
 8. **Open the PR.** Risk tier from the PR template (docs-only is tier 1 in
    core; an ADR that changes the organization authority tree or a gate is
@@ -98,12 +103,18 @@ Accepted ADRs are semantically immutable. Never rewrite one.
 
 - **Amend in part:** a new ADR whose title or status line says
   "amends ADR-NNNN in part", stating exactly which statements change and
-  which stay. In the old ADR, add only a reference line such as
-  `- Amended in part by: [ADR-MMMM](MMMM-title.md)` (link-only maintenance,
-  [core ADR-0033](https://github.com/frostyard/core/blob/main/docs/adr/0033-link-maintenance-in-immutable-adrs.md)).
+  which stay. In the old ADR, add only a reference line (link-only
+  maintenance,
+  [core ADR-0033](https://github.com/frostyard/core/blob/main/docs/adr/0033-link-maintenance-in-immutable-adrs.md)):
+
+  ```text
+  - Amended in part by: [ADR-MMMM](MMMM-title.md)
+  ```
+
 - **Supersede:** a new ADR that replaces the decision. Change the old ADR's
-  status to `Superseded by [MMMM](MMMM-title.md)` and its index line to show
-  it. Nothing else in the old ADR changes.
+  status line to "Superseded by", linking the new ADR, and mark its index
+  line the same way (core's `docs/README.md` shows ADR-0049 as an example).
+  Nothing else in the old ADR changes.
 - **Fix a dead link:** allowed under ADR-0033: change only the destination
   and the smallest label needed (for example "historical"); a retired
   artifact points to a commit or tag permalink.
