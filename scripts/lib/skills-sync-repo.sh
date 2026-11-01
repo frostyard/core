@@ -60,8 +60,11 @@ skills_sync_run_repo() {
     return 1
   fi
   local skills_root rel_root
-  skills_root=$(realpath -m "${dir}/.agents")/skills
-  rel_root=$(realpath -m --relative-to="$dir" "$skills_root")
+  if ! skills_root=$(realpath -m "${dir}/.agents") ||
+    ! rel_root=$(realpath -m --relative-to="$dir" "${skills_root}/skills"); then
+    echo "::error::sync failed for frostyard/${repo}" >&2
+    return 1
+  fi
 
   # Run the per-repo git/PR work in a subshell where every step checks its
   # own status. `set -e` cannot be the guard here: sync-skills.sh calls this
@@ -74,9 +77,14 @@ skills_sync_run_repo() {
   (
     cd "$dir" || exit 1
     git add -A "$rel_root" || exit 1
-    if git diff --cached --quiet; then
+    # 0: nothing staged; 1: a change; anything else is a git error.
+    diff_rc=0
+    git diff --cached --quiet || diff_rc=$?
+    if [ "$diff_rc" -eq 0 ]; then
       echo "== ${repo}: up to date"
       exit 0
+    elif [ "$diff_rc" -ne 1 ]; then
+      exit 1
     fi
     git checkout -q -B "$branch" || exit 1
     git -c user.name="$git_name" -c user.email="$git_email" \

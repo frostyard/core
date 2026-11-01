@@ -93,6 +93,7 @@ test("a changed managed skill follows the sync branch and pull-request path", as
 // real entry point, not the bare function, so a git/gh failure that only
 // `set -e` would catch shows up here as a green run.
 for (const { name, env, step } of [
+  { name: "staged-diff check", env: { SYNC_SKILLS_TEST_DIFF_FAIL: "1" }, step: "diff --cached --quiet" },
   { name: "push", env: { SYNC_SKILLS_TEST_PUSH_FAIL: "1" }, step: "push" },
   { name: "pull-request list", env: { SYNC_SKILLS_TEST_GH_LIST_FAIL: "1" }, step: "gh pr list" },
   { name: "pull-request create", env: { SYNC_SKILLS_TEST_GH_CREATE_FAIL: "1" }, step: "gh pr create" },
@@ -138,6 +139,43 @@ test("a failed skill copy fails the run before anything is staged or pushed", as
   const invocations = await readLog(fixture.log);
   assert.equal(invocations.some((line) => / push /.test(line)), false);
   assert.equal(invocations.some((line) => line.startsWith("gh ")), false);
+});
+
+test("a failed path resolution fails the run before anything is copied, staged or pushed", async () => {
+  const fixture = await createFixture();
+  await seedConsumerRemote(fixture.remotesDir, "consumer", { "README.md": "seed\n" });
+  const failBin = await mkdtemp(path.join(os.tmpdir(), "sync-skills-failbin-"));
+  const rsyncLog = path.join(failBin, "rsync.log");
+  // Fail only the clone root's resolution: an empty root once made every
+  // absolute destination look contained.
+  const { stdout: realRealpath } = await execFileAsync("which", ["realpath"]);
+  await writeFile(
+    path.join(failBin, "realpath"),
+    `#!/usr/bin/env bash
+case "\${@: -1}" in
+  */.agents*) exec "${realRealpath.trim()}" "$@" ;;
+esac
+echo "stub: simulated realpath failure" >&2
+exit 1
+`,
+  );
+  await writeFile(
+    path.join(failBin, "rsync"),
+    `#!/usr/bin/env bash\necho rsync >> "${rsyncLog}"\nexit 1\n`,
+  );
+  await chmod(path.join(failBin, "realpath"), 0o755);
+  await chmod(path.join(failBin, "rsync"), 0o755);
+
+  await assert.rejects(runSync(fixture, {}, failBin), (error) => {
+    assert.equal(error.code, 1);
+    assert.match(error.stderr, /::error::sync failed for frostyard\/consumer/);
+    assert.doesNotMatch(error.stdout, /consumer: (synced|up to date)/);
+    return true;
+  });
+  const invocations = await readLog(fixture.log);
+  assert.equal(invocations.some((line) => / (add|push) /.test(line)), false);
+  assert.equal(invocations.some((line) => line.startsWith("gh ")), false);
+  await assert.rejects(readFile(rsyncLog, "utf8"), { code: "ENOENT" });
 });
 
 function syncedMarker(skill) {
@@ -228,6 +266,13 @@ for arg in "$@"; do
 done
 # A push runs inside the clone, whose origin is the redirected bare
 # fixture, so the fixture's name identifies the repository being pushed.
+if [ "$subcmd" = "diff" ] && [ -n "\${SYNC_SKILLS_TEST_DIFF_FAIL:-}" ]; then
+  origin=$("$real_git" remote get-url origin)
+  if [ "$(basename "$origin" .git)" = "\${SYNC_SKILLS_TEST_FAIL_REPO:-}" ]; then
+    echo "stub: simulated git diff error" >&2
+    exit 128
+  fi
+fi
 if [ "$subcmd" = "push" ] && [ -n "\${SYNC_SKILLS_TEST_PUSH_FAIL:-}" ]; then
   origin=$("$real_git" remote get-url origin)
   if [ "$(basename "$origin" .git)" = "\${SYNC_SKILLS_TEST_FAIL_REPO:-}" ]; then

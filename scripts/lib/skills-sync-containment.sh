@@ -22,8 +22,17 @@ set -euo pipefail
 skills_sync_require_contained() {
   local root="$1" path="$2" label="$3"
   local root_real path_real
-  root_real=$(realpath -m -- "$root")
-  path_real=$(realpath -m -- "$path")
+  # Each resolution checks its own status: callers run this in an `if`
+  # condition, where bash ignores `set -e`, and an empty root_real would
+  # make every absolute path look contained.
+  root_real=$(realpath -m -- "$root") && [ -n "$root_real" ] || {
+    echo "::error::cannot resolve the cloned repository root ${root}" >&2
+    return 1
+  }
+  path_real=$(realpath -m -- "$path") && [ -n "$path_real" ] || {
+    echo "::error::cannot resolve ${label} (${path})" >&2
+    return 1
+  }
   case "$path_real" in
     "$root_real"/*)
       return 0
@@ -50,7 +59,8 @@ skills_sync_sync_repo() {
   shift 2
 
   local skills_root
-  skills_root=$(realpath -m "${dir}/.agents")/skills
+  skills_root=$(realpath -m "${dir}/.agents") || return 1
+  skills_root="${skills_root}/skills"
   skills_sync_require_contained "$dir" "$skills_root" ".agents/skills root" || return 1
 
   # Validate every destination before any mutation: with multiple skills, an
