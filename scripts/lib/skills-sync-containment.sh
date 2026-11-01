@@ -66,12 +66,15 @@ skills_sync_sync_repo() {
   for skill in "$@"; do
     src="${core_root}/.agents/skills/${skill}"
     dst="${skills_root}/${skill}"
-    mkdir -p "$dst"
-    rsync -a --delete "$src/" "$dst/"
+    # Each step checks its own status: the caller runs this function as an
+    # `if` condition, where bash ignores `set -e`, so a failed copy would
+    # otherwise stage a partial mirror.
+    mkdir -p "$dst" || return 1
+    rsync -a --delete "$src/" "$dst/" || return 1
     # No commit SHA in the marker: a SHA would make every core commit dirty
     # every consumer (marker-only diff PRs). Provenance detail lives in the
     # sync commit message instead.
     printf 'Managed by frostyard/core — edit there, not here (ADR-0026).\nSource: https://github.com/frostyard/core/tree/main/.agents/skills/%s\n' \
-      "$skill" > "$dst/.synced-from-core"
+      "$skill" > "$dst/.synced-from-core" || return 1
   done
 }

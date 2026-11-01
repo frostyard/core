@@ -87,6 +87,59 @@ test("a changed managed skill follows the sync branch and pull-request path", as
   assert.equal(marker, syncedMarker("demo"));
 });
 
+// sync-skills.sh calls skills_sync_run_repo as an `if` condition, and bash
+// ignores `set -e` for every command run inside a function in that
+// context — subshells that set -e again included. These tests drive the
+// real entry point, not the bare function, so a git/gh failure that only
+// `set -e` would catch shows up here as a green run.
+for (const { name, env, step } of [
+  { name: "push", env: { SYNC_SKILLS_TEST_PUSH_FAIL: "1" }, step: "push" },
+  { name: "pull-request list", env: { SYNC_SKILLS_TEST_GH_LIST_FAIL: "1" }, step: "gh pr list" },
+  { name: "pull-request create", env: { SYNC_SKILLS_TEST_GH_CREATE_FAIL: "1" }, step: "gh pr create" },
+]) {
+  test(`a failed ${name} fails the run and does not report the consumer synced`, async () => {
+    const fixture = await createFixture({ repos: { consumer: [], later: [] } });
+    await seedConsumerRemote(fixture.remotesDir, "consumer", { "README.md": "seed\n" });
+    await seedConsumerRemote(fixture.remotesDir, "later", { "README.md": "seed\n" });
+
+    await assert.rejects(runSync(fixture, { ...env, SYNC_SKILLS_TEST_FAIL_REPO: "consumer" }), (error) => {
+      assert.equal(error.code, 1);
+      assert.match(error.stderr, /::error::sync failed for frostyard\/consumer/);
+      assert.doesNotMatch(error.stdout, /consumer: synced/);
+      assert.doesNotMatch(error.stdout, /consumer: PR #/);
+      // A per-repository failure is recoverable: later consumers still run.
+      assert.match(error.stdout, /later: synced/);
+      return true;
+    });
+    const invocations = await readLog(fixture.log);
+    assert.ok(
+      invocations.some((line) => line.includes(step)),
+      `expected the failing ${step} to run, got: ${invocations.join("\n")}`,
+    );
+  });
+}
+
+test("a failed skill copy fails the run before anything is staged or pushed", async () => {
+  const fixture = await createFixture();
+  await seedConsumerRemote(fixture.remotesDir, "consumer", { "README.md": "seed\n" });
+  const failBin = await mkdtemp(path.join(os.tmpdir(), "sync-skills-failbin-"));
+  await writeFile(
+    path.join(failBin, "rsync"),
+    '#!/usr/bin/env bash\necho "stub: simulated rsync failure" >&2\nexit 23\n',
+  );
+  await chmod(path.join(failBin, "rsync"), 0o755);
+
+  await assert.rejects(runSync(fixture, {}, failBin), (error) => {
+    assert.equal(error.code, 1);
+    assert.match(error.stderr, /::error::sync failed for frostyard\/consumer/);
+    assert.doesNotMatch(error.stdout, /consumer: synced/);
+    return true;
+  });
+  const invocations = await readLog(fixture.log);
+  assert.equal(invocations.some((line) => / push /.test(line)), false);
+  assert.equal(invocations.some((line) => line.startsWith("gh ")), false);
+});
+
 function syncedMarker(skill) {
   return `Managed by frostyard/core — edit there, not here (ADR-0026).\nSource: https://github.com/frostyard/core/tree/main/.agents/skills/${skill}\n`;
 }
@@ -100,7 +153,7 @@ async function readLog(log) {
   }
 }
 
-async function createFixture() {
+async function createFixture({ repos = { consumer: [] } } = {}) {
   const base = await mkdtemp(path.join(os.tmpdir(), "sync-skills-test-"));
   const coreRepo = path.join(base, "core");
   const remotesDir = path.join(base, "remotes");
@@ -113,7 +166,7 @@ async function createFixture() {
   await writeFile(path.join(coreRepo, ".agents/skills/demo/SKILL.md"), "# Demo\n");
   await writeFile(
     path.join(coreRepo, ".github/skills-sync.json"),
-    JSON.stringify({ defaults: ["demo"], repos: { consumer: [] } }, null, 2) + "\n",
+    JSON.stringify({ defaults: ["demo"], repos }, null, 2) + "\n",
   );
   await gitInit(coreRepo);
   await execFileAsync("git", ["add", "-A"], { cwd: coreRepo });
@@ -173,6 +226,15 @@ for arg in "$@"; do
     *) subcmd="$arg"; break ;;
   esac
 done
+# A push runs inside the clone, whose origin is the redirected bare
+# fixture, so the fixture's name identifies the repository being pushed.
+if [ "$subcmd" = "push" ] && [ -n "\${SYNC_SKILLS_TEST_PUSH_FAIL:-}" ]; then
+  origin=$("$real_git" remote get-url origin)
+  if [ "$(basename "$origin" .git)" = "\${SYNC_SKILLS_TEST_FAIL_REPO:-}" ]; then
+    echo "stub: simulated push failure" >&2
+    exit 1
+  fi
+fi
 if [ "$subcmd" = "clone" ]; then
   # Redirect the github.com URL to the local bare fixture for that repo;
   # every other argument (flags, credential helper, destination) is kept.
@@ -199,11 +261,23 @@ exec "$real_git" "$@"
     `#!/usr/bin/env bash
 set -euo pipefail
 printf 'gh %s\\n' "$*" >> "\${SYNC_SKILLS_TEST_LOG}"
+fail_here=0
+case " $* " in
+  *" frostyard/\${SYNC_SKILLS_TEST_FAIL_REPO:-} "*) fail_here=1 ;;
+esac
 if [ "\${1:-}" = "pr" ] && [ "\${2:-}" = "list" ]; then
+  if [ "$fail_here" = 1 ] && [ -n "\${SYNC_SKILLS_TEST_GH_LIST_FAIL:-}" ]; then
+    echo "stub: simulated pr list failure" >&2
+    exit 1
+  fi
   printf '%s' "\${SYNC_SKILLS_TEST_GH_PR_LIST_OUTPUT:-}"
   exit 0
 fi
 if [ "\${1:-}" = "pr" ] && [ "\${2:-}" = "create" ]; then
+  if [ "$fail_here" = 1 ] && [ -n "\${SYNC_SKILLS_TEST_GH_CREATE_FAIL:-}" ]; then
+    echo "stub: simulated pr create failure" >&2
+    exit 1
+  fi
   echo "https://github.com/example/consumer/pull/1"
   exit 0
 fi
@@ -250,16 +324,17 @@ async function hasCommand(cmd) {
   }
 }
 
-async function runSync({ coreRepo, remotesDir, log, fakeBin, realGit }) {
+async function runSync({ coreRepo, remotesDir, log, fakeBin, realGit }, extraEnv = {}, firstBin = "") {
   return execFileAsync("bash", [scriptPath], {
     cwd: coreRepo,
     env: {
       ...process.env,
-      PATH: `${fakeBin}:${process.env.PATH}`,
+      PATH: `${firstBin ? `${firstBin}:` : ""}${fakeBin}:${process.env.PATH}`,
       GH_TOKEN: "sync-skills-test-token",
       SYNC_SKILLS_TEST_LOG: log,
       SYNC_SKILLS_TEST_REAL_GIT: realGit,
       SYNC_SKILLS_TEST_REMOTES_DIR: remotesDir,
+      ...extraEnv,
     },
   });
 }
