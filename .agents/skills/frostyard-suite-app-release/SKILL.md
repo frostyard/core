@@ -79,12 +79,12 @@ Promote, or change package visibility or secrets.
    - the core local workflow;
    - close and reopen the window (the daemon keeps working), log out and
      in (the daemon starts at login through the Background portal);
-     refuse the portal on a second VM: only the start at login stops, so
-     the daemon starts with the app's first launch and, for a daemon that
-     works without a window, keeps running after the last window closes
-     until logout (ADR-0062). frostmail's accepted behaviour differs (maild
-     ends with the last window; frostmail ADR-0046): record which one the
-     app shows;
+     refuse the portal on a second VM: the start at login stops, the
+     daemon starts with the app's first window, and it may end with the
+     last window or run until logout
+     ([ADR-0065](https://github.com/frostyard/core/blob/main/docs/adr/0065-let-a-suite-daemon-end-with-the-last-window-when-the-portal-is-refused.md),
+     amending ADR-0062). Record which behaviour the app shows, and check
+     that the app tells the user the same;
    - `flatpak update` from a baseline candidate (`rc.1`) to the release
      candidate keeps the data, and the new build replaces the old daemon,
      never the reverse; a release that changes the database schema tests
