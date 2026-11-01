@@ -54,6 +54,13 @@ Start from .agents/skills/TEMPLATE/SKILL.md. -->
   — socratic interview first, umbrella issue + `depends-on:` slice issues,
   evidence-shaped criteria, release slices at version boundaries, human
   approval before any issue is created (snowcat ADR-0066).
+- **Writing, accepting, amending or superseding an ADR (core or
+  repository-local)** →
+  [.agents/skills/frostyard-write-adr/SKILL.md](.agents/skills/frostyard-write-adr/SKILL.md)
+  — next free number, TEMPLATE, facts-only voice
+  ([ADR-0051](docs/adr/0051-adrs-state-facts-not-process.md)), two-way
+  links, index line, link-only maintenance
+  ([ADR-0033](docs/adr/0033-link-maintenance-in-immutable-adrs.md)).
 - **Scaffolding or updating a repo's docs/ tree, or retiring a legacy
   `yeti/`/`cairn/` tree** →
   [.agents/skills/frostyard-repo-docs/SKILL.md](.agents/skills/frostyard-repo-docs/SKILL.md)
