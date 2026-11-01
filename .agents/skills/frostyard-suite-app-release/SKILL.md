@@ -98,31 +98,49 @@ Promote, or change package visibility or secrets.
 
 ## Server track: the daemon's sysext
 
-1. **The `.deb` contract** (the app's repository; checked by its tests):
-   `frostyard-<name>`, built with nFPM (`make deb`), installs only under
-   `/usr` (an `/etc` default comes from `/usr/share/factory/etc/` through a
-   `tmpfiles.d` `C` rule); units start through an `Upholds=` drop-in and a
-   preset, an upheld unit has no `Condition*=` unless it is a
-   `RemainAfterExit=yes` oneshot, and no unit uses `RequiredBy=`; its own
-   `sysusers.d` file declares the groups it uses; snosi's base image
-   satisfies its `Depends:`.
+1. **The `.deb` contract** (the app's repository; its tests and snosi's
+   build guards check it): `frostyard-<name>`, built with nFPM
+   (`make deb`), installs only under `/usr` (an `/etc` default comes from
+   `/usr/share/factory/etc/` through a `tmpfiles.d` `C` rule) and ships no
+   file at a path snosi's base image ships; its own `sysusers.d` file
+   declares the groups it uses; an upheld unit has no `Condition*=` unless
+   it is a `Type=oneshot` with `RemainAfterExit=yes`; no unit uses
+   `RequiredBy=`; snosi's base image satisfies its `Depends:`. The
+   `Upholds=` drop-in and the preset are **not** in the `.deb`: snosi ships
+   them in the sysext (step 4).
 2. **Release.** The `vX.Y.Z` tag's `release.yml` attaches
    `frostyard-<name>_X.Y.Z_amd64.deb` to the GitHub release and attests it.
    Do not add a `publish-deb` dispatch: suite daemons are not APT producers.
 3. **Pin in snosi** (Murbella's repository). snosi's
-   `check-dependencies.yml` (`check-sysext-updates`) finds the release,
-   verifies its attestation (`gh attestation verify --source-ref
-   refs/tags/vX.Y.Z --deny-self-hosted-runners` against the app's
-   `release.yml`), and opens a checksum PR on
-   `shared/download/sysext-checksums.json`. Its merge builds the sysext,
-   repogen publishes it under `ext/<name>/`, and updex installs it on hosts
-   that enabled the feature. Updates take effect at the next boot. A suite
+   `check-dependencies.yml` (`check-sysext-updates`) runs weekly (Monday
+   09:00 UTC) or on dispatch, not on each release. It verifies the
+   attestation (`gh attestation verify --signer-workflow
+   <repository>/<workflow> --source-ref refs/tags/vX.Y.Z
+   --deny-self-hosted-runners`, from the checksum entry's `attestation`
+   object) and opens or updates the PR on branch
+   `auto-update-sysext-checksums`, which can carry other sysext updates. A
+   pin can also be made by hand in a snosi PR, by its owner. The merge to
+   snosi `main` builds the sysext, and repogen publishes it under
+   `ext/<name>/`. On hosts that enabled the feature, `updex-update.timer`
+   applies it at the next boot; an interactive `sudo updex features update`
+   merges it at once (`EXTENSION_RELOAD_MANAGER=1`, updex 2.1.3 or later),
+   and the running daemon keeps its old binary until it restarts. A suite
    release sends no `build` dispatch.
-4. **A new daemon** needs a snosi change first, by its owner: an
-   `mkosi.images/<name>/` sysext with the `.deb` as `KEYPACKAGE`, a
-   `sysext-checksums.json` entry with its `attestation` object, a
-   `required-paths.txt`, and its updex feature (shipped disabled). Ask
-   Murbella; do not open it from the app's side.
+4. **A new daemon** is a snosi change by its owner. Ask Murbella; do not
+   open it from the app's side. With `notesd` as the model, it needs:
+   `mkosi.images/<name>/mkosi.conf` (`KEYPACKAGE` and the full
+   `FinalizeScripts=` guard list); `mkosi.postinst.chroot`
+   (`verified_download`, `assert_deb_dependencies_satisfied`, `dpkg -i`);
+   `mkosi.extra/` with the `Upholds=` drop-in, the preset and
+   `extension-release.<name>` (`EXTENSION_RELOAD_MANAGER=1`);
+   `required-paths.txt` and the entry in the root `mkosi.conf` list; the
+   updex `<name>.feature` (`Enabled=false`) and `<name>.transfer` in the
+   **base** image, so hosts see the feature only after a new OS image; the
+   `sysext-checksums.json` entry with its `attestation` object, plus the
+   per-key check and `pin_attested` call in `check-dependencies.yml`
+   (without them no automatic pin PR comes); the checks in
+   `test/suite-sysexts-test.sh`; and its rows in snosi's
+   `docs/design/sysexts.md` and the suite lists.
 
 ## Pitfalls
 
