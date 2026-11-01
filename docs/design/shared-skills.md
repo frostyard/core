@@ -56,24 +56,34 @@ canonical `.agents/skills` path so all supported agents see the same content.
 ### Handling a sync pull request
 
 A sync pull request (`chore: sync agent skills from frostyard/core`, branch
-`chore/sync-core-skills`) carries content that was already reviewed in core.
-The repository's owner handles it with a tree check, not a cross-review:
+`chore/sync-core-skills`) carries content that was already reviewed and
+cross-reviewed in core. Brian made a standing exception to the cross-review
+rule for it on 2026-11-01: the repository's owner handles it with a tree
+check instead.
 
-1. Every file the pull request changes is under a managed skill directory
-   (`.agents/skills/<name>/`, or the physical path an `.agents` symlink
-   points to).
-2. Each managed file's blob SHA at the pull request's head equals the blob
-   SHA of the same file under `.agents/skills/` at core's current `main`
-   (the `.synced-from-core` markers excepted). For example, compare
-   `gh api repos/frostyard/core/git/trees/main?recursive=1` with the same
-   call on the consumer at the head SHA.
-3. The repository's CI is green at that head.
+1. Resolve the consumer's physical skills path first: `.agents/skills/`,
+   or the in-repository target of an `.agents` symlink (chairlift and
+   pilothouse use `docs/agents/skills/`).
+2. Every file the pull request changes lies under one of that consumer's
+   managed skill directories (`defaults` plus its extras in
+   [skills-sync.json](../../.github/skills-sync.json)).
+3. For each managed directory, the recursive tree entries at the pull
+   request's head equal those of `.agents/skills/<name>/` at core's current
+   `main`: the same relative paths, no extra and no missing entry (a file
+   that `rsync --delete` removed is absent on both sides), and the same
+   mode, type and object SHA per entry. `gh api
+   repos/OWNER/REPO/git/trees/SHA?recursive=1` lists `path`, `mode`, `type`
+   and `sha` for both sides. The `.synced-from-core` marker exists only on
+   the consumer side; check it separately: its content is the 2 lines
+   `scripts/lib/skills-sync-containment.sh` writes for that skill.
+4. The repository's CI is green at that head.
 
-When all 3 hold, the owner adds `ready-for-human`. A new push to the sync
+When all 4 hold, the owner adds `ready-for-human`. A new push to the sync
 branch (each core skill change force-updates it) means the label comes off
 until the check passes again at the new head. A pull request that fails the
 check is not edited on the reserved branch: fix core, or dispatch the sync
-again. Do not close a needed sync pull request; the next run reopens it.
+again. Do not close a needed sync pull request: the next run creates
+another one.
 
 ## References
 
