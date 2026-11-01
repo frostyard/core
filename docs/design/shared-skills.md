@@ -24,12 +24,14 @@ linked canonical skill rather than a copied version:
 | Skill | Use it for |
 | --- | --- |
 | [frostyard-acmm-conformance](../../.agents/skills/frostyard-acmm-conformance/SKILL.md) | Bringing a repository to Hive ACMM conformance |
+| [frostyard-apt-producer](../../.agents/skills/frostyard-apt-producer/SKILL.md) | Publishing a repository's `.deb` packages through apt-publisher |
 | [frostyard-design](../../.agents/skills/frostyard-design/SKILL.md) | Frostyard-branded interfaces and assets |
 | [frostyard-docs-site](../../.agents/skills/frostyard-docs-site/SKILL.md) | Adding an Astro documentation site |
 | [frostyard-go-repo](../../.agents/skills/frostyard-go-repo/SKILL.md) | Creating or conforming a Frostyard Go repository |
 | [frostyard-onboard-repo](../../.agents/skills/frostyard-onboard-repo/SKILL.md) | Onboarding an existing repository into core + snowcat |
 | [frostyard-plan-project](../../.agents/skills/frostyard-plan-project/SKILL.md) | Planning a multi-step project into sequenced Snowcat issues |
 | [frostyard-suite-app-release](../../.agents/skills/frostyard-suite-app-release/SKILL.md) | Releasing a suite app's Flatpak and its daemon's sysext |
+| [frostyard-write-adr](../../.agents/skills/frostyard-write-adr/SKILL.md) | Writing, accepting, amending or superseding an ADR |
 | [frostyard-repo-docs](../../.agents/skills/frostyard-repo-docs/SKILL.md) | Maintaining a repository's documentation tree |
 
 Core owns the canonical copy of every managed skill. A consumer directory with

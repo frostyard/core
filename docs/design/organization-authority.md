@@ -12,8 +12,12 @@ and [verification profiles](../specs/organization-verification-profiles.md), and
 
 The `organization/` tree is core's machine-readable organization authority.
 Humans change it through core pull requests; a deterministic validator proves
-that one complete Git revision conforms; Snowcat (the coordination service, named Fluent until 2026-08-18 — its ADR-0064) can then import that revision
-as an atomic authority snapshot. The implemented foundation covers repository
+that one complete Git revision conforms. Snowcat (the coordination service,
+named Fluent until 2026-08-18) imported such a revision as an atomic authority
+snapshot until its retirement
+([ADR-0064](../adr/0064-retire-snowcat.md)); no service imports the tree now,
+and it stays the reviewed record of which repositories the fleet maintains.
+The implemented foundation covers repository
 declarations, the canonical repository-surface contract, reusable
 verification-profile contracts, and executable Goal records.
 
@@ -22,12 +26,10 @@ core pull request
       |
       v
 strict organization/ tree -- npm run check:organization --> valid Git revision
-      |                                                          |
-      |                                                          v
-      +-----------------------------------------------> Snowcat snapshot import
                                                                  |
                                                                  v
-                                                      runtime enrollment state
+                              npm run check:fleet, scripts/apply-repo-settings.sh
+                              (the Snowcat snapshot import is retired, ADR-0064)
 ```
 
 ## Design
@@ -68,13 +70,14 @@ The `frostyard/core` declaration was deliberately `disabled` from its first
 revision through 2026-08-24 so it exercised the live registry without
 authorizing runtime participation. It is `enabled` since 2026-08-24, a
 distinct reviewed organization decision taken when this repository gained its
-own `policies/agent-governance.json`; core's maintenance now runs through
-Snowcat under the same gate as every other fleet repository.
+own `policies/agent-governance.json`. The `snowcat` and `snowcat-cockpit`
+declarations are `disabled` since 2026-11-01, when Snowcat was retired and
+both repositories were archived
+([ADR-0064](../adr/0064-retire-snowcat.md)).
 
-The authority tree and Snowcat runtime state are intentionally separate. A
-merged declaration is an input to a later import, not evidence that the
-snapshot was activated or the repository became available for work. Runtime
-holds, suspensions, leases, and work history remain Snowcat state.
+The authority tree and any runtime state are intentionally separate. A merged
+declaration was an input to a later Snowcat import, never evidence that the
+snapshot was activated or the repository became available for work.
 
 Repository-local governance remains at the canonical path named by the surface
 contract. Core owns its schema and common vocabulary, while each repository
@@ -103,7 +106,8 @@ contract.
 - Rationale:
   [ADR-0035](../adr/0035-author-organization-authority-as-strict-json.md),
   [ADR-0036](../adr/0036-publish-versioned-verification-profiles.md), and
-  [ADR-0037](../adr/0037-publish-executable-organization-goals.md)
+  [ADR-0037](../adr/0037-publish-executable-organization-goals.md);
+  Snowcat's retirement: [ADR-0064](../adr/0064-retire-snowcat.md)
 - Contracts:
   [repository enrollment](../specs/organization-repository-enrollment.md) and
   [verification profiles](../specs/organization-verification-profiles.md), and

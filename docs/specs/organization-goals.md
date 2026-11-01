@@ -6,6 +6,11 @@ by Snowcat. The executable schemas are
 `organization/schemas/v1/goal.schema.json`; this spec pins their canonical
 path, cross-record rules, and runtime interpretation.
 
+> **Consumer status:** Snowcat, the runtime consumer this spec names, is
+> retired ([ADR-0064](../adr/0064-retire-snowcat.md)); no service imports
+> the authority tree. The document contract and the validator rules stay
+> binding. The runtime rules that name Snowcat bind any future importer.
+
 ## Interface
 
 A Goal exists only at `organization/goals/<metadata.id>.json`:
@@ -130,7 +135,8 @@ Applicability has exactly one of these shapes:
 
 ## References
 
-- Rationale: [ADR-0037](../adr/0037-publish-executable-organization-goals.md)
+- Rationale: [ADR-0037](../adr/0037-publish-executable-organization-goals.md);
+  consumer retired: [ADR-0064](../adr/0064-retire-snowcat.md)
 - Context: [organization authority](../design/organization-authority.md) and
   [verification profiles](organization-verification-profiles.md)
 - Delivery: [organization authority rollout — Phases 2–3](../plans/0005-organization-authority-rollout.md)

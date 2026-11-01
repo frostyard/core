@@ -10,8 +10,6 @@
     "clix": ["frostyard-go-repo"],
     "std": ["frostyard-go-repo"],
     "intuneme": ["frostyard-go-repo"],
-    "firn": ["frostyard-go-repo"],
-    "snowcat": ["frostyard-design"],
-    "snowcat-cockpit": ["frostyard-go-repo"]
+    "firn": ["frostyard-go-repo"]
   }
 }

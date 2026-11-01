@@ -11,7 +11,7 @@
       "login": "bketelsen"
     }
   ],
-  "fleet_state": "enabled",
+  "fleet_state": "disabled",
   "maintenance_programs": [
     "quality",
     "ci",
