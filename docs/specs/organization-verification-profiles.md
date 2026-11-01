@@ -6,6 +6,11 @@ The JSON Schema in `organization/schemas/v1/verification-profile.schema.json`
 is the executable document contract; this spec pins its path and cross-field
 invariants.
 
+> **Consumer status:** Snowcat, the runtime consumer this spec names, is
+> retired ([ADR-0064](../adr/0064-retire-snowcat.md)); no service imports
+> the authority tree. The document contract and the validator rules stay
+> binding. The runtime rules that name Snowcat bind any future importer.
+
 ## Interface
 
 A verification profile exists only at
@@ -105,6 +110,7 @@ Each binding contains only a kebab-case `id` and positive integer `version`.
 ## References
 
 - Rationale:
-  [ADR-0036](../adr/0036-publish-versioned-verification-profiles.md)
+  [ADR-0036](../adr/0036-publish-versioned-verification-profiles.md);
+  consumer retired: [ADR-0064](../adr/0064-retire-snowcat.md)
 - Context: [organization authority](../design/organization-authority.md)
 - Consumer contract: [organization goals](organization-goals.md)

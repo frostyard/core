@@ -38,7 +38,8 @@ Core still treats both repositories as live:
 - No service imports the organization authority tree. The tree stays the
   reviewed record of which repositories the fleet maintains, and the
   validators, `npm run check:fleet`, and `scripts/apply-repo-settings.sh`
-  keep reading it.
+  keep reading it. The organization specs keep their document contracts;
+  their runtime rules that name Snowcat bind any future importer.
 
 ## Consequences
 
@@ -78,7 +79,9 @@ Core still treats both repositories as live:
 
 - Shapes: [design/organization-authority.md](../design/organization-authority.md),
   [design/skills-sync-operations.md](../design/skills-sync-operations.md),
-  [specs/organization-repository-enrollment.md](../specs/organization-repository-enrollment.md)
+  [specs/organization-repository-enrollment.md](../specs/organization-repository-enrollment.md),
+  [specs/organization-goals.md](../specs/organization-goals.md),
+  [specs/organization-verification-profiles.md](../specs/organization-verification-profiles.md)
 - Builds on: [ADR-0026](0026-distribute-core-skills-via-sync-prs.md),
   [ADR-0035](0035-author-organization-authority-as-strict-json.md),
   [ADR-0041](0041-retire-copilot-review-apply-where-snowcat-gates-review.md)
