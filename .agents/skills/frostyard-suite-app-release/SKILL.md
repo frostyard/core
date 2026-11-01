@@ -79,8 +79,12 @@ Promote, or change package visibility or secrets.
    - the core local workflow;
    - close and reopen the window (the daemon keeps working), log out and
      in (the daemon starts at login through the Background portal);
-     refuse the portal on a second VM: the daemon then starts with the
-     first window only and stops with the last;
+     refuse the portal on a second VM: only the start at login stops, so
+     the daemon starts with the app's first launch and, for a daemon that
+     works without a window, keeps running after the last window closes
+     until logout (ADR-0062). frostmail's accepted behaviour differs (maild
+     ends with the last window; frostmail ADR-0046): record which one the
+     app shows;
    - `flatpak update` from a baseline candidate (`rc.1`) to the release
      candidate keeps the data, and the new build replaces the old daemon,
      never the reverse; a release that changes the database schema tests
@@ -130,7 +134,9 @@ Promote, or change package visibility or secrets.
    (`make deb`), installs only under `/usr` and ships no file at a path
    snosi's base image ships (an example configuration goes under
    `/usr/share/<app>/`, as lodge's `config.example.json`); its own
-   `sysusers.d` file declares the groups it uses, user `lodge` included;
+   `sysusers.d` file declares its own service user, group `lodge` and the
+   memberships it needs (`lodge-apps`, `lodge-agents`), and also user
+   `lodge` (frostnotes' and frostmail's files do, per snosi T401a);
    its units install with `WantedBy=`; an upheld unit has no `Condition*=` unless
    it is a `Type=oneshot` with `RemainAfterExit=yes`; no unit uses
    `RequiredBy=`; snosi's base image satisfies its `Depends:`. The
