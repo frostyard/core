@@ -41,19 +41,19 @@ Start from .agents/skills/TEMPLATE/SKILL.md. -->
   — SDK-first layout, clix CLI, Makefile check gate, GoReleaser Pro + svu
   releases (extracted from updex).
 - **Onboarding an existing repository into the fleet (core declaration,
-  canonical surfaces, settings + merge queue, Snowcat enrollment and queue
-  opt-in, proven work loop)** →
+  canonical surfaces, mise and Makefile gate, settings + merge queue,
+  skills-sync enrollment)** →
   [.agents/skills/frostyard-onboard-repo/SKILL.md](.agents/skills/frostyard-onboard-repo/SKILL.md)
-  — agent drafts and probes, operator runs every state-changing command
+  — agent drafts and probes, Brian runs every state-changing command
   ([ADR-0040](docs/adr/0040-publish-the-repository-settings-contract.md),
   [ADR-0042](docs/adr/0042-adopt-a-merge-queue-on-the-default-branch.md),
   [enrollment spec](docs/specs/organization-repository-enrollment.md)).
-- **Planning a multi-step or multi-repo project into sequenced
-  Snowcat-importable issues** →
+- **Planning a multi-step or multi-repo project (a Desk plan thread)** →
   [.agents/skills/frostyard-plan-project/SKILL.md](.agents/skills/frostyard-plan-project/SKILL.md)
-  — socratic interview first, umbrella issue + `depends-on:` slice issues,
-  evidence-shaped criteria, release slices at version boundaries, human
-  approval before any issue is created (snowcat ADR-0066).
+  — socratic interview first, decisions as asks anchored to plan sections,
+  a task graph of one-PR tasks with evidence-shaped acceptance and release
+  tasks at version boundaries, Brian's approval of one revision, then
+  delivery and a whole-plan verification.
 - **Scaffolding or updating a repo's docs/ tree, or retiring a legacy
   `yeti/`/`cairn/` tree** →
   [.agents/skills/frostyard-repo-docs/SKILL.md](.agents/skills/frostyard-repo-docs/SKILL.md)

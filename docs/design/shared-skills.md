@@ -27,8 +27,8 @@ linked canonical skill rather than a copied version:
 | [frostyard-design](../../.agents/skills/frostyard-design/SKILL.md) | Frostyard-branded interfaces and assets |
 | [frostyard-docs-site](../../.agents/skills/frostyard-docs-site/SKILL.md) | Adding an Astro documentation site |
 | [frostyard-go-repo](../../.agents/skills/frostyard-go-repo/SKILL.md) | Creating or conforming a Frostyard Go repository |
-| [frostyard-onboard-repo](../../.agents/skills/frostyard-onboard-repo/SKILL.md) | Onboarding an existing repository into core + snowcat |
-| [frostyard-plan-project](../../.agents/skills/frostyard-plan-project/SKILL.md) | Planning a multi-step project into sequenced Snowcat issues |
+| [frostyard-onboard-repo](../../.agents/skills/frostyard-onboard-repo/SKILL.md) | Onboarding an existing repository into the fleet and the skills sync |
+| [frostyard-plan-project](../../.agents/skills/frostyard-plan-project/SKILL.md) | Planning a multi-step project into an approved task graph |
 | [frostyard-repo-docs](../../.agents/skills/frostyard-repo-docs/SKILL.md) | Maintaining a repository's documentation tree |
 
 Core owns the canonical copy of every managed skill. A consumer directory with
