@@ -14,7 +14,8 @@ A suite app ships on up to two tracks
   [frostyard/flatpak-index](https://github.com/frostyard/flatpak-index) only
   when its digest carries a build-provenance attestation from the app's
   release workflow on a `v*` tag. Desktop apps: frostnotes, frostmail,
-  frostread. Porter has no Flatpak.
+  frostread. frostread has no `flatpak.yml` yet (its plan 0002 adds it and
+  uses the candidate flow below). lodge and porter have no Flatpak.
 - **Server:** one sysext per daemon (`lodge`, `notesd`, `maild`, `readd`,
   `porterd`), built by snosi from the app's attested
   `frostyard-<name>_X.Y.Z_amd64.deb`. That `.deb` is a build input: it is
@@ -29,8 +30,12 @@ version is merged and its sysext published.
 The app's own `AGENTS.md` section "Releases and dependencies" and its
 release plan are the reference for that app. When they and this skill
 disagree, the app wins. Today frostmail runs the full candidate flow below
-(its plan 0013, Phases 8 to 10); frostnotes' `flatpak.yml` still publishes
-straight from the `vX.Y.Z` tag and moves `latest` after the attestation.
+(its plan 0013, Phases 8 to 10). frostnotes' `flatpak.yml` still publishes
+straight from the `vX.Y.Z` tag and moves `latest` after the attestation,
+with no candidate and no gate before the listing; whether it moves to the
+candidate flow is Brian's decision. Repositories without a candidate flow
+(frostnotes, lodge, porter, frostread today) release with `make bump`,
+which Brian runs: it tags `svu next` and pushes the tag.
 
 **Division of labour (fixed).** Brian pushes every tag (candidate and
 release), runs `make bump`, and runs `promote.yml`. Agents prepare the
@@ -59,14 +64,26 @@ Promote, or change package visibility or secrets.
    candidate's digest and serve it on the VM
    ([flatpak-index "Stage a candidate"](https://github.com/frostyard/flatpak-index#stage-a-candidate)).
    Run the checks ADR-0062's standalone contract requires and the app's plan
-   lists: nothing else frostyard is installed; install from the staged
-   remote; the core local workflow; close, reopen, log out and in (the
-   daemon and the Background portal); `flatpak update` from the previous
-   release keeps the data; each lodge mode the app offers, and mode changes
-   that move no data. A test in the build sandbox does not count: it has no
-   portals. Record each check with the digest, the date, the VM's image
-   version and the evidence path in the app's plan. A failed check blocks
-   the release; a waiver is Brian's decision, as an ask.
+   lists (the per-app lists are also in core Plan 0010):
+   - nothing else frostyard is installed (no lodge, Tailscale, host
+     daemon, sysext or other suite app);
+   - install from the staged remote;
+   - the core local workflow;
+   - close and reopen the window (the daemon keeps working), log out and
+     in (the daemon starts at login through the Background portal);
+     refuse the portal on a second VM: the daemon then starts with the
+     first window only and stops with the last;
+   - `flatpak update` from a baseline candidate (`rc.1`) to the release
+     candidate keeps the data, and the new build replaces the old daemon,
+     never the reverse; a release that changes the database schema tests
+     its migration in this gate;
+   - each lodge mode the app offers, and mode changes both ways: no data
+     moves or disappears, and no second daemon runs.
+
+   All checks pass on **one** candidate digest. A test in the build sandbox
+   does not count: it has no portals. Record each check with the digest, the
+   date, the VM's image version and the evidence path in the app's plan. A
+   failed check blocks the release; a waiver is Brian's decision, as an ask.
 4. **Release tag.** Brian runs `make bump CANDIDATE=vX.Y.Z-rc.N`: it verifies
    the candidate's commit and tags that same commit `vX.Y.Z`. The tag runs
    `release.yml`, which refuses a `vX.Y.Z` that is not a candidate's commit,
@@ -75,9 +92,11 @@ Promote, or change package visibility or secrets.
    `flatpak.yml` publishes no image for `vX.Y.Z`.
 5. **Promote.** Brian runs `promote.yml` with the candidate and the version.
    It builds and attests nothing: it copies the gated digest to `vX.Y.Z` and
-   `latest` (`skopeo copy --preserve-digests`), refuses a version tag that
-   already points elsewhere, and dispatches flatpak-index's `publish`
-   workflow with `FLATPAK_INDEX_DISPATCH_TOKEN`.
+   `latest` (`skopeo copy --preserve-digests`). It refuses a version tag that
+   already points elsewhere, a missing `vX.Y.Z` git tag or one on another
+   commit, and a candidate without an attestation from `flatpak.yml`. If
+   `FLATPAK_INDEX_DISPATCH_TOKEN` is set, it dispatches flatpak-index's
+   `publish` workflow.
 6. **Prove the listing.** flatpak-index's `publish` run is green, and
    `flatpak remote-ls --user --app --columns=application,version,commit frostyard`
    (or the deployed `index/static`) shows the version at the gated digest.
@@ -100,10 +119,11 @@ Promote, or change package visibility or secrets.
 
 1. **The `.deb` contract** (the app's repository; its tests and snosi's
    build guards check it): `frostyard-<name>`, built with nFPM
-   (`make deb`), installs only under `/usr` (an `/etc` default comes from
-   `/usr/share/factory/etc/` through a `tmpfiles.d` `C` rule) and ships no
-   file at a path snosi's base image ships; its own `sysusers.d` file
-   declares the groups it uses; an upheld unit has no `Condition*=` unless
+   (`make deb`), installs only under `/usr` and ships no file at a path
+   snosi's base image ships (an example configuration goes under
+   `/usr/share/<app>/`, as lodge's `config.example.json`); its own
+   `sysusers.d` file declares the groups it uses, user `lodge` included;
+   its units install with `WantedBy=`; an upheld unit has no `Condition*=` unless
    it is a `Type=oneshot` with `RemainAfterExit=yes`; no unit uses
    `RequiredBy=`; snosi's base image satisfies its `Depends:`. The
    `Upholds=` drop-in and the preset are **not** in the `.deb`: snosi ships
