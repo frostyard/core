@@ -1,133 +1,118 @@
 ---
 name: frostyard-onboard-repo
-description: Bring one existing repository into the frostyard fleet end to end — core declaration, canonical surfaces, settings and merge queue, Snowcat enrollment, queue opt-in, and a proven work loop — drafting every file and printing every state-changing command for the operator to run. Use whenever asked to onboard a repository, add a repo to the fleet, or enroll a repository in core or snowcat.
+description: Bring one existing repository into the frostyard fleet end to end — core declaration, canonical surfaces, the Makefile and mise gate, settings and merge queue, and skills-sync enrollment — drafting every file and printing every state-changing command for Brian to run, then proving each part. Use whenever asked to onboard a repository, add a repo to the fleet, declare a repository in core, or enroll a repository in the skills sync.
 ---
 
-# Onboard a repository into core + snowcat
+# Onboard a repository into the fleet
 
 Take one existing repository (code and CI already present) into the fleet:
 declared in core's organization authority, carrying the four canonical
-surfaces, conformant to the settings contract with a merge queue, `enrolled`
-in Snowcat's control plane, opted into the queue — and proven, not presumed:
-done means the engine has been observed running one work item for this
-repository. The reference this skill follows is the snowcat runbook's
-[Onboard a repository](https://github.com/frostyard/snowcat/blob/main/docs/design/queue-operations.md#onboard-a-repository)
-section.
+surfaces and the gate conventions, conformant to the settings contract with a
+merge queue, and receiving core's shared skills. Done means each part is
+observed, not presumed: `npm run check:fleet` reports the repository `ok`, a
+dry run of `apply-repo-settings.sh` reports no change, and the first
+skills-sync pull request exists in the repository.
 
-**Division of labor (fixed):** the agent drafts every file, opens every pull
-request, and runs read-only probes; the OPERATOR runs every state-changing
-command — ruleset apply, merge-queue rollout, core activation, snowcat
-toggles — from the exact command list this skill prints, in order. Never run
-those yourself. Out of scope: de-boarding (a repository leaves the fleet via
-a `disabled` declaration, retained forever, never deleted) and platform
-bootstrap (host, tailnet, tokens — the snowcat runbook's install sections
-own those).
+The Snowcat enrollment and queue steps this skill once had are gone: Snowcat
+is retired
+([core ADR-0064](https://github.com/frostyard/core/blob/main/docs/adr/0064-retire-snowcat.md)).
+
+**Division of labour (fixed).** The agent drafts every file, opens every pull
+request, and runs read-only probes. Brian runs every state-changing command
+on settings, rulesets, the merge queue and secrets, from the exact list this
+skill prints, in order, and merges the pull requests. The machine account
+never changes settings, rulesets, secrets or collaborators. Out of scope:
+leaving the fleet (a `disabled` declaration, retained, never deleted) and
+assigning the repository to an agent's roster (Brian's decision: an ask).
 
 ## Steps
 
-1. **Intake — one question at a time.** Collect: the `<owner>/<name>` slug;
-   public or private; the accountable owner(s) (GitHub logins/team slugs);
-   which maintenance programs the repository should declare, from exactly
-   `quality, ci, security, architecture, conformance, triage, dependencies,
-   docs, release` (an enabled declaration needs at least one); review gate
-   on (recommend on) and foreign-PR cure on (recommend off); the CI check
-   contexts to require on the default branch (e.g.
-   `"check (node 24),check (node 26)"` or Go equivalents); and any
-   skills-sync extras (`frostyard-go-repo` for a Go repository).
-2. **Audit, read-only.** Probe and report gaps before drafting anything:
-   - `gh api repos/<owner>/<name> --jq '{id,private,default_branch}'` — the
-     numeric id becomes the declaration's `repository_id` (as a string); for
-     a private repository, confirm the snowcat host's `SNOWCAT_GITHUB_TOKEN`
-     can read it, and note that the cure/review sweeps use GraphQL, which
-     needs the token even on public repositories.
-   - The four canonical surfaces at the default-branch head: `AGENTS.md`,
-     `policies/agent-governance.json`, `.agents/skills/` (**a real git tree
-     — the enrollment probe reads the tree API, where a symlink is a blob,
-     and refuses it**), `docs/README.md`; plus a root `Makefile` with
-     `verify`, `check`, and `ci` targets (ADR-0044) — for a Node repository,
-     targets that wrap its npm scripts. Missing docs shape or aliases →
-     run the `frostyard-repo-docs` / `frostyard-acmm-conformance` /
-     `frostyard-go-repo` skills first, as their own pull requests.
-   - Every CI workflow that triggers on `pull_request` also triggers on
-     `merge_group` — the merge-queue rollout refuses the repository
-     otherwise; a missing trigger is one workflow edit, drafted in step 3.
-3. **Draft the repository-side pull request.** One PR to the target
-   repository: `policies/agent-governance.json` started from core's valid
-   fixture (`organization/fixtures/v1/valid/repository-agent-governance.json`)
-   — the only per-repository content is the `protected_boundaries` paths;
-   every other field is fixed by the schema's constants — plus any missing
-   surfaces, aliases, or the `merge_group` trigger from the audit. The
-   operator reviews and merges (governance changes are review-required by
-   the very policy being added).
-4. **Draft the core pull request.** One PR to `frostyard/core`, three files:
-   - `organization/repositories/<owner>/<name>.json` — copy an existing
-     declaration (snowcat's is the fullest), set identity, owners,
-     `fleet_state: "enabled"`, the chosen programs, and the standard
-     six-action ceiling.
-   - `test/organization-validation.test.mjs` — bump `repositoryCount` (the
+1. **Intake, one question at a time.** Collect: the `owner/name` slug;
+   public or private; the accountable owner(s) (GitHub logins or team
+   slugs); the maintenance programs to declare, from exactly `quality, ci,
+   security, architecture, conformance, triage, dependencies, docs,
+   release` (start small: `quality, ci, dependencies, docs`); the CI check
+   contexts to require on the default branch (compare with `gh pr checks`
+   on a recent PR: a name no PR produces makes every merge wait forever);
+   and the skills-sync extras (`frostyard-go-repo` for a Go repository).
+
+2. **Audit, read-only.** Report the gaps before drafting anything:
+   - `gh api repos/OWNER/NAME --jq '{id,private,default_branch,archived}'`.
+     The numeric `id` becomes `repository_id` (a string). Refuse an archived
+     repository.
+   - The four canonical surfaces at the default-branch head
+     ([enrollment spec](https://github.com/frostyard/core/blob/main/docs/specs/organization-repository-enrollment.md)):
+     `AGENTS.md`, `policies/agent-governance.json`, `.agents/skills/` (a real
+     git tree, not a symlink: the tree API shows a symlink as a blob), and
+     `docs/README.md`.
+   - `mise.toml` and `mise.lock`
+     ([ADR-0043](https://github.com/frostyard/core/blob/main/docs/adr/0043-pin-repository-tools-in-mise-and-name-the-verify-gate.md)),
+     and a root `Makefile` with `verify`, `check` and `ci` targets
+     ([ADR-0044](https://github.com/frostyard/core/blob/main/docs/adr/0044-expose-the-make-gate-triad-in-every-repository.md)).
+   - Every workflow that runs on `pull_request` also runs on `merge_group`
+     ([ADR-0042](https://github.com/frostyard/core/blob/main/docs/adr/0042-adopt-a-merge-queue-on-the-default-branch.md));
+     the merge-queue rollout skips the repository otherwise.
+   - Missing docs shape or instruction aliases: run the
+     `frostyard-repo-docs` (and, if wanted, `frostyard-acmm-conformance` or
+     `frostyard-go-repo`) skills first, each as its own pull request.
+
+3. **Repository pull request.** One PR to the repository:
+   `policies/agent-governance.json` started from core's valid fixture
+   (`organization/fixtures/v1/valid/repository-agent-governance.json`; only
+   `protected_boundaries` is per repository), plus any missing surface,
+   `mise.toml`/`mise.lock`, Makefile targets, or `merge_group` trigger from
+   the audit. Brian reviews and merges it.
+
+4. **Core pull request.** One PR to `frostyard/core`:
+   - `organization/repositories/OWNER/NAME.json`: copy a current
+     declaration (for example `updex.json`), set the identity, owners,
+     `fleet_state: "enabled"`, the programs and the action ceiling.
+   - `test/organization-validation.test.mjs`: bump `repositoryCount` (the
      count is pinned; `npm test` fails otherwise).
-   - `.github/skills-sync.json` — add the repository with its extras so it
-     receives the shared skills.
-   Run core's `npm ci && npm run check` before opening. The operator merges.
-5. **Print the settings commands.** From a core checkout, for the operator
-   (dry-run first — the script prints `WOULD` lines and touches nothing):
+   - `.github/skills-sync.json`: add the repository with its extras.
+   Run `npm ci && npm run check` and `npm run check:fleet` (it fetches the
+   new repository's `mise.toml`, `mise.lock` and verify gate) before opening.
+   Ask Brian, in the report's asks, to give the `ORG_PAT` secret access to
+   the repository before this PR merges: the skills sync clones and pushes
+   with it ([design/skills-sync-operations.md](https://github.com/frostyard/core/blob/main/docs/design/skills-sync-operations.md)).
 
-       scripts/apply-repo-settings.sh <owner>/<name> --required-checks "<ctx>[,<ctx>…]"
-       scripts/apply-repo-settings.sh <owner>/<name> --required-checks "…" --apply
-       scripts/rollout-merge-queue.sh <owner>/<name> --apply
+5. **Print the settings commands for Brian.** From a core checkout, dry run
+   first (the scripts print `WOULD` lines and change nothing):
 
-   This applies the settings contract (ADR-0040) and merge queue (ADR-0042)
-   and creates the `snowcat` import label the timers depend on. The script
-   never writes a LICENSE or description — relay its `NOTE` lines.
-6. **Print the host activation sequence.** After both PRs merge, for the
-   operator on the snowcat host (`set -a; . /etc/snowcat/env; set +a`
-   first):
+       scripts/apply-repo-settings.sh OWNER/NAME --required-checks "CTX[,CTX…]"
+       scripts/apply-repo-settings.sh OWNER/NAME --required-checks "CTX[,CTX…]" --apply
+       scripts/rollout-merge-queue.sh OWNER/NAME
+       scripts/rollout-merge-queue.sh OWNER/NAME --apply
 
-       npm run --silent control -- metadata            # note lastTransactionSequence
-       npm run --silent core -- activate <lastTransactionSequence>
-       npm run --silent repository -- status           # want "effectiveState": "enrolled"
+   They apply the settings contract
+   ([ADR-0040](https://github.com/frostyard/core/blob/main/docs/adr/0040-publish-the-repository-settings-contract.md))
+   and the merge queue. Use `--required-check "NAME"` (repeatable) for a
+   context that contains a comma, such as a matrix job. The scripts never
+   write a LICENSE or description: relay their `NOTE` lines as PRs or asks.
 
-   `core -- activate` runs the reconciliation pass itself;
-   `npm run --silent repository -- reconcile` re-runs it and converges. A
-   state other than `enrolled` names what is missing (`awaiting-surfaces`,
-   `surface-held`, `github-held`, …); `npm run --silent core -- readiness`
-   explains a refusal to activate.
-7. **Print the queue opt-in and gates** (the toggles require the opt-in
-   first):
-
-       npm run --silent queue -- opt-in <owner>/<name>
-       npm run --silent queue -- review-gate <owner>/<name> on
-       npm run --silent queue -- cure-foreign <owner>/<name> on   # only if chosen
-
-8. **Verify: prove the loop.** Onboarding is done only when observed:
-   - `npm run --silent queue -- seed-dogfood --enrolled` (or the 00:15 UTC
-     timer) creates discovery roots for exactly the declared programs — an
-     enrolled repository missing the opt-in is reported `notOptedIn`.
-   - One item is claimed and completed
-     (`npm run --silent queue -- watch --repository <owner>/<name>`, or the
-     `/progress` page); with the gate on, its draft pull request passes a
-     review round and the artifact verifies.
-   - Optionally, label one issue `snowcat` and watch the 15-minute import
-     propose it.
-   Report the evidence (item ids, event sequences, PR URLs) back to the
-   operator; the fleet's timers handle everything from here.
+6. **Prove it.** After both PRs merge and Brian ran step 5:
+   - `npm run check:fleet` in core reports `ok OWNER/NAME`.
+   - The dry run of `apply-repo-settings.sh` with the same checks prints no
+     `WOULD` line.
+   - The next skills-sync run (a dispatch, the Monday cron, or the merge of
+     the core PR) opens `chore: sync agent skills from frostyard/core` in the
+     repository, and its CI is green.
+   Report the run URLs and PR links.
 
 ## Pitfalls
 
-- **The declaration count test.** Core's `npm test` pins `repositoryCount`;
-  a declaration PR without the test bump fails CI.
-- **Toggles before opt-in.** `review-gate`/`cure-foreign` fail with
-  `repository is not opted in: <slug>` until `queue -- opt-in` has run.
-- **`SNOWCAT_CONTROL_DB` set before enrollment.** With the variable set,
-  `claim_work` returns `null` for any repository not yet `enrolled` — items
-  look stuck. Check `repository -- status` before suspecting the queue.
-- **`.agents/skills` as a symlink.** Fine for local tooling, fatal for
-  enrollment: the surface probe requires a real tree at the head.
-- **Missing `merge_group` trigger.** `rollout-merge-queue.sh` skips the
-  repository and exits nonzero; fix CI first (step 2's audit catches it).
-- **Declaring programs the repository can't sustain.** Every declared
-  program seeds discovery work on its own cadence; start with the small set
-  (`quality, ci, dependencies, docs` is the fleet's floor) and widen by a
-  later core PR.
-- **Deleting a declaration.** Never — a repository that leaves the fleet is
-  set `fleet_state: "disabled"` and retained.
+- **The declaration count test.** A declaration PR without the
+  `repositoryCount` bump fails core's CI.
+- **`.agents/skills` as a symlink.** Fine for local tools; the surface
+  check needs a real tree. The skills sync follows an in-repository symlink
+  (chairlift and pilothouse point `.agents` at `docs/agents`).
+- **Missing `merge_group` trigger.** Every queue entry waits for checks that
+  never run; fix CI before the merge queue.
+- **Required checks that no PR produces.** Merges block until the check
+  times out; copy the names from `gh pr checks`.
+- **`ORG_PAT` without access** to the new repository: the sync fails for it
+  (since core#177, the run is red, naming the repository).
+- **Deleting a declaration.** Never. A repository that leaves the fleet is
+  set `fleet_state: "disabled"` and kept.
+- **Declaring programs the repository cannot sustain.** Start with the small
+  set and widen with a later core PR.
