@@ -12,6 +12,15 @@
     "intuneme": ["frostyard-go-repo"],
     "firn": ["frostyard-go-repo"],
     "snowcat": ["frostyard-design"],
-    "snowcat-cockpit": ["frostyard-go-repo"]
+    "snowcat-cockpit": ["frostyard-go-repo"],
+    "nsl": ["frostyard-go-repo"],
+    "frostmail": [],
+    "frostnotes": [],
+    "lodge": [],
+    "porter": [],
+    "frostread": [],
+    "testsuite": [],
+    "frostyard-org": [],
+    "apt-publisher": []
   }
 }

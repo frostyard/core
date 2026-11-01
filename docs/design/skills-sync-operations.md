@@ -50,9 +50,14 @@ skills, but edits within a managed skill are replaced on the next sync.
   script does not accept another owner or an arbitrary clone URL.
 
 Only keys present in `repos` are consumers. The live file is authoritative;
-it includes `chairlift`, `clix`, `firn`, `intuneme`, `lab`, `pilothouse`,
-`repogen`, `snosi`, `std`, and `updex`. Firn receives the
-`frostyard-go-repo` extra in addition to the default skills. A regular
+it includes `apt-publisher`, `chairlift`, `clix`, `firn`, `frostmail`,
+`frostnotes`, `frostread`, `frostyard-org`, `intuneme`, `lab`, `lodge`,
+`nsl`, `pilothouse`, `porter`, `repogen`, `snosi`, `std`, `testsuite`, and
+`updex`. The Go repositories built in the updex pattern (`chairlift`,
+`clix`, `firn`, `intuneme`, `nsl`, `pilothouse`, `repogen`, `std`, `updex`)
+receive the `frostyard-go-repo` extra in addition to the default skills.
+`apt-publisher` is private: the token needs access to it like any other
+consumer. A regular
 `.agents/` directory and a `.agents` symlink are both supported: the script
 resolves the physical target before writing or staging files.
 
