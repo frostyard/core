@@ -81,6 +81,7 @@ no ADR, spec, or plan covers yet.
 - [0063 — Uphold notesd's service as well as its socket](adr/0063-uphold-notesds-service-as-well-as-its-socket.md)
 - [0064 — Retire Snowcat](adr/0064-retire-snowcat.md)
 - [0065 — Let a suite daemon end with the last window when the Background portal is refused](adr/0065-let-a-suite-daemon-end-with-the-last-window-when-the-portal-is-refused.md)
+- [0066 — Build only the omarchy-apps packages that Snosi uses](adr/0066-build-only-the-omarchy-apps-packages-that-snosi-uses.md)
 
 ### Design
 
