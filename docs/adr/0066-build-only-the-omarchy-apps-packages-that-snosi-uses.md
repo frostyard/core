@@ -15,12 +15,12 @@
 The twelve were built for Snosi's flurry desktop, an Omarchy replica.
 frostyard/snosi#908 removed the flurry image on 2026-08-31.
 
-On 2026-11-02 the only Frostyard references to these packages outside
-omarchy-apps, frostyard/apt-publisher's registration and the ADRs are:
+On 2026-11-02 the remaining Frostyard consumers of these packages are two
+Snosi sysexts:
 
 - `voxtype`: Snosi's `mkosi.images/voxtype/mkosi.conf`
-  (`Packages=voxtype`), its `sysupdate.voxtype.d` transfer, and the
-  frostyard.org page `docs/sysexts/voxtype`.
+  (`Packages=voxtype`) and `required-paths.txt`, its `sysupdate.voxtype.d`
+  transfer, and the frostyard.org page `docs/sysexts/voxtype`.
 - `moonlight-qt`: Snosi's `mkosi.images/moonlight/mkosi.conf`
   (`Packages=moonlight-qt`) and `required-paths.txt`, and the frostyard.org
   page `docs/sysexts/moonlight`.
