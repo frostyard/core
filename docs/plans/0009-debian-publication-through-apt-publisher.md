@@ -151,14 +151,19 @@ Snosi `dd0def7`, 2026-10-02):
     `incus-ui-canonical` exists only here.
 - [x] **omarchy-apps.** Governed by
   [ADR-0060](../adr/0060-publish-omarchy-apps-through-the-apt-publisher.md)
-  and [ADR-0066](../adr/0066-build-only-the-omarchy-apps-packages-that-snosi-uses.md).
+  [ADR-0066](../adr/0066-build-only-the-omarchy-apps-packages-that-snosi-uses.md)
+  and [ADR-0067](../adr/0067-publish-omarchy-apps-on-change-and-keep-the-newest-two.md).
   Shipped twelve Omarchy apps until 2026-11-02; since ADR-0066 it builds
   only `voxtype` and `moonlight-qt` (Snosi's sysexts). The other ten served
   the flurry desktop, which Snosi removed.
-  - Each push to `main` builds its amd64 packages in `debian:trixie`,
-    publishes a GitHub release `main-<UTC time>-<short sha>` of exactly
-    those `.deb` files, then requests `trixie` (frostyard/omarchy-apps#2).
-    The repository holds no signing key and no bucket credentials.
+  - A push to `main` builds, in `debian:trixie`, the amd64 packages whose
+    inputs changed (ADR-0067), publishes a GitHub release
+    `main-<UTC time>-<short sha>` of exactly those `.deb` files, then
+    requests `trixie` (frostyard/omarchy-apps#2). A push that changes no
+    app's inputs publishes nothing. The repository holds no signing key and
+    no bucket credentials.
+  - Its registration keeps the newest two versions of each package
+    (`keep` 2, ADR-0067).
   - Registered by exact package names, `trixie` only, `attested=no`
     (frostyard/apt-publisher#12).
     - Its versions carry no `~deb13` marker.
@@ -293,8 +298,9 @@ until that queue is processed.
 - Implements: [Debian publication](../design/debian-publication.md)
 - Governed by: [ADR-0055](../adr/0055-publish-debian-packages-through-the-apt-publisher.md),
   [ADR-0056](../adr/0056-rebuild-images-after-apt-publication.md);
-  omarchy-apps by [ADR-0060](../adr/0060-publish-omarchy-apps-through-the-apt-publisher.md)
-  and [ADR-0066](../adr/0066-build-only-the-omarchy-apps-packages-that-snosi-uses.md)
+  omarchy-apps by [ADR-0060](../adr/0060-publish-omarchy-apps-through-the-apt-publisher.md),
+  [ADR-0066](../adr/0066-build-only-the-omarchy-apps-packages-that-snosi-uses.md)
+  and [ADR-0067](../adr/0067-publish-omarchy-apps-on-change-and-keep-the-newest-two.md)
 - Replaces: [Plan 0006](0006-nbc-retirement-and-debian-suite-migration-fast-path.md),
   [Plan 0007](0007-support-suites-in-repogen.md)
 - Coordinates with: [Plan 0008](0008-post-nbc-bootc-only-transition.md)

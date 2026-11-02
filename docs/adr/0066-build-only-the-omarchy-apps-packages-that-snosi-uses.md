@@ -84,6 +84,7 @@ apt-publisher, `trixie` only, `attested=no`, a release on each push to
 
 ## References
 
+- Amended in part by: [ADR-0067](0067-publish-omarchy-apps-on-change-and-keep-the-newest-two.md)
 - Amends in part: [ADR-0060](0060-publish-omarchy-apps-through-the-apt-publisher.md)
 - Builds on: [ADR-0055](0055-publish-debian-packages-through-the-apt-publisher.md)
 - Shapes: [Plan 0009](../plans/0009-debian-publication-through-apt-publisher.md)

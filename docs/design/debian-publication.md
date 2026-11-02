@@ -31,8 +31,13 @@ producer repository:
 
 - the package-name globs it may publish;
 - the codenames it may publish to;
-- whether its `.deb` files must carry build-provenance attestations; and
-- which repositories receive a `build` dispatch after a successful publish.
+- whether its `.deb` files must carry build-provenance attestations;
+- which repositories receive a `build` dispatch after a successful publish;
+- its component (`main` or `image`); and
+- how many versions of each package it keeps (`keep`: a count, or `-` for
+  all). A publication of a producer with a count removes the older versions
+  from the index in the same snapshot
+  ([ADR-0067](../adr/0067-publish-omarchy-apps-on-change-and-keep-the-newest-two.md)).
 
 `config/codenames.tsv` maps each codename to its Debian major version and
 architectures (`amd64`, `arm64`, `all`). A `~debNN` or `+debNN` version
@@ -121,7 +126,8 @@ the repository paths that never change under the same name.
 
 - Rationale: [ADR-0055](../adr/0055-publish-debian-packages-through-the-apt-publisher.md),
   [ADR-0056](../adr/0056-rebuild-images-after-apt-publication.md),
-  [ADR-0014](../adr/0014-single-gpg-trust-root.md)
+  [ADR-0014](../adr/0014-single-gpg-trust-root.md),
+  [ADR-0067](../adr/0067-publish-omarchy-apps-on-change-and-keep-the-newest-two.md) (retention count)
 - Contracts: [apt-publisher README](https://github.com/frostyard/apt-publisher/blob/main/README.md)
 - Built in: [Plan 0009](../plans/0009-debian-publication-through-apt-publisher.md)
 - Accepted, not yet built: [ADR-0059](../adr/0059-publish-image-only-packages-in-a-separate-apt-component.md)

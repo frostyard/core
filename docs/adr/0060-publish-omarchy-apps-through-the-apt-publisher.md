@@ -74,7 +74,8 @@ to disable Actions and to archive the repository no longer apply.
 ## References
 
 - Supersedes: [ADR-0049](0049-retire-omarchy-apps-without-breaking-snosi.md)
-- Amended in part by: [ADR-0066](0066-build-only-the-omarchy-apps-packages-that-snosi-uses.md)
+- Amended in part by: [ADR-0066](0066-build-only-the-omarchy-apps-packages-that-snosi-uses.md),
+  [ADR-0067](0067-publish-omarchy-apps-on-change-and-keep-the-newest-two.md)
 - Builds on: [ADR-0055](0055-publish-debian-packages-through-the-apt-publisher.md),
   [ADR-0056](0056-rebuild-images-after-apt-publication.md)
 - Related: [ADR-0059](0059-publish-image-only-packages-in-a-separate-apt-component.md)

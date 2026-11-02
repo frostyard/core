@@ -191,6 +191,7 @@ This ADR supersedes ADR-0048 and ADR-0054, and supersedes ADR-0009 in part
 
 ## References
 
+- Amended in part by: [ADR-0067](0067-publish-omarchy-apps-on-change-and-keep-the-newest-two.md)
 - Shapes: [Debian publication](../design/debian-publication.md),
   [Plan 0009](../plans/0009-debian-publication-through-apt-publisher.md)
 - Implemented in: [`frostyard/apt-publisher`](https://github.com/frostyard/apt-publisher)
