@@ -150,10 +150,12 @@ Snosi `dd0def7`, 2026-10-02):
   - Its epoch makes apt prefer it over Debian's incus, and
     `incus-ui-canonical` exists only here.
 - [x] **omarchy-apps.** Governed by
-  [ADR-0060](../adr/0060-publish-omarchy-apps-through-the-apt-publisher.md).
-  Ships twelve Omarchy apps, among them `voxtype` and
-  `moonlight-qt` (Snosi's sysexts) and the flurry desktop's apps.
-  - Each push to `main` builds all twelve amd64 packages in `debian:trixie`,
+  [ADR-0060](../adr/0060-publish-omarchy-apps-through-the-apt-publisher.md)
+  and [ADR-0066](../adr/0066-build-only-the-omarchy-apps-packages-that-snosi-uses.md).
+  Shipped twelve Omarchy apps until 2026-11-02; since ADR-0066 it builds
+  only `voxtype` and `moonlight-qt` (Snosi's sysexts). The other ten served
+  the flurry desktop, which Snosi removed.
+  - Each push to `main` builds its amd64 packages in `debian:trixie`,
     publishes a GitHub release `main-<UTC time>-<short sha>` of exactly
     those `.deb` files, then requests `trixie` (frostyard/omarchy-apps#2).
     The repository holds no signing key and no bucket credentials.
@@ -292,6 +294,7 @@ until that queue is processed.
 - Governed by: [ADR-0055](../adr/0055-publish-debian-packages-through-the-apt-publisher.md),
   [ADR-0056](../adr/0056-rebuild-images-after-apt-publication.md);
   omarchy-apps by [ADR-0060](../adr/0060-publish-omarchy-apps-through-the-apt-publisher.md)
+  and [ADR-0066](../adr/0066-build-only-the-omarchy-apps-packages-that-snosi-uses.md)
 - Replaces: [Plan 0006](0006-nbc-retirement-and-debian-suite-migration-fast-path.md),
   [Plan 0007](0007-support-suites-in-repogen.md)
 - Coordinates with: [Plan 0008](0008-post-nbc-bootc-only-transition.md)
