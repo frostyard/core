@@ -86,9 +86,11 @@ Everything else in those ADRs stands.
 - `trixie` lists at most two versions of each omarchy-apps package after its
   first publication with the count. A host that installed an older version
   keeps it, but apt cannot install that version again.
-- A version that the count removed comes back only through a rollback to an
-  earlier snapshot. Republishing its release is refused while two newer
-  versions are listed. A withdrawal of the newest version leaves one.
+- A version that the count removed comes back through a rollback to an
+  earlier snapshot that lists it, or through a republication of its release
+  once it is within the newest two again, for example after a withdrawal of a
+  newer version. Republishing it is refused while two newer versions are
+  listed. A withdrawal of the newest version leaves one.
 - Other producers keep every version until their registration sets a count.
 
 ## Alternatives considered
