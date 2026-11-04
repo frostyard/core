@@ -1,6 +1,7 @@
 # Quality loop
 
 Living document. Rationale:
+[ADR-0018](../adr/0018-org-wide-agent-instruction-and-knowledge-surfaces.md),
 [ADR-0019](../adr/0019-governance-as-code-and-risk-tiers.md),
 [ADR-0029](../adr/0029-acmm-conformance-via-canonical-aliases.md).
 Contracts: [specs/pr-review-rubric.md](../specs/pr-review-rubric.md),
@@ -55,6 +56,21 @@ PR template ──► review rubric ──► CI gates ──► corrections ─
   [.memory/corrections.jsonl](../../.memory/README.md) (append-only,
   five-field schema, ADR-0018) and are promoted into `AGENTS.md`, docs, or
   skills; promotion is the only sanctioned duplication.
+  `scripts/check-corrections.mjs` (`npm run check:corrections`, part of
+  `make verify`) validates every line; with `--base <ref>` it also enforces
+  append-only, where the only allowed change to an existing line is an empty
+  `promoted_to` that is filled.
+  - **Blocker to guard.** When a review (cross-review, owner review, or a
+    human) finds a blocking point, the PR that fixes it also adds a guard in
+    the same PR: a targeted test that fails without the fix (preferred), or
+    an `AGENTS.md` rule when no test can catch it. The same PR appends one
+    line to `.memory/corrections.jsonl`: `evidence` names the PR and the
+    review, and `promoted_to` names the test or the rule.
+  - **Lessons live in the repository.** A lesson about one repository goes
+    into that repository by PR — a test, an `AGENTS.md` rule, or a
+    corrections line — so other agents, other tools, and humans see it.
+    Agent-private memory keeps only an agent's role, its owner's
+    preferences, lessons that span repositories, and facts of one machine.
 - **Enforce mechanically** — [.claude/settings.json](../../.claude/settings.json)
   denies the ADR-0019 forbidden acts at the tool layer: merging PRs
   (`gh pr merge`), approving own work (`gh pr review --approve`), publishing
@@ -79,7 +95,8 @@ copy it as-is.
 
 ## References
 
-- Rationale: [ADR-0019](../adr/0019-governance-as-code-and-risk-tiers.md),
+- Rationale: [ADR-0018](../adr/0018-org-wide-agent-instruction-and-knowledge-surfaces.md),
+  [ADR-0019](../adr/0019-governance-as-code-and-risk-tiers.md),
   [ADR-0021](../adr/0021-sha-pinned-actions-and-least-privilege-ci.md),
   [ADR-0029](../adr/0029-acmm-conformance-via-canonical-aliases.md),
   [ADR-0043](../adr/0043-pin-repository-tools-in-mise-and-name-the-verify-gate.md),
