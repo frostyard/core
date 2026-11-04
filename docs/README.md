@@ -103,6 +103,7 @@ no ADR, spec, or plan covers yet.
 - [Organization goals](specs/organization-goals.md)
 - [Stable repository drift alarm](specs/stable-repository-drift-alarm.md)
 - [Risk paths](specs/risk-paths.md)
+- [Flaky-test scan](specs/flaky-test-scan.md)
 
 ### Plans
 
