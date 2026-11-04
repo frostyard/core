@@ -21,6 +21,9 @@ Contract:
 - Never record credentials or non-public vulnerability details.
 - `scripts/check-corrections.mjs` validates this file in `make verify`;
   `node scripts/check-corrections.mjs --base origin/main` also checks that
-  existing lines are unchanged except a filled `promoted_to`. A blocking
+  existing lines are unchanged except a filled `promoted_to`.
+  `scripts/corrections-report.mjs` is the weekly promotion report for local
+  checkouts ([quality loop](../docs/design/quality-loop.md), Learn station).
+  A blocking
   review point adds a line here in the PR that fixes it
   ([quality loop](../docs/design/quality-loop.md), Learn station).
