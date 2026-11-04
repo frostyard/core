@@ -286,6 +286,11 @@ test("remote identity keeps the host and the full path", () => {
   assert.equal(parseRemoteUrl("git@git.example.net:frostyard/core.git"), "git.example.net/frostyard/core");
   assert.equal(parseRemoteUrl("https://gitlab.com/group/sub/core.git"), "gitlab.com/group/sub/core");
   assert.notEqual(parseRemoteUrl("https://gitlab.com/group/sub/core.git"), parseRemoteUrl("https://gitlab.com/other/sub/core.git"));
+  assert.equal(parseRemoteUrl("ssh://git@github.com:22/frostyard/core.git"), "frostyard/core");
+  assert.equal(parseRemoteUrl("https://git.example.net:443/team/core.git"), "git.example.net/team/core");
+  assert.equal(parseRemoteUrl("https://git.example.net:8443/team/core.git"), "git.example.net:8443/team/core");
+  assert.notEqual(parseRemoteUrl("https://git.example.net:8443/team/core.git"), parseRemoteUrl("https://git.example.net:9443/team/core.git"));
+  assert.equal(parseRemoteUrl("ssh://git@git.example.net:2222/team/core.git"), "git.example.net:2222/team/core");
   assert.equal(parseRemoteUrl("/srv/git/core.git"), null);
   assert.equal(parseRemoteUrl("file:///srv/git/core.git"), null);
 });

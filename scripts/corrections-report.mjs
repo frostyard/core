@@ -46,7 +46,11 @@ export function parseRemoteUrl(value) {
   } else {
     try {
       const url = new URL(remote);
-      host = url.hostname;
+      // A non-default port is part of the identity: 2 ports are 2 servers.
+      // URL already drops 80 and 443 for http(s); ssh is not a special
+      // scheme, so its default 22 is dropped here.
+      const port = url.port && !(url.protocol === "ssh:" && url.port === "22") ? `:${url.port}` : "";
+      host = `${url.hostname}${port}`;
       path = decodeURIComponent(url.pathname);
     } catch {
       return null;
