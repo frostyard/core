@@ -66,4 +66,5 @@ shared vocabulary for how much scrutiny a change deserves.
   [ADR-0051](0051-adrs-state-facts-not-process.md), which places a review
   rubric check for ADR voice alongside this ADR's rubric, and
   [ADR-0068](0068-label-pull-requests-that-touch-high-risk-paths.md), which
-  labels PRs that touch a repository's high-risk paths
+  labels PRs that touch a repository's high-risk paths (contract:
+  [specs/risk-paths.md](../specs/risk-paths.md))

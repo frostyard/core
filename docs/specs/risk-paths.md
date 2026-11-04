@@ -40,11 +40,13 @@ Validation is deny-by-default (ADR-0019). An unknown key at any level fails. Ano
 - `{a,b,c}` matches 1 of the comma-separated alternatives. Nesting is not supported. An empty alternative is not supported.
 - A dotfile or dot folder matches like any other name. `*` matches `.env`.
 - Character classes (`[...]`), negation (`!`), backslash escapes and `**` mixed with other characters in 1 segment, such as `a**`, are not supported. Validation fails for these forms.
-- A glob with no `/` matches only at the root. Use `**/name` to match that name anywhere.
+- A glob with no `/` matches only at the root. Use `**/name` to match that name anywhere. The glob `**` alone is the exception: it matches every path.
 
 | Glob | Matches | Does not match |
 | --- | --- | --- |
 | `**/x` | `x`, `a/x`, `a/b/x` | `a/x/y` |
+| `**` | `x`, `a/b`, `.github/x.yml` | (nothing) |
+| `x*` | `x`, `xy` | `a/x`, `a/xy` |
 | `docs/*.md` | `docs/a.md`, `docs/.md` | `docs/a/b.md`, `src/a.md` |
 | `shared/**` | `shared/a`, `shared/a/b` | `other/a` |
 | `.github/{risk-paths.json,settings.yml}` | `.github/risk-paths.json`, `.github/settings.yml` | `.github/workflows/ci.yml` |
@@ -68,7 +70,7 @@ Where the repository has a governance policy with protected boundaries, the `why
 - Core uses `protected_boundaries[].id` in `policies/agent-governance.json`.
 - Snosi uses `protectedBoundaries[]` in `policies/agent-governance.json`.
 
-The validator checks only that `why` is non-empty. A review checks the category or boundary name.
+The validator checks the constraints of the field table (a string, non-empty after trim, at most 200 characters). A review checks the category or boundary name.
 
 ### C. Required entries
 
@@ -89,7 +91,7 @@ A PR matches when at least 1 changed path matches at least 1 glob.
 
 The reusable workflow is `frostyard/core/.github/workflows/risk-paths.yml`, with `on: workflow_call`.
 
-- The caller runs on `pull_request_target` with types `opened`, `synchronize` and `reopened`.
+- The caller runs on `pull_request_target` with types `opened`, `synchronize`, `reopened` and `edited`. An `edited` event includes a change of the base branch: the job then reads the list at the new base SHA and matches the current file list. The job runs the same steps on every listed type.
 - The caller pins the reusable workflow to a full 40-character core commit SHA (ADR-0021).
 - The caller has no `merge_group` trigger.
 - The caller is not a required check.
