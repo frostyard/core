@@ -82,10 +82,10 @@ write exists.
 | `repos[].owner` | string or `null` | The agent profile that lists the repository; `null` for a `--repo` that no profile lists |
 | `repos[].runs` | integer or `null` | Workflow runs created in the window, at most 1,000 (the runs API returns no more for 1 query); `null` when the read failed |
 | `repos[].rerunAttempts` | integer or `null` | Sum over those runs of `run_attempt − 1`; `null` when the read failed |
-| `repos[].error` | string or `null` | Why the repository could not be read, or the first failed write |
+| `repos[].error` | string or `null` | Why the repository could not be read, or the first failed write or issue-comment read (the scan goes on with the next key) |
 | `repos[].flaky[].key` | string | `repo/workflow/job/test` |
 | `repos[].flaky[].action.type` | string | `open`, `comment`, `none` (no new event) or `skip` |
-| `repos[].flaky[].action.reason` | string or `null` | `cap` for a skip over a cap; the error of a failed write |
+| `repos[].flaky[].action.reason` | string or `null` | `cap` for a skip over a cap; the error of a failed write or comment read |
 
 ## Rules
 

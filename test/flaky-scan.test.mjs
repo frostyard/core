@@ -68,27 +68,31 @@ test("detection: rerun and later run on the same SHA", () => {
   assert.equal(detectFlakyEvents([first, later], laterJobs).length, 1);
 });
 
-test("detection: SHA differs, success then failure, and standalone attempts", async () => {
+test("detection: cross-SHA, success-then-failure, and standalone attempts", async () => {
   const shaA = "a".repeat(40);
   const shaB = "b".repeat(40);
-  assert.equal(detectFlakyEvents([
+
+  const crossShaRuns = [
     run({ id: 30, attempt: 1, sha: shaA }),
     run({ id: 31, attempt: 1, sha: shaB }),
-  ], new Map()).length, 0);
+  ];
+  const crossShaJobs = new Map([
+    ["30:1", [job({ id: 300, name: "test", runId: 30, attempt: 1, sha: shaA, conclusion: "failure", completed: "2026-11-01T12:00:00Z" })]],
+    ["31:1", [job({ id: 310, name: "test", runId: 31, attempt: 1, sha: shaB, conclusion: "success", completed: "2026-11-01T13:00:00Z" })]],
+  ]);
+  assert.equal(detectFlakyEvents(crossShaRuns, crossShaJobs).length, 0);
 
   assert.equal(detectFlakyEvents([
     run({ id: 32, attempt: 1, sha: shaA }),
   ], new Map([
-    ["32:1", [job({ id: 320, name: "test", conclusion: "failure", sha: shaA })]],
+    ["32:1", [job({ id: 320, name: "test", runId: 32, conclusion: "failure", sha: shaA })]],
   ])).length, 0);
 
   const successThenFailure = detectFlakyEvents([
-    run({ id: 33, attempt: 1, sha: shaA }),
+    run({ id: 33, attempt: 2, sha: shaA }),
   ], new Map([
-    ["33:1", [
-      job({ id: 331, name: "test", conclusion: "success", completed: "2026-11-01T11:00:00Z", sha: shaA }),
-      job({ id: 332, name: "test", conclusion: "failure", completed: "2026-11-01T12:00:00Z", sha: shaA }),
-    ]],
+    ["33:1", [job({ id: 331, name: "test", runId: 33, attempt: 1, conclusion: "success", completed: "2026-11-01T11:00:00Z", sha: shaA })]],
+    ["33:2", [job({ id: 332, name: "test", runId: 33, attempt: 2, conclusion: "failure", completed: "2026-11-01T12:00:00Z", sha: shaA })]],
   ]));
   assert.equal(successThenFailure.length, 0);
 
@@ -96,7 +100,26 @@ test("detection: SHA differs, success then failure, and standalone attempts", as
   const exec = async (args) => {
     calls.push(args);
     const key = args.join(" ");
-    if (key.includes("/actions/runs?")) return JSON.stringify({ workflow_runs: [run({ id: 40, attempt: 1, sha: shaA })] });
+    if (key.includes("/actions/runs?")) {
+      return JSON.stringify({ workflow_runs: [
+        run({ id: 40, attempt: 1, sha: shaA }),
+        run({ id: 41, attempt: 1, sha: shaB }),
+        run({ id: 42, attempt: 2, sha: shaA }),
+      ] });
+    }
+    if (key.includes("/attempts/1/jobs") && key.includes("/runs/40/")) {
+      return JSON.stringify({ jobs: [job({ id: 400, name: "test", runId: 40, attempt: 1, sha: shaA, conclusion: "failure", completed: "2026-11-01T12:00:00Z" })] });
+    }
+    if (key.includes("/attempts/1/jobs") && key.includes("/runs/41/")) {
+      return JSON.stringify({ jobs: [job({ id: 410, name: "test", runId: 41, attempt: 1, sha: shaB, conclusion: "success", completed: "2026-11-01T13:00:00Z" })] });
+    }
+    if (key.includes("/attempts/1/jobs") && key.includes("/runs/42/")) {
+      return JSON.stringify({ jobs: [job({ id: 420, name: "other", runId: 42, attempt: 1, sha: shaA, conclusion: "failure", completed: "2026-11-01T11:00:00Z" })] });
+    }
+    if (key.includes("/attempts/2/jobs") && key.includes("/runs/42/")) {
+      return JSON.stringify({ jobs: [job({ id: 421, name: "other", runId: 42, attempt: 2, sha: shaA, conclusion: "failure", completed: "2026-11-01T14:00:00Z" })] });
+    }
+    if (key.includes("/actions/jobs/")) return "";
     if (key.includes("/issues?state=open")) return "[]";
     throw new Error(`unexpected: ${key}`);
   };
@@ -104,11 +127,32 @@ test("detection: SHA differs, success then failure, and standalone attempts", as
     repos: [{ repo: "o/r", owner: null }], exec, apply: false,
     window: { from: "2026-10-28", to: "2026-11-04T12:00:00Z" },
   });
-  assert.equal(result[0].runs, 1);
-  assert.equal(calls.filter((args) => args.join(" ").includes("/attempts/")).length, 0);
+  assert.equal(result[0].flaky.length, 0);
+  assert.equal(calls.filter((args) => args.join(" ").includes("/attempts/")).length, 3);
 });
 
-test("dedupe keeps the first job id and ignores success-then-failure", () => {
+test("same-attempt success does not create a flaky event", () => {
+  const sha = "b".repeat(40);
+  const rerun = run({ id: 49, attempt: 2, sha });
+  const jobs = new Map([
+    ["49:1", [
+      job({ id: 490, name: "test", runId: 49, attempt: 1, sha, conclusion: "failure", completed: "2026-11-01T12:00:00Z" }),
+      job({ id: 491, name: "test", runId: 49, attempt: 1, sha, conclusion: "success", completed: "2026-11-01T12:01:00Z" }),
+    ]],
+  ]);
+  assert.equal(detectFlakyEvents([rerun], jobs).length, 0);
+
+  const sameAttemptWithFailure = new Map([
+    ["49:1", [
+      job({ id: 492, name: "test", runId: 49, attempt: 1, sha, conclusion: "failure", completed: "2026-11-01T12:00:00Z" }),
+      job({ id: 493, name: "test", runId: 49, attempt: 1, sha, conclusion: "success", completed: "2026-11-01T12:01:00Z" }),
+    ]],
+    ["49:2", [job({ id: 494, name: "test", runId: 49, attempt: 2, sha, conclusion: "failure", completed: "2026-11-01T12:02:00Z" })]],
+  ]);
+  assert.equal(detectFlakyEvents([rerun], sameAttemptWithFailure).length, 0);
+});
+
+test("dedupe keeps the first job id", () => {
   const sha = "c".repeat(40);
   const jobs = new Map([
     ["50:1", [job({ id: 501, name: "test", runId: 50, attempt: 1, sha, conclusion: "failure", completed: "2026-11-01T12:00:00Z" })]],
@@ -178,6 +222,69 @@ test("open marker comments only new events and an already reported event gives n
   const reported = await scan(true, "https://github.com/o/r/actions/runs/70/job/701");
   assert.equal(reported.result[0].flaky[0].action.type, "none");
   assert.equal(reported.calls.filter((call) => call.args.includes("--method") && call.args.join(" ").includes("comments")).length, 0);
+});
+
+test("comments read failure keeps completed opens and preserves the 15-run cap", async () => {
+  let issuePostCount = 0;
+  const exec = async (args) => {
+    const key = args.join(" ");
+    if (key.includes("/actions/runs?")) {
+      const repoMatch = key.match(/repos\/([^/]+\/[^/]+)\/actions\/runs/);
+      const repo = repoMatch?.[1];
+      const repoIndex = repo ? Number(repo.slice(-1)) : 0;
+      const keyCount = repoIndex === 0 ? 4 : 3;
+      const runs = [];
+      for (let i = 0; i < keyCount; i += 1) {
+        runs.push(run({ id: 2000 + repoIndex * 100 + i, attempt: 2, sha: String(i + 1).repeat(40) }));
+      }
+      return JSON.stringify({ workflow_runs: runs });
+    }
+    if (key.includes("/attempts/")) {
+      const runMatch = key.match(/runs\/([0-9]+)\/attempts\/([12])/);
+      const runId = Number(runMatch?.[1]);
+      const attempt = Number(runMatch?.[2]);
+      const index = runId % 100;
+      const conclusion = attempt === 1 ? "failure" : "success";
+      return JSON.stringify({ jobs: [job({
+        id: runId * 10 + (attempt === 2 ? 1 : 0),
+        name: `job-${index}`,
+        runId,
+        attempt,
+        sha: String(index + 1).repeat(40),
+        conclusion,
+        completed: attempt === 1 ? "2026-11-01T12:00:00Z" : "2026-11-01T12:01:00Z",
+      })] });
+    }
+    if (key.includes("/actions/jobs/")) return "";
+    if (key.includes("/issues?state=open")) {
+      if (key.includes("repos/o/r0/issues")) {
+        return JSON.stringify([{ number: 44, body: "<!-- flaky-scan key=o/r0/ci.yml/job-3/job-3 -->" }]);
+      }
+      return "[]";
+    }
+    if (key.includes("/issues/44/comments?")) throw new Error("comments unavailable");
+    if (key.includes("--method POST") && key.includes("/issues --input -")) {
+      issuePostCount += 1;
+      return JSON.stringify({ number: 100 + issuePostCount });
+    }
+    throw new Error(`unexpected: ${key}`);
+  };
+
+  const repos = [];
+  for (let r = 0; r < 6; r += 1) repos.push({ repo: `o/r${r}`, owner: null });
+  const lines = [];
+  const result = await scanRepositories({ repos, exec, apply: true,
+    window: { from: "2026-10-28", to: "2026-11-04T12:00:00Z" }, log: (line) => lines.push(line) });
+
+  const repo0Opens = result[0].flaky.filter((item) => item.action.type === "open").length;
+  assert.equal(repo0Opens, 3);
+  assert.notEqual(result[0].error, null);
+  assert.equal(result[0].flaky.some((item) => item.action.type === "comment" && item.action.reason === "comments unavailable"), true);
+
+  const opens = result.reduce((sum, item) => sum + item.flaky.filter((entry) => entry.action.type === "open").length, 0);
+  assert.equal(opens, 15);
+  assert.equal(issuePostCount, 15);
+  assert.equal(lines.some((line) => line === "failed o/r0#44: comments unavailable"), true);
 });
 
 test("caps: 5 keys in one repo and 15 opens plus 3 skips across 6 repos", async () => {

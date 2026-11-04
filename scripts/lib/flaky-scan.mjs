@@ -253,7 +253,11 @@ export function detectFlakyEvents(runs, jobsByAttempt) {
       for (let i = 0; i < jobs.length; i += 1) {
         const failed = jobs[i];
         if (!["failure", "timed_out"].includes(failed.conclusion)) continue;
-        const laterSuccess = jobs.slice(i + 1).some((job) => job.conclusion === "success");
+        const laterSuccess = jobs.slice(i + 1).some((success) =>
+          success.conclusion === "success" &&
+          (String(success.run_id) !== String(failed.run_id) ||
+            Number(success.run_attempt) > Number(failed.run_attempt))
+        );
         if (!laterSuccess) continue;
         detected.push({
           event: {
@@ -532,7 +536,12 @@ export async function scanRepository({
     try {
       comments = await fetchAllComments(guarded, repo, foundIssue.number);
     } catch (error) {
-      return { repo, owner, runs: null, rerunAttempts: null, error: errorText(error), flaky: [] };
+      const message = errorText(error);
+      globalWriteError ??= message;
+      flaky.push({ key: item.key, workflow: item.workflow, job: item.job, test: item.test, events: item.events,
+        action: { type: "comment", issue: foundIssue.number, reason: message } });
+      log(`failed ${repo}#${foundIssue.number}: ${message}`);
+      continue;
     }
 
     const issueText = typeof foundIssue.body === "string" ? foundIssue.body : "";
