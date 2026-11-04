@@ -84,7 +84,11 @@ PR template ──► review rubric ──► CI gates ──► corrections ─
   releases (`gh release`), and pushing to `main`; session state lives in
   [.claude/session-summary.md](../../.claude/session-summary.md) (ADR-0025).
 - **Observe** — the [PR acceptance metric](../specs/pr-acceptance-metric.md)
-  summarizes the stream; it informs, never gates.
+  summarizes the stream; it informs, never gates. The weekly
+  [flaky-test scan](../specs/flaky-test-scan.md)
+  (`scripts/flaky-scan.mjs`) finds Actions jobs that failed and then passed
+  on the same SHA, files 1 issue per flaky test in the repository where it
+  ran, and records rerun counts for the fleet metrics.
 
 ## Operational notes
 
@@ -111,6 +115,7 @@ copy it as-is.
   [ADR-0044](../adr/0044-expose-the-make-gate-triad-in-every-repository.md)
 - Contracts: [specs/pr-review-rubric.md](../specs/pr-review-rubric.md),
   [specs/pr-acceptance-metric.md](../specs/pr-acceptance-metric.md),
-  [specs/risk-paths.md](../specs/risk-paths.md)
+  [specs/risk-paths.md](../specs/risk-paths.md),
+  [specs/flaky-test-scan.md](../specs/flaky-test-scan.md)
 - Built in: the 2026-08-12 ACMM conformance PR
   (closes [core#22–#41](https://github.com/frostyard/core/issues/22))
