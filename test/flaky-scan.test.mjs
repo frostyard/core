@@ -15,6 +15,8 @@ import {
   resolveRepos,
   scanRepositories,
   scanWindow,
+  windowDays,
+  withReadRetry,
 } from "../scripts/lib/flaky-scan.mjs";
 
 const execFileAsync = promisify(execFile);
@@ -404,7 +406,9 @@ process.stdout.write(typeof response === "string" ? response : JSON.stringify(re
 
   const sha = "f".repeat(40);
   await writeFile(fixture, JSON.stringify({ responses: {
-    "api repos/o/r/actions/runs?created=>=2026-10-28&per_page=100&page=1": { workflow_runs: [run({ id: 90, attempt: 2, sha })] },
+    ...Object.fromEntries(["2026-10-28", "2026-10-29", "2026-10-30", "2026-10-31", "2026-11-01", "2026-11-02", "2026-11-03", "2026-11-04"]
+      .map((day) => [`api repos/o/r/actions/runs?created=${day}&per_page=100&page=1`, { workflow_runs: [] }])),
+    "api repos/o/r/actions/runs?created=2026-11-01&per_page=100&page=1": { workflow_runs: [run({ id: 90, attempt: 2, sha })] },
     "api repos/o/r/actions/runs/90/attempts/1/jobs?per_page=100&page=1": { jobs: [job({ id: 901, name: "test", runId: 90, attempt: 1, sha })] },
     "api repos/o/r/actions/runs/90/attempts/2/jobs?per_page=100&page=1": { jobs: [job({ id: 902, name: "test", runId: 90, attempt: 2, sha, conclusion: "success", completed: "2026-11-02T12:00:00Z" })] },
     "api repos/o/r/actions/jobs/901/logs": "FAILED tests/a.py::test_a\n",
@@ -422,7 +426,7 @@ process.stdout.write(typeof response === "string" ? response : JSON.stringify(re
     window: { from: "2026-10-28", to: "2026-11-04T12:00:00.000Z" },
     apply: false,
     repos: [{
-      repo: "o/r", owner: null, runs: 1, rerunAttempts: 1, error: null,
+      repo: "o/r", owner: null, runs: 1, rerunAttempts: 1, truncatedDays: [], error: null,
       flaky: [{
         key: "o/r/ci.yml/test/tests/a.py::test_a",
         workflow: "ci.yml", job: "test", test: "tests/a.py::test_a",
@@ -461,4 +465,103 @@ test("profile parsing and CLI usage", async () => {
     assert.match(error.stderr, /At least 1 repository is required/);
     return true;
   });
+});
+
+const WEEK = { from: "2026-10-28", to: "2026-11-04T12:00:00.000Z" };
+
+test("windowDays lists every UTC day from the start to the day of --now", () => {
+  assert.deepEqual(windowDays(WEEK), [
+    "2026-10-28", "2026-10-29", "2026-10-30", "2026-10-31", "2026-11-01", "2026-11-02", "2026-11-03", "2026-11-04",
+  ]);
+});
+
+test("runs are read 1 day at a time, deduped by id, and a day with 1000 runs is reported", async () => {
+  const calls = [];
+  const lines = [];
+  const exec = async (args) => {
+    const key = args.join(" ");
+    calls.push(key);
+    const match = /actions\/runs\?created=(\d{4}-\d\d-\d\d)&per_page=100&page=(\d+)$/.exec(key);
+    if (match) {
+      const [, day, page] = match;
+      if (day === "2026-10-30") {
+        // 10 full pages: the API limit for 1 query.
+        const base = 100_000 + Number(page) * 100;
+        return JSON.stringify({ workflow_runs: Array.from({ length: 100 }, (_, i) => run({ id: base + i, sha: `${base + i}`.padStart(40, "0") })) });
+      }
+      // The same run on 2 days counts once.
+      if (day === "2026-11-01" || day === "2026-11-02") return JSON.stringify({ workflow_runs: [run({ id: 7, sha: "7".repeat(40) })] });
+      return JSON.stringify({ workflow_runs: [] });
+    }
+    if (key.includes("/issues?state=open")) return "[]";
+    throw new Error(`unexpected: ${key}`);
+  };
+  const [result] = await scanRepositories({ repos: [{ repo: "o/r", owner: null }], exec, window: WEEK, log: (line) => lines.push(line) });
+  const runCalls = calls.filter((key) => key.includes("/actions/runs?"));
+  assert.equal(runCalls.filter((key) => key.includes("created=2026-10-30")).length, 10);
+  assert.equal(runCalls.length, 7 + 10);
+  assert.equal(runCalls.some((key) => key.includes(">=")), false);
+  assert.equal(result.runs, 1000 + 1);
+  assert.deepEqual(result.truncatedDays, ["2026-10-30"]);
+  assert.deepEqual(lines, ["warn o/r: 2026-10-30 has 1000 runs or more; the runs API returns no more"]);
+});
+
+test("GitHub-generated dynamic runs (Dependabot) are no flaky events and are not counted", async () => {
+  const sha = "9".repeat(40);
+  const dependabot = "dynamic/dependabot/dependabot-updates";
+  const calls = [];
+  const exec = async (args) => {
+    const key = args.join(" ");
+    calls.push(key);
+    if (key.includes("/actions/runs?created=2026-11-01&")) {
+      // 2 ecosystems on 1 SHA: 1 fails, 1 passes, same job name.
+      return JSON.stringify({ workflow_runs: [run({ id: 1, sha, workflow: dependabot }), run({ id: 2, sha, workflow: dependabot })] });
+    }
+    if (key.includes("/actions/runs?")) return JSON.stringify({ workflow_runs: [] });
+    if (key.includes("/attempts/1/jobs") && key.includes("runs/1/")) {
+      return JSON.stringify({ jobs: [job({ id: 11, name: "Dependabot", runId: 1, sha, conclusion: "failure" })] });
+    }
+    if (key.includes("/attempts/1/jobs") && key.includes("runs/2/")) {
+      return JSON.stringify({ jobs: [job({ id: 21, name: "Dependabot", runId: 2, sha, conclusion: "success", completed: "2026-11-01T13:00:00Z" })] });
+    }
+    if (key.includes("/actions/jobs/")) return "";
+    if (key.includes("/issues?state=open")) return "[]";
+    throw new Error(`unexpected: ${key}`);
+  };
+  const [result] = await scanRepositories({ repos: [{ repo: "o/r", owner: null }], exec, window: WEEK });
+  assert.deepEqual(result.flaky, []);
+  assert.equal(result.runs, 0);
+  assert.equal(calls.some((key) => key.includes("/attempts/")), false);
+});
+
+test("a 5xx read is retried once; a 5xx write is not retried", async () => {
+  let runsCalls = 0;
+  const exec = async (args) => {
+    const key = args.join(" ");
+    if (key.includes("/actions/runs?created=2026-10-28&")) {
+      runsCalls += 1;
+      if (runsCalls === 1) throw new Error("gh: Server Error (HTTP 502)");
+    }
+    if (key.includes("/actions/runs?")) return JSON.stringify({ workflow_runs: [] });
+    if (key.includes("/issues?state=open")) return "[]";
+    throw new Error(`unexpected: ${key}`);
+  };
+  const [result] = await scanRepositories({ repos: [{ repo: "o/r", owner: null }], exec, window: WEEK, retryDelayMs: 0 });
+  assert.equal(runsCalls, 2);
+  assert.equal(result.error, null);
+  assert.equal(result.runs, 0);
+
+  let attempts = 0;
+  const flaky = withReadRetry(async () => { attempts += 1; throw new Error("gh: Server Error (HTTP 503)"); }, { delayMs: 0 });
+  await assert.rejects(flaky(["api", "repos/o/r/issues?state=open&per_page=100&page=1"]));
+  assert.equal(attempts, 2);
+
+  attempts = 0;
+  await assert.rejects(flaky(["api", "--method", "POST", "repos/o/r/issues", "--input", "-"], { input: "{}" }));
+  assert.equal(attempts, 1);
+
+  attempts = 0;
+  const notFound = withReadRetry(async () => { attempts += 1; throw new Error("gh: Not Found (HTTP 404)"); }, { delayMs: 0 });
+  await assert.rejects(notFound(["api", "repos/o/r/actions/runs?created=2026-10-28&per_page=100&page=1"]));
+  assert.equal(attempts, 1);
 });

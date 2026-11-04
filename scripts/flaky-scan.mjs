@@ -72,7 +72,7 @@ async function main() {
     apply: args.apply,
     window,
     log: (line) => {
-      if (line.startsWith("failed ")) console.error(line);
+      if (line.startsWith("failed ") || line.startsWith("warn ")) console.error(line);
       else console.log(line);
     },
   });
