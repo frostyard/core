@@ -207,6 +207,7 @@ export function assertSurfaceInvariants(data, relativePath, availablePaths) {
     "agent-governance",
     "agent-skills",
     "documentation-index",
+    "risk-paths",
   ]);
   for (const surface of data.surfaces) {
     if (!expected.delete(surface.id)) {

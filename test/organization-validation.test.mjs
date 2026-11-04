@@ -10,6 +10,7 @@ import {
   assertExpectedRejection,
   assertGoalInvariants,
   assertRepositoryInvariants,
+  assertSurfaceInvariants,
   assertVerificationProfileInvariants,
   readStrictJson,
   validateOrganization,
@@ -27,8 +28,37 @@ test("the live organization tree and fixture corpus validate", async () => {
     verificationProfileCount: 0,
     goalCount: 0,
     validFixtureCount: 7,
-    invalidFixtureCount: 18,
+    invalidFixtureCount: 19,
   });
+});
+
+test("the surface contract requires the risk-paths surface exactly once", async () => {
+  const contract = await readStrictJson(
+    path.join(repoRoot, "organization/contracts/repository-surfaces/v1.json"),
+    "organization/contracts/repository-surfaces/v1.json",
+  );
+  const available = new Set([
+    "organization/schemas/v1/repository-agent-governance.schema.json",
+  ]);
+  assert.deepEqual(
+    contract.surfaces.map((surface) => surface.id),
+    [
+      "agent-instructions",
+      "agent-governance",
+      "agent-skills",
+      "documentation-index",
+      "risk-paths",
+    ],
+  );
+  assertSurfaceInvariants(contract, "contract", available);
+  const missing = {
+    ...contract,
+    surfaces: contract.surfaces.filter((surface) => surface.id !== "risk-paths"),
+  };
+  assert.throws(
+    () => assertSurfaceInvariants(missing, "contract", available),
+    /missing surfaces: risk-paths/,
+  );
 });
 
 test("strict JSON rejects duplicate keys before JSON.parse can erase them", async () => {

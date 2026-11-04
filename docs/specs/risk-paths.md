@@ -1,6 +1,6 @@
 # Spec: Risk paths
 
-This contract governs `.github/risk-paths.json`, its validation and matching behavior, and the reusable workflow that labels pull requests. Consumers include the core validator and matcher (`scripts/lib/risk-paths.mjs`, later change), the reusable workflow, cross-reviewers and the accountable owner.
+This contract governs `.github/risk-paths.json`, its validation and matching behavior, and the reusable workflow that labels pull requests. Consumers include the core validator and matcher (`scripts/lib/risk-paths.mjs`), the gate `npm run check:risk-paths` (`scripts/check-risk-paths.mjs`), the reusable workflow, cross-reviewers and the accountable owner.
 
 ## Interface
 
@@ -92,20 +92,21 @@ A PR matches when at least 1 changed path matches at least 1 glob.
 The reusable workflow is `frostyard/core/.github/workflows/risk-paths.yml`, with `on: workflow_call`.
 
 - The caller runs on `pull_request_target` with types `opened`, `synchronize`, `reopened` and `edited`. An `edited` event includes a change of the base branch: the job then reads the list at the new base SHA and matches the current file list. The job runs the same steps on every listed type.
-- The caller pins the reusable workflow to a full 40-character core commit SHA (ADR-0021).
+- The caller pins the reusable workflow to a full 40-character core commit SHA (ADR-0021): `frostyard/core/.github/workflows/risk-paths.yml@<SHA>`.
+- Core's own caller, `.github/workflows/risk-paths-caller.yml`, is the 1 exception to the SHA pin. It uses the local path `./.github/workflows/risk-paths.yml`. Under `pull_request_target`, the local path resolves to the base branch commit, not to the PR head.
 - The caller has no `merge_group` trigger.
 - The caller is not a required check.
 - The workflow has top-level `permissions: {}`.
 - The job has `contents: read` and `pull-requests: write`. It has no other permission.
 - Actions are SHA-pinned.
-- A checkout sets `persist-credentials: false`.
+- The job checks out nothing. The reusable workflow embeds `scripts/lib/risk-paths.mjs` verbatim in a heredoc and runs it with Node (`node --input-type=module`). `npm run check:risk-paths` fails when the embedded copy differs from the library.
 - Code that the job runs comes only from `frostyard/core` at a pinned commit, never from the PR's repository.
 - The job reads `.github/risk-paths.json` at `github.event.pull_request.base.sha`.
 - The job MUST NOT check out, read as code or run anything from the PR head or the merge ref.
 - The changed files come from `GET /repos/{owner}/{repo}/pulls/{number}/files`, all pages.
-- The GitHub API returns at most 3000 files for 1 PR. When the list has 3000 entries, the job adds the label and writes that the file list is truncated. This behavior is fail safe.
+- The GitHub API returns at most 3000 files for 1 PR. When the list has 3000 or more entries, the job adds the label and writes that the file list is truncated. This behavior is fail safe.
 - With no list at the base SHA, for example in a PR that adds the list, the job writes "no list on base" to the job summary and passes.
-- Before it adds the label, the job checks that `risk:high` exists (`GET /repos/{owner}/{repo}/labels/risk:high`). The job MUST NOT create the label: the add-labels API creates a missing label, so this check comes first.
+- On every run with a valid list, the job checks that `risk:high` exists (`GET /repos/{owner}/{repo}/labels/risk:high`) before it reads the file list or uses a match result. A missing label therefore shows on the first run, also with no match. The job MUST NOT create the label: the add-labels API creates a missing label, so this check comes first.
 - On a match, the job adds `risk:high` with the caller's `GITHUB_TOKEN` and writes each matched path, glob and `why` to the job summary.
 - With no match, the job changes no label.
 - The job never removes `risk:high`.
@@ -126,14 +127,18 @@ Rules 3 and 4 are policy. All agents use 1 GitHub login, so GitHub cannot check 
 
 | Artifact | Derivation |
 | --- | --- |
-| Core validator and matcher (`scripts/lib/risk-paths.mjs`) | Implement this interface and validation contract |
-| Reusable workflow | Execute the workflow contract and add labels |
+| Core validator and matcher (`scripts/lib/risk-paths.mjs`) | Implement this interface and validation contract, and the labeling job |
+| Gate (`scripts/check-risk-paths.mjs`, `npm run check:risk-paths`) | Validate a list and rule C, and fail when the reusable workflow's embedded copy of the library drifts |
+| Reusable workflow (`.github/workflows/risk-paths.yml`) | Embed `scripts/lib/risk-paths.mjs` verbatim, run it with Node with no checkout, and add labels |
+| Sync (`scripts/sync-risk-paths-workflow.mjs`, `npm run sync:risk-paths-workflow`) | Rewrite the embedded copy from the library |
 | Caller in each repository | Run `pull_request_target` with the pinned reusable workflow |
-| `repository-surfaces` v1 entry | Declare `.github/risk-paths.json` as a repository surface |
+| Core's caller (`.github/workflows/risk-paths-caller.yml`) | Run `pull_request_target` with the local reusable workflow path |
+| Core's list (`.github/risk-paths.json`) | Name 1 `protected_boundaries[].id` of `policies/agent-governance.json` in each `why` |
+| `repository-surfaces` v1 entry | Declare `.github/risk-paths.json` as a repository surface ([enrollment spec](organization-repository-enrollment.md)) |
 
-These artifacts land with their tests in a later change. They MUST match this spec.
+Tests: `test/risk-paths.test.mjs`. These artifacts MUST match this spec.
 
 ## References
 
 - Rationale: [ADR-0068](../adr/0068-label-pull-requests-that-touch-high-risk-paths.md), [ADR-0019](../adr/0019-governance-as-code-and-risk-tiers.md), [ADR-0020](../adr/0020-ai-automation-trust-boundaries.md), [ADR-0021](../adr/0021-sha-pinned-actions-and-least-privilege-ci.md)
-- Context: [quality loop](../design/quality-loop.md), [PR review rubric](pr-review-rubric.md)
+- Context: [quality loop](../design/quality-loop.md), [PR review rubric](pr-review-rubric.md), [organization repository enrollment](organization-repository-enrollment.md) (the `risk-paths` surface)

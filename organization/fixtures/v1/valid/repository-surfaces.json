@@ -28,6 +28,12 @@
       "path": "docs/README.md",
       "artifact_type": "file",
       "media_type": "text/markdown"
+    },
+    {
+      "id": "risk-paths",
+      "path": ".github/risk-paths.json",
+      "artifact_type": "file",
+      "media_type": "application/json"
     }
   ]
 }
