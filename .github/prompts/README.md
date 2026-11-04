@@ -8,3 +8,4 @@ for one recurring task, not policy.
 | Prompt | Task |
 | --- | --- |
 | [review.prompt.md](review.prompt.md) | Review a pull request against the org rubric |
+| [instruction-hygiene.prompt.md](instruction-hygiene.prompt.md) | Blind-review agent instruction files for contradictions, dead rules, duplicates and cuts |
