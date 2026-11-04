@@ -8,10 +8,11 @@ export class FlakyScanError extends Error {
   }
 }
 
+const WRITE_FLAGS = ["--method", "-X", "-f", "-F", "--field", "--raw-field", "--input"];
+
 export function makeGh({ exec, apply }) {
   return async (args, options = {}) => {
-    const writeFlags = ["--method", "-X", "-f", "-F", "--field", "--raw-field", "--input"];
-    const writes = args.some((arg) => writeFlags.includes(arg));
+    const writes = args.some((arg) => WRITE_FLAGS.includes(arg));
 
     if (!apply) {
       if (writes) throw new FlakyScanError("refusing GitHub write because --apply is not set");
@@ -362,15 +363,62 @@ async function ghJson(exec, args) {
   }
 }
 
-async function fetchAllRuns(exec, repo, from) {
-  const runs = [];
-  for (let page = 1; page <= 10; page += 1) {
-    const value = await ghJson(exec, ["api", `repos/${repo}/actions/runs?created=>=${from}&per_page=100&page=${page}`]);
-    const pageRuns = readItems(value, "workflow_runs");
-    runs.push(...pageRuns);
-    if (pageRuns.length < 100) break;
+/** Every UTC day from `window.from` to the day of `window.to`, as `YYYY-MM-DD`. */
+export function windowDays(window) {
+  const days = [];
+  const last = String(window.to).slice(0, 10);
+  let ms = Date.parse(`${window.from}T00:00:00Z`);
+  while (Number.isFinite(ms)) {
+    const day = new Date(ms).toISOString().slice(0, 10);
+    if (day > last) break;
+    days.push(day);
+    ms += 86_400_000;
   }
-  return runs;
+  return days;
+}
+
+/** A run of a GitHub-generated workflow (Dependabot, CodeQL default setup): no file in the repository. */
+export function isDynamicRun(run) {
+  return String(run.path ?? "").startsWith("dynamic/");
+}
+
+/**
+ * Read the runs 1 day at a time: the runs API returns at most 1,000 runs (10
+ * pages) for 1 query, so a busy repository is read in full unless 1 day alone
+ * has 1,000 runs. Such a day is listed in `truncatedDays`.
+ */
+async function fetchAllRuns(exec, repo, window) {
+  const byId = new Map();
+  const truncatedDays = [];
+  for (const day of windowDays(window)) {
+    for (let page = 1; page <= 10; page += 1) {
+      const value = await ghJson(exec, ["api", `repos/${repo}/actions/runs?created=${day}&per_page=100&page=${page}`]);
+      const pageRuns = readItems(value, "workflow_runs");
+      for (const run of pageRuns) if (!byId.has(run.id)) byId.set(run.id, run);
+      if (pageRuns.length < 100) break;
+      if (page === 10) truncatedDays.push(day);
+    }
+  }
+  return { runs: [...byId.values()].filter((run) => !isDynamicRun(run)), truncatedDays };
+}
+
+const SERVER_ERROR = /HTTP 5\d\d/;
+
+/**
+ * Retry a read once after a GitHub 5xx answer. Writes are never retried: a
+ * 5xx on a POST can still have created the issue or the comment.
+ */
+export function withReadRetry(gh, { delayMs = 2000 } = {}) {
+  return async (args, options = {}) => {
+    try {
+      return await gh(args, options);
+    } catch (error) {
+      const write = args.some((arg) => WRITE_FLAGS.includes(arg));
+      if (write || !SERVER_ERROR.test(errorText(error))) throw error;
+      if (delayMs > 0) await new Promise((resolve) => setTimeout(resolve, delayMs));
+      return gh(args, options);
+    }
+  };
 }
 
 async function fetchJobs(exec, repo, run, attempt) {
@@ -420,14 +468,21 @@ export async function scanRepository({
   issueOpensBefore = 0,
   globalIssueCap = 15,
   log = () => {},
+  retryDelayMs = 2000,
 }) {
   const guarded = gh ?? makeGh({ exec, apply });
+  const reader = withReadRetry(guarded, { delayMs: retryDelayMs });
+  const failed = (error) => ({
+    repo, owner, runs: null, rerunAttempts: null, truncatedDays: null, error: errorText(error), flaky: [],
+  });
   let runs;
+  let truncatedDays;
   try {
-    runs = await fetchAllRuns(guarded, repo, window.from);
+    ({ runs, truncatedDays } = await fetchAllRuns(reader, repo, window));
   } catch (error) {
-    return { repo, owner, runs: null, rerunAttempts: null, error: errorText(error), flaky: [] };
+    return failed(error);
   }
+  for (const day of truncatedDays) log(`warn ${repo}: ${day} has 1000 runs or more; the runs API returns no more`);
 
   let rerunAttempts = 0;
   for (const run of runs) rerunAttempts += Math.max(Number(run.run_attempt ?? 1) - 1, 0);
@@ -441,13 +496,13 @@ export async function scanRepository({
       for (const run of group.runs) {
         const count = Math.max(Number(run.run_attempt ?? 1), 1);
         for (let attempt = 1; attempt <= count; attempt += 1) {
-          const jobs = await fetchJobs(guarded, repo, run, attempt);
+          const jobs = await fetchJobs(reader, repo, run, attempt);
           jobsByAttempt.set(`${run.id}:${attempt}`, jobs);
         }
       }
     }
   } catch (error) {
-    return { repo, owner, runs: null, rerunAttempts: null, error: errorText(error), flaky: [] };
+    return failed(error);
   }
 
   const detected = detectFlakyEvents(runs, jobsByAttempt);
@@ -456,7 +511,7 @@ export async function scanRepository({
     const { event, job: failedJob, workflow } = detectedRecord;
     let names = [];
     try {
-      const logText = await guarded(["api", `repos/${repo}/actions/jobs/${failedJob.id}/logs`], { input: undefined });
+      const logText = await reader(["api", `repos/${repo}/actions/jobs/${failedJob.id}/logs`], { input: undefined });
       names = parseTestNames(String(logText), failedJob);
     } catch {
       names = parseTestNames("", failedJob);
@@ -474,9 +529,9 @@ export async function scanRepository({
 
   let openIssues;
   try {
-    openIssues = await fetchAllOpenIssues(guarded, repo);
+    openIssues = await fetchAllOpenIssues(reader, repo);
   } catch (error) {
-    return { repo, owner, runs: null, rerunAttempts: null, error: errorText(error), flaky: [] };
+    return failed(error);
   }
 
   const flaky = [];
@@ -534,7 +589,7 @@ export async function scanRepository({
 
     let comments = [];
     try {
-      comments = await fetchAllComments(guarded, repo, foundIssue.number);
+      comments = await fetchAllComments(reader, repo, foundIssue.number);
     } catch (error) {
       const message = errorText(error);
       globalWriteError ??= message;
@@ -578,10 +633,10 @@ export async function scanRepository({
     }
   }
 
-  return { repo, owner, runs: runs.length, rerunAttempts, error: globalWriteError, flaky };
+  return { repo, owner, runs: runs.length, rerunAttempts, truncatedDays, error: globalWriteError, flaky };
 }
 
-export async function scanRepositories({ repos, exec, apply = false, window, log = () => {} }) {
+export async function scanRepositories({ repos, exec, apply = false, window, log = () => {}, retryDelayMs = 2000 }) {
   const all = [];
   let openedGlobal = 0;
   for (const entry of repos) {
@@ -594,6 +649,7 @@ export async function scanRepositories({ repos, exec, apply = false, window, log
       issueOpensBefore: openedGlobal,
       globalIssueCap: 15,
       log,
+      retryDelayMs,
     });
 
     for (const item of result.flaky) {

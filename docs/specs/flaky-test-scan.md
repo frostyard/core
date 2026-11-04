@@ -33,12 +33,14 @@ flag).
 
 ### GitHub calls
 
-Reads: `GET repos/{r}/actions/runs?created=>={from}` (paged, at most 10
-pages), `GET repos/{r}/actions/runs/{id}/attempts/{n}/jobs`,
+Reads: `GET repos/{r}/actions/runs?created={day}` for each UTC day of the
+window (paged, at most 10 pages a day), `GET repos/{r}/actions/runs/{id}/attempts/{n}/jobs`,
 `GET repos/{r}/actions/jobs/{job}/logs`, `GET repos/{r}/issues?state=open`
 and `GET repos/{r}/issues/{n}/comments`. Writes, only with `--apply`:
 `POST repos/{r}/issues` and `POST repos/{r}/issues/{n}/comments`. No other
-write exists.
+write exists. A read that fails with a GitHub 5xx answer is retried once,
+after 2 seconds; a write is never retried, because a 5xx answer to a POST
+can still have created the issue or the comment.
 
 ### Result file
 
@@ -54,6 +56,7 @@ write exists.
       "owner": "lucilla",
       "runs": 42,
       "rerunAttempts": 3,
+      "truncatedDays": [],
       "error": null,
       "flaky": [
         {
@@ -80,8 +83,9 @@ write exists.
 | `window.to` | ISO time | `--now` |
 | `apply` | boolean | `true` only with `--apply` |
 | `repos[].owner` | string or `null` | The agent profile that lists the repository; `null` for a `--repo` that no profile lists |
-| `repos[].runs` | integer or `null` | Workflow runs created in the window, at most 1,000 (the runs API returns no more for 1 query); `null` when the read failed |
+| `repos[].runs` | integer or `null` | Workflow runs created in the window, without GitHub-generated `dynamic/` runs; `null` when the read failed |
 | `repos[].rerunAttempts` | integer or `null` | Sum over those runs of `run_attempt − 1`; `null` when the read failed |
+| `repos[].truncatedDays` | string array or `null` | The days (`YYYY-MM-DD`) with 1,000 runs or more, the most the runs API returns for 1 query: `runs` and the events of these days are a lower bound; `null` when the read failed |
 | `repos[].error` | string or `null` | Why the repository could not be read, or the first failed write or issue-comment read (the scan goes on with the next key) |
 | `repos[].flaky[].key` | string | `repo/workflow/job/test` |
 | `repos[].flaky[].action.type` | string | `open`, `comment`, `none` (no new event) or `skip` |
@@ -96,9 +100,16 @@ write exists.
   success on another SHA is no event. Jobs are deduplicated by job id, so a
   passed job that a rerun copies counts once.
 - **Jobs read.** Jobs are read only for (workflow file, head SHA) groups
-  with 2 or more attempts in total. The runs list stops at 1,000 runs (10
-  pages), the most the runs API returns for 1 query: a busier repository is
-  scanned for its newest 1,000 runs, so its scan uses a shorter `--days`.
+  with 2 or more attempts in total. Runs are listed 1 UTC day at a time,
+  because the runs API returns at most 1,000 runs for 1 query; a day that
+  reaches the limit is listed in `truncatedDays` and printed as a `warn`
+  line.
+- **Workflow files only.** Runs whose `path` starts with `dynamic/` come
+  from workflows that GitHub generates (Dependabot updates, CodeQL default
+  setup), not from a file in the repository. They are skipped and not
+  counted: 1 SHA has 1 Dependabot run per package ecosystem, all with the
+  job name `Dependabot`, so a failure in 1 ecosystem and a success in
+  another is no flaky test.
 - **Test name.** From the failed job's log: Go `--- FAIL: Name`, TAP
   `not ok N - name`, pytest `FAILED path::name`; at most 5 distinct names
   per job, and a Go parent test is dropped when a subtest of it failed.
