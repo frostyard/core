@@ -16,6 +16,7 @@
     "check:corrections": "node scripts/check-corrections.mjs",
     "check:secret-expiry": "node scripts/check-secret-expiry.mjs",
     "check:stable-repository": "node scripts/check-stable-repository.mjs",
+    "report:corrections": "node scripts/corrections-report.mjs",
     "test": "node --test test/*.test.mjs"
   },
   "dependencies": {
