@@ -32,6 +32,26 @@ gh pr list --repo frostyard/core --state all --limit 30 \
   --json number,state,mergedAt,title
 ```
 
+### Fleet variant: decided acceptance
+
+A second, fleet-wide number exists beside this one. It is **not** the same
+number, and the two MUST NOT be compared or substituted for each other:
+
+```
+decided_acceptance = (merged − reverted) / (merged + closed unmerged)
+```
+
+| | `acceptance_rate` (this spec) | `decided_acceptance` (fleet) |
+| --- | --- | --- |
+| Scope | frostyard/core only | every repository the agents work in, one row per repository and one per agent |
+| Window | last 30 PRs opened, clipped to 90 days | PRs decided (merged or closed unmerged) in the last 30 days |
+| Denominator | PRs opened, including still-open PRs | decided PRs only; open PRs are excluded |
+| Reverted | the revert rule above | the same title and body rule, per repository |
+| Computed by | anyone, from the command above | check Q1 of the daily audit (bketelsen/pi-pocket-team `audit/`), from a daily record of decided PRs summed over 30 days |
+
+Q1 reports the days its 30-day sum covers and states the reverts its rule
+misses. Its thresholds and findings belong to the audit, not to this spec.
+
 ## Rules
 
 - The window slides by PR count first (last 30 opened), clipped to 90 days —
