@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -182,6 +182,62 @@ test("base: a removed file fails", async () => {
   await assert.rejects(run(root, ["--base", "HEAD"]), (error) => error.code === 1 && error.stderr.includes("file removed"));
   const { stdout } = await run(root);
   assert.match(stdout, /no file/);
+});
+
+test("a duplicate key fails, also when one copy is escaped", async () => {
+  const root = await fixture();
+  const line = JSON.stringify(valid());
+  await writeFile(path.join(root, ".memory/corrections.jsonl"), line.replace("{", '{"correction":"hidden",') + "\n");
+  await assert.rejects(run(root), (error) => error.stderr.includes("duplicate key(s): correction"));
+
+  await writeFile(path.join(root, ".memory/corrections.jsonl"), line.replace("{", '{"\\u0063orrection":"hidden",') + "\n");
+  await assert.rejects(run(root), (error) => error.stderr.includes("duplicate key(s): correction"));
+});
+
+test("base: an absolute --file inside the root is compared, not skipped", async () => {
+  const root = await fixture();
+  await writeJsonl(root, [valid()]);
+  await initGit(root);
+  await commitAll(root);
+  await writeJsonl(root, [{ ...valid(), correction: "Changed" }]);
+  const absolute = path.join(root, ".memory/corrections.jsonl");
+  await assert.rejects(run(root, ["--file", absolute, "--base", "HEAD"]), (error) => error.code === 1 && error.stderr.includes("line changed"));
+});
+
+test("a --file outside the root exits 2", async () => {
+  const root = await fixture();
+  await assert.rejects(run(root, ["--file", "../outside.jsonl"]), (error) => error.code === 2 && error.stderr.includes("inside --root"));
+});
+
+test("base: an unreadable base object fails instead of passing", async () => {
+  const root = await fixture();
+  await writeJsonl(root, [valid()]);
+  await initGit(root);
+  await commitAll(root);
+  const { stdout } = await execFileAsync("git", ["rev-parse", "HEAD:.memory/corrections.jsonl"], { cwd: root });
+  const blob = stdout.trim();
+  await rm(path.join(root, ".git/objects", blob.slice(0, 2), blob.slice(2)));
+  await writeJsonl(root, [valid("2026-11-05", "Replaced")]);
+  await assert.rejects(run(root, ["--base", "HEAD"]), (error) => error.code === 1 && error.stderr.includes("cannot read"));
+});
+
+test("base: a missing file with a bad ref fails", async () => {
+  const root = await fixture();
+  await initGit(root);
+  await execFileAsync("git", ["-c", "user.email=test@example.invalid", "-c", "user.name=Test", "commit", "--quiet", "--allow-empty", "-m", "empty"], { cwd: root });
+  await rm(path.join(root, ".memory"), { recursive: true });
+  await assert.rejects(run(root, ["--base", "nosuchref"]), (error) => error.code === 1 && error.stderr.includes("does not exist"));
+});
+
+test("the default root works from a path with spaces", async () => {
+  const parent = await mkdtemp(path.join(os.tmpdir(), "core corrections "));
+  const root = path.join(parent, "repo with space");
+  await mkdir(path.join(root, "scripts"), { recursive: true });
+  await mkdir(path.join(root, ".memory"), { recursive: true });
+  await copyFile(script, path.join(root, "scripts/check-corrections.mjs"));
+  await writeJsonl(root, [valid()]);
+  const { stdout } = await execFileAsync(process.execPath, [path.join(root, "scripts/check-corrections.mjs")], { cwd: os.tmpdir() });
+  assert.match(stdout, /ok {3}corrections: 1 lines/);
 });
 
 test("unknown option exits 2", async () => {
