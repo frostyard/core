@@ -6,12 +6,12 @@ export function stripFencedBlocks(text) {
   return lines
     .map((line) => {
       if (open === null) {
-        const start = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line);
+        const start = /^[ \t>]*(`{3,}|~{3,})(.*)$/.exec(line);
         if (!start || (start[1][0] === "`" && start[2].includes("`"))) return line;
         open = { char: start[1][0], length: start[1].length };
         return "";
       }
-      const end = /^ {0,3}(`{3,}|~{3,})[ \t]*$/.exec(line);
+      const end = /^[ \t>]*(`{3,}|~{3,})[ \t]*$/.exec(line);
       if (end && end[1][0] === open.char && end[1].length >= open.length) open = null;
       return "";
     })
@@ -22,8 +22,44 @@ export function extractInlineCodeSpans(text) {
   const stripped = stripFencedBlocks(text);
   const spans = [];
   stripped.split("\n").forEach((line, index) => {
-    for (const match of line.matchAll(/(?<!`)`([^`\n]+)`(?!`)/g)) {
-      spans.push({ span: match[1], line: index + 1 });
+    let offset = 0;
+    while (offset < line.length) {
+      if (line[offset] !== "`") {
+        offset += 1;
+        continue;
+      }
+
+      let openingLength = 1;
+      while (line[offset + openingLength] === "`") openingLength += 1;
+      const contentStart = offset + openingLength;
+      let closing = contentStart;
+      let found = -1;
+
+      while (closing < line.length) {
+        if (line[closing] !== "`") {
+          closing += 1;
+          continue;
+        }
+        let closingLength = 1;
+        while (line[closing + closingLength] === "`") closingLength += 1;
+        if (closingLength === openingLength) {
+          found = closing;
+          break;
+        }
+        closing += closingLength;
+      }
+
+      if (found === -1) {
+        offset = contentStart;
+        continue;
+      }
+
+      let content = line.slice(contentStart, found);
+      if (content.startsWith(" ") && content.endsWith(" ") && content.trim() !== "") {
+        content = content.slice(1, -1);
+      }
+      spans.push({ span: content, line: index + 1 });
+      offset = found + openingLength;
     }
   });
   return spans;
@@ -62,7 +98,7 @@ export function findRetiredOccurrences(text, name) {
     const afterIndex = index + needle.length;
     const after = afterIndex < source.length ? source[afterIndex] : "";
     if (
-      (before === "" || !/[A-Za-z0-9_.\/-]/u.test(before)) &&
+      (before === "" || !/[A-Za-z0-9_.-]/u.test(before)) &&
       (after === "" || !/[A-Za-z0-9_-]/u.test(after))
     ) {
       const line = source.slice(0, index).split("\n").length;
@@ -106,11 +142,36 @@ export function extractProseSentences(text) {
 
   const sentences = [];
   for (const paragraph of paragraphs) {
-    for (const match of paragraph.text.matchAll(/[^.!?]*[.!?](?=\s|$)|[^.!?]+$/g)) {
-      const sentence = normalizeWhitespace(match[0]);
-      if (!sentence) continue;
-      const line = paragraph.map[match.index] ?? 1;
-      sentences.push({ sentence, line });
+    let start = 0;
+    while (start < paragraph.text.length) {
+      let boundary = -1;
+      for (let index = start; index < paragraph.text.length; index += 1) {
+        if (/[.!?]/u.test(paragraph.text[index]) && (index + 1 === paragraph.text.length || /\s/u.test(paragraph.text[index + 1]))) {
+          boundary = index;
+          break;
+        }
+      }
+
+      if (boundary === -1) {
+        const segment = paragraph.text.slice(start);
+        const sentence = normalizeWhitespace(segment);
+        if (sentence) {
+          const first = segment.search(/[^\s]/u);
+          const line = first >= 0 ? (paragraph.map[start + first] ?? 1) : 1;
+          sentences.push({ sentence, line });
+        }
+        break;
+      }
+
+      const segment = paragraph.text.slice(start, boundary + 1);
+      const sentence = normalizeWhitespace(segment);
+      if (sentence) {
+        const first = segment.search(/[^\s]/u);
+        const line = first >= 0 ? (paragraph.map[start + first] ?? 1) : 1;
+        sentences.push({ sentence, line });
+      }
+      start = boundary + 1;
+      while (start < paragraph.text.length && /\s/u.test(paragraph.text[start])) start += 1;
     }
   }
   return sentences;

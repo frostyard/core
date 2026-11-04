@@ -338,8 +338,8 @@ try {
           const lineGrowth = lines - oldLines;
           const wordGrowth = words - oldWords;
           addRecord("info", display, null, `info growth: ${display}: ${signed(lineGrowth)} lines, ${signed(wordGrowth)} words since ${options.base}`);
-          if (lineGrowth > 0) {
-            addRecord("warning", display, null, `WARN size_growth: ${display}: +${lineGrowth} lines since ${options.base}`);
+          if (lineGrowth > 0 || wordGrowth > 0) {
+            addRecord("warning", display, null, `WARN size_growth: ${display}: ${signed(lineGrowth)} lines, ${signed(wordGrowth)} words since ${options.base}`);
           }
         }
       }
