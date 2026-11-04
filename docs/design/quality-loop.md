@@ -2,9 +2,11 @@
 
 Living document. Rationale:
 [ADR-0019](../adr/0019-governance-as-code-and-risk-tiers.md),
-[ADR-0029](../adr/0029-acmm-conformance-via-canonical-aliases.md).
+[ADR-0029](../adr/0029-acmm-conformance-via-canonical-aliases.md),
+[ADR-0068](../adr/0068-label-pull-requests-that-touch-high-risk-paths.md).
 Contracts: [specs/pr-review-rubric.md](../specs/pr-review-rubric.md),
-[specs/pr-acceptance-metric.md](../specs/pr-acceptance-metric.md).
+[specs/pr-acceptance-metric.md](../specs/pr-acceptance-metric.md),
+[specs/risk-paths.md](../specs/risk-paths.md).
 `docs/quality.md` is a conformance alias for this file (ADR-0029).
 
 ## Overview
@@ -24,6 +26,11 @@ PR template ──► review rubric ──► CI gates ──► corrections ─
 - **Declare** — [.github/pull_request_template.md](../../.github/pull_request_template.md)
   makes every PR state its risk tier (highest applicable, never lower —
   ADR-0019) and walk the docs-housekeeping checklist.
+- **Flag risk paths** — each repository lists its high-risk paths in
+  `.github/risk-paths.json`; core's reusable workflow labels a PR that
+  touches 1 path with `risk:high`; the label routes the PR to the owner's
+  review or the accountable owner's read ([ADR-0068](../adr/0068-label-pull-requests-that-touch-high-risk-paths.md),
+  [risk paths spec](../specs/risk-paths.md)).
 - **Review** — the [PR review rubric](../specs/pr-review-rubric.md) is the
   contract a review applies; the
   [review runbook](../../.github/prompts/review.prompt.md) is its task-shaped
@@ -82,9 +89,11 @@ copy it as-is.
 - Rationale: [ADR-0019](../adr/0019-governance-as-code-and-risk-tiers.md),
   [ADR-0021](../adr/0021-sha-pinned-actions-and-least-privilege-ci.md),
   [ADR-0029](../adr/0029-acmm-conformance-via-canonical-aliases.md),
+  [ADR-0068](../adr/0068-label-pull-requests-that-touch-high-risk-paths.md),
   [ADR-0043](../adr/0043-pin-repository-tools-in-mise-and-name-the-verify-gate.md),
   [ADR-0044](../adr/0044-expose-the-make-gate-triad-in-every-repository.md)
 - Contracts: [specs/pr-review-rubric.md](../specs/pr-review-rubric.md),
-  [specs/pr-acceptance-metric.md](../specs/pr-acceptance-metric.md)
+  [specs/pr-acceptance-metric.md](../specs/pr-acceptance-metric.md),
+  [specs/risk-paths.md](../specs/risk-paths.md)
 - Built in: the 2026-08-12 ACMM conformance PR
   (closes [core#22–#41](https://github.com/frostyard/core/issues/22))

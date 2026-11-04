@@ -60,4 +60,6 @@ itself can carry injected instructions.
 - Extended by:
   [ADR-0035](0035-author-organization-authority-as-strict-json.md), which
   publishes strict organization authority without storing provider credentials
-  or worker execution state
+  or worker execution state, and
+  [ADR-0068](0068-label-pull-requests-that-touch-high-risk-paths.md), which
+  keeps PR-controlled code outside the privileged risk-path labeling job
