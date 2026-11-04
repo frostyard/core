@@ -3,7 +3,9 @@
 export function stripFencedBlocks(text) {
   const lines = String(text).split("\n");
   let open = null;
-  let listIndent = 0;
+  // Content indents of the open list items, outermost first; the last one is
+  // the item that a line at its indent or deeper belongs to.
+  let listStack = [];
   let quoteDepth = 0;
 
   function splitQuote(line) {
@@ -48,18 +50,17 @@ export function stripFencedBlocks(text) {
     const blank = /^[ \t]*$/.test(parts.rest);
 
     if (parts.q !== quoteDepth) {
-      listIndent = 0;
+      listStack = [];
     }
     quoteDepth = parts.q;
 
     if (!blank) {
+      // An outdent closes the list items it leaves and returns to the parent.
+      while (listStack.length > 0 && listStack.at(-1) > indent) listStack.pop();
       const itemIndent = listContentIndent(trimmed, indent);
-      if (itemIndent !== null) {
-        listIndent = itemIndent;
-      } else if (indent < listIndent) {
-        listIndent = 0;
-      }
+      if (itemIndent !== null) listStack.push(itemIndent);
     }
+    const listIndent = listStack.at(-1) ?? 0;
 
     const start = /^(`{3,}|~{3,})(.*)$/.exec(trimmed);
     if (!start) return line;

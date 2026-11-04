@@ -195,6 +195,24 @@ test("fence in a list item and ended list item are handled", async () => {
   }
 });
 
+test("a fence in the parent item after a nested list ends is skipped, and text after the list is checked", async () => {
+  const dir = tempDir();
+  try {
+    const nested = "  - outer\n    - inner\n      text\n\n    ```text\n    `~/missing.md`\n    ```\n";
+    writeFileSync(path.join(dir, "AGENTS.md"), nested);
+    const inParent = await runGuard(dir, ["--root", dir, "--home", dir, "AGENTS.md"]);
+    assert.equal(inParent.code, 0, inParent.stdout);
+
+    writeFileSync(path.join(dir, "AGENTS.md"), `${nested}\nSee \`~/missing.md\`.\n`);
+    const afterList = await runGuard(dir, ["--root", dir, "--home", dir, "AGENTS.md"]);
+    assert.equal(afterList.code, 1);
+    assert.match(afterList.stdout, /dead_reference: AGENTS\.md:9:/);
+    assert.doesNotMatch(afterList.stdout, /AGENTS\.md:6:/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("line suffix is removed before checking a script path", async () => {
   const dir = tempDir();
   try {
