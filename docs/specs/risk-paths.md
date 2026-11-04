@@ -37,7 +37,7 @@ Validation is deny-by-default (ADR-0019). An unknown key at any level fails. Ano
 - `*` matches 0 or more characters except `/`.
 - `?` matches 1 character except `/`.
 - `**` as a whole segment matches 0 or more whole segments. `**/x` matches `x` and `a/b/x`. `a/**` matches every file under `a/`.
-- `{a,b,c}` matches 1 of the comma-separated alternatives. Nesting is not supported. An empty alternative is not supported.
+- `{a,b,c}` matches 1 of the comma-separated alternatives. Nesting is not supported. An empty alternative is not supported. One glob expands to at most 256 brace alternatives in all (for example, 8 groups of 2 give 256); validation fails above that limit.
 - A dotfile or dot folder matches like any other name. `*` matches `.env`.
 - Character classes (`[...]`), negation (`!`), backslash escapes and `**` mixed with other characters in 1 segment, such as `a**`, are not supported. Validation fails for these forms.
 - A glob with no `/` matches only at the root. Use `**/name` to match that name anywhere. The glob `**` alone is the exception: it matches every path.
@@ -107,7 +107,7 @@ The reusable workflow is `frostyard/core/.github/workflows/risk-paths.yml`, with
 - The GitHub API returns at most 3000 files for 1 PR. When the list has 3000 or more entries, the job adds the label and writes that the file list is truncated. This behavior is fail safe.
 - With no list at the base SHA, for example in a PR that adds the list, the job writes "no list on base" to the job summary and passes.
 - On every run with a valid list, the job checks that `risk:high` exists (`GET /repos/{owner}/{repo}/labels/risk:high`) before it reads the file list or uses a match result. A missing label therefore shows on the first run, also with no match. The job MUST NOT create the label: the add-labels API creates a missing label, so this check comes first.
-- On a match, the job adds `risk:high` with the caller's `GITHUB_TOKEN` and writes each matched path, glob and `why` to the job summary.
+- On a match, the job adds `risk:high` with the caller's `GITHUB_TOKEN`. It writes each matched path, glob and `why` to the job log. The job summary shows the first 500 matches as a table, and the number of matches that it does not show, so that the summary stays inside the GitHub size limit.
 - With no match, the job changes no label.
 - The job never removes `risk:high`.
 - When `risk:high` does not exist in the repository, the job fails with a message that names the label and says that the accountable owner must create it.

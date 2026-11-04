@@ -284,6 +284,18 @@ test("job adds risk:high once on a match and writes path, glob and why", async (
   for (const line of logs) assert.ok(line.startsWith("risk-paths: "), line);
 });
 
+test("job summary shows 500 matches, the count of the rest, and the log has every match", async () => {
+  const files = Array.from({ length: 503 }, (_, i) => ({ filename: `shared/bootc-secure/f${i}.sh`, status: "added" }));
+  const { api } = fakeApi({ lists: { [BASE_SHA]: JSON.stringify(validList()) }, files });
+  const { result, summary, logs } = await runJob(api);
+  assert.equal(result.outcome, "labeled");
+  assert.equal(result.matches.length, 503);
+  assert.equal(summary.split("\n").filter((line) => line.startsWith("| shared/bootc-secure/")).length, 500);
+  assert.match(summary, /3 more matches are not shown/);
+  assert.equal(logs.filter((line) => line.startsWith("risk-paths: match ")).length, 503);
+  assert.ok(logs.some((line) => line.includes("shared/bootc-secure/f502.sh")));
+});
+
 test("job with no list on base passes with no label call", async () => {
   const { api, calls } = fakeApi();
   const { result, summary } = await runJob(api);

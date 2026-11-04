@@ -555,7 +555,7 @@ export async function runRiskPathsJob({ api, eventName, event, summary, log }) {
       lines.push(`| ${escapeCell(match.path)} | ${escapeCell(match.glob)} | ${escapeCell(match.why)} |`);
     }
     if (matches.length > SUMMARY_ROW_LIMIT) {
-      lines.push("", `${matches.length - SUMMARY_ROW_LIMIT} more matches are not shown.`);
+      lines.push("", `${matches.length - SUMMARY_ROW_LIMIT} more matches are not shown here; the job log lists every match.`);
     }
   }
   await summary(`${lines.join("\n")}\n`);
