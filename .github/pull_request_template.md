@@ -10,7 +10,8 @@ closes. -->
 
 <!-- Declare the highest applicable tier — never lower (ADR-0019).
 Docs/skills/templates-only changes in this repo are tier 1. Scale
-harmonization is tracked in core#13; cite a tier, don't invent a scale. -->
+harmonization is tracked in core#13; cite a tier, don't invent a scale.
+A `risk:high` label (risk-path match, ADR-0068) means the highest tier. -->
 
 Risk tier: 1 — <!-- justification -->
 

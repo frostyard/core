@@ -1,0 +1,81 @@
+#!/usr/bin/env node
+// Risk-path list gate (ADR-0068, docs/specs/risk-paths.md): strict JSON and
+// the field table of .github/risk-paths.json, the required entries (rule C),
+// and, where the library lives, the embedded copy in the reusable workflow.
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { LIST_PATH, matchGlob, parseStrictJson, validateRiskPaths } from "./lib/risk-paths.mjs";
+import { LIBRARY_PATH, checkSync } from "./sync-risk-paths-workflow.mjs";
+
+const scriptRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const usage = "Usage: node scripts/check-risk-paths.mjs [--root DIR] [--file PATH] [--caller PATH]";
+
+let root = scriptRoot;
+let file = LIST_PATH;
+let caller = ".github/workflows/risk-paths-caller.yml";
+const args = process.argv.slice(2);
+for (let i = 0; i < args.length; i++) {
+  const arg = args[i];
+  if (arg === "--root" || arg === "--file" || arg === "--caller") {
+    const value = args[i + 1];
+    if (!value || value.startsWith("--")) {
+      console.error(usage);
+      process.exit(2);
+    }
+    i++;
+    if (arg === "--root") root = resolve(value);
+    if (arg === "--file") file = value;
+    if (arg === "--caller") caller = value;
+  } else {
+    console.error(usage);
+    process.exit(2);
+  }
+}
+
+const failures = [];
+let entries = 0;
+const absoluteFile = resolve(root, file);
+
+if (!existsSync(absoluteFile)) {
+  failures.push(`${file}: file does not exist`);
+} else {
+  let list;
+  try {
+    list = parseStrictJson(readFileSync(absoluteFile, "utf8"));
+  } catch (error) {
+    failures.push(`${file}: ${error.message}`);
+  }
+  if (list !== undefined) {
+    const validation = validateRiskPaths(list);
+    for (const error of validation.errors) failures.push(`${file}: ${error}`);
+    if (validation.ok) {
+      entries = list.paths.length;
+      // Rule C: the list and the caller workflow are always high risk.
+      for (const required of [LIST_PATH, caller]) {
+        if (!list.paths.some((entry) => matchGlob(entry.glob, required))) {
+          failures.push(`${file}: no glob matches the required path ${required}`);
+        }
+      }
+    }
+  }
+}
+
+// The sync check applies where the library lives (core).
+let synced = false;
+if (existsSync(resolve(root, LIBRARY_PATH))) {
+  try {
+    const problem = checkSync(root);
+    if (problem) failures.push(problem);
+    else synced = true;
+  } catch (error) {
+    failures.push(error.message);
+  }
+}
+
+for (const failure of failures) console.error(`FAIL risk-paths: ${failure}`);
+if (failures.length > 0) {
+  console.log(`FAIL risk_paths: ${failures.length} problem(s)`);
+  process.exit(1);
+}
+console.log(`ok   risk_paths: ${entries} entries${synced ? ", workflow in sync" : ""}`);

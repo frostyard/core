@@ -59,6 +59,10 @@
     "constraint": "repository-surface-path-matches-contract",
     "diagnostic": "/surfaces/0/path must be equal to constant"
   },
+  "repository-surfaces-risk-paths-wrong-path.json": {
+    "constraint": "repository-surface-path-matches-contract",
+    "diagnostic": "/surfaces/4/path must be equal to constant"
+  },
   "repository-unknown-program.json": {
     "constraint": "maintenance-programs-closed-vocabulary",
     "diagnostic": "/maintenance_programs/0 must be equal to one of the allowed values"

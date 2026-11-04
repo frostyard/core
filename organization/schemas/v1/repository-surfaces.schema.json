@@ -24,8 +24,8 @@
     },
     "surfaces": {
       "type": "array",
-      "minItems": 4,
-      "maxItems": 4,
+      "minItems": 5,
+      "maxItems": 5,
       "items": {
         "oneOf": [
           {
@@ -39,6 +39,9 @@
           },
           {
             "$ref": "#/$defs/documentationIndex"
+          },
+          {
+            "$ref": "#/$defs/riskPaths"
           }
         ]
       }
@@ -118,6 +121,25 @@
         },
         "media_type": {
           "const": "text/markdown"
+        }
+      }
+    },
+    "riskPaths": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "path", "artifact_type", "media_type"],
+      "properties": {
+        "id": {
+          "const": "risk-paths"
+        },
+        "path": {
+          "const": ".github/risk-paths.json"
+        },
+        "artifact_type": {
+          "const": "file"
+        },
+        "media_type": {
+          "const": "application/json"
         }
       }
     }

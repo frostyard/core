@@ -69,6 +69,7 @@ surface IDs and canonical repository paths:
 | `agent-governance` | `policies/agent-governance.json` | `file` | `organization/schemas/v1/repository-agent-governance.schema.json` |
 | `agent-skills` | `.agents/skills` | `directory` | none |
 | `documentation-index` | `docs/README.md` | `file` | none |
+| `risk-paths` | `.github/risk-paths.json` | `file` | none ([risk-paths spec](risk-paths.md)) |
 
 ### Repository settings contract
 
@@ -155,5 +156,7 @@ derives.
   [ADR-0042](../adr/0042-adopt-a-merge-queue-on-the-default-branch.md)
   (required merge queue),
   [ADR-0064](../adr/0064-retire-snowcat.md) (Snowcat retired; no service
-  imports declarations)
+  imports declarations),
+  [ADR-0068](../adr/0068-label-pull-requests-that-touch-high-risk-paths.md)
+  (the `risk-paths` surface)
 - Context: [organization authority](../design/organization-authority.md)
