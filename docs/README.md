@@ -83,6 +83,7 @@ no ADR, spec, or plan covers yet.
 - [0065 — Let a suite daemon end with the last window when the Background portal is refused](adr/0065-let-a-suite-daemon-end-with-the-last-window-when-the-portal-is-refused.md)
 - [0066 — Build only the omarchy-apps packages that Snosi uses](adr/0066-build-only-the-omarchy-apps-packages-that-snosi-uses.md)
 - [0067 — Publish omarchy-apps packages on change, and keep the newest two](adr/0067-publish-omarchy-apps-on-change-and-keep-the-newest-two.md)
+- [0068 — Label pull requests that touch high-risk paths](adr/0068-label-pull-requests-that-touch-high-risk-paths.md)
 
 ### Design
 
@@ -101,6 +102,7 @@ no ADR, spec, or plan covers yet.
 - [Organization verification profiles](specs/organization-verification-profiles.md)
 - [Organization goals](specs/organization-goals.md)
 - [Stable repository drift alarm](specs/stable-repository-drift-alarm.md)
+- [Risk paths](specs/risk-paths.md)
 
 ### Plans
 
