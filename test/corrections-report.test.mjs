@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, lstatSync, mkdirSync, symlinkSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -10,6 +10,7 @@ import { fileURLToPath } from "node:url";
 const execFileAsync = promisify(execFile);
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const script = path.join(repoRoot, "scripts/corrections-report.mjs");
+const { parseRemoteUrl } = await import(script);
 
 function line(date, scope, correction, evidence = "review", promotedTo = "") {
   return { date, scope, correction, evidence, promoted_to: promotedTo };
@@ -21,8 +22,12 @@ async function initRepo(root, name) {
 }
 
 const fixtures = [];
+const denied = [];
 test.after(() => {
-  for (const root of fixtures) rmSync(root, { recursive: true, force: true });
+  for (const root of fixtures) {
+    for (const folder of denied) chmodSync(folder, 0o755);
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 async function fixture() {
@@ -223,7 +228,7 @@ test("an unreadable JSON line is reported and the run exits 0", async () => {
 
   const { stdout } = await run(root);
   assert.match(stdout, /## Unreadable lines/);
-  assert.match(stdout, /- frostyard\/repo-a repo-a:1: invalid JSON/);
+  assert.match(stdout, /- frostyard\/repo-a repo-a\/\.memory\/corrections\.jsonl:1: invalid JSON/);
 });
 
 test("depth limits discovery and node_modules is skipped", async () => {
@@ -265,4 +270,72 @@ test("text output replaces control characters from correction text", async () =>
   assert.match(stdout, /- 2026-11-04 \[Scope\] Line one ## Fake heading  \[31mred — evidence: review/);
   assert.doesNotMatch(stdout, /\u001b/);
   assert.doesNotMatch(stdout, /^## Fake heading/m);
+});
+
+test("remote identity keeps the host and the full path", () => {
+  for (const remote of [
+    "https://github.com/frostyard/core.git",
+    "https://github.com/frostyard/core",
+    "git@github.com:frostyard/core.git",
+    "ssh://git@github.com/frostyard/core.git",
+    "https://GitHub.com/Frostyard/Core.git",
+  ]) {
+    assert.equal(parseRemoteUrl(remote), "frostyard/core", remote);
+  }
+  assert.equal(parseRemoteUrl("https://git.example.net/frostyard/core.git"), "git.example.net/frostyard/core");
+  assert.equal(parseRemoteUrl("git@git.example.net:frostyard/core.git"), "git.example.net/frostyard/core");
+  assert.equal(parseRemoteUrl("https://gitlab.com/group/sub/core.git"), "gitlab.com/group/sub/core");
+  assert.notEqual(parseRemoteUrl("https://gitlab.com/group/sub/core.git"), parseRemoteUrl("https://gitlab.com/other/sub/core.git"));
+  assert.equal(parseRemoteUrl("/srv/git/core.git"), null);
+  assert.equal(parseRemoteUrl("file:///srv/git/core.git"), null);
+});
+
+test("2 repositories with the same owner/name on different hosts do not merge", async () => {
+  const root = await fixture();
+  const shared = line("2026-11-04", "Scope", "Same correction");
+  for (const [name, remote, promoted] of [
+    ["github", "https://github.com/frostyard/core.git", "AGENTS.md"],
+    ["mirror", "https://git.example.net/frostyard/core.git", ""],
+  ]) {
+    const repo = path.join(root, name);
+    mkdirSync(repo);
+    await execFileAsync("git", ["init", "--quiet"], { cwd: repo });
+    await execFileAsync("git", ["remote", "add", "origin", remote], { cwd: repo });
+    writeJsonl(repo, [{ ...shared, promoted_to: promoted }]);
+  }
+
+  const report = JSON.parse((await run(root, ["--json"])).stdout);
+  assert.deepEqual(report.repositories.map((repository) => repository.name), ["frostyard/core", "git.example.net/frostyard/core"]);
+  assert.equal(report.pending, 1);
+  assert.equal(report.repositories[1].pending[0].correction, "Same correction");
+});
+
+test("a .memory symbolic link is not followed and is listed as unreadable", async () => {
+  const root = await fixture();
+  const outside = await fixture();
+  writeJsonl(outside, [line("2026-11-04", "Outside", "Outside correction")]);
+  const repo = path.join(root, "repo-a");
+  mkdirSync(repo);
+  await initRepo(repo, "repo-a");
+  symlinkSync(path.join(outside, ".memory"), path.join(repo, ".memory"));
+
+  const { stdout } = await run(root);
+  assert.doesNotMatch(stdout, /Outside correction/);
+  assert.match(stdout, /- frostyard\/repo-a repo-a\/\.memory: symbolic link, not followed/);
+});
+
+test("a denied .memory folder is listed as unreadable, not left out", { skip: process.getuid?.() === 0 && "root reads any folder" }, async () => {
+  const root = await fixture();
+  const repo = path.join(root, "repo-a");
+  mkdirSync(repo);
+  await initRepo(repo, "repo-a");
+  writeJsonl(repo, [line("2026-11-04", "Scope", "Hidden correction")]);
+  const memory = path.join(repo, ".memory");
+  chmodSync(memory, 0o000);
+  denied.push(memory);
+
+  const { stdout } = await run(root);
+  chmodSync(memory, 0o755);
+  assert.match(stdout, /- frostyard\/repo-a repo-a\/\.memory\/corrections\.jsonl: cannot read: EACCES/);
+  assert.match(stdout, /with corrections: 1;/);
 });

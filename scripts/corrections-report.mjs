@@ -29,31 +29,38 @@ function relativePath(root, folder) {
   return value === "" ? "." : value.split(sep).join("/");
 }
 
-function parseRemoteUrl(value) {
+// The repository identity is the host plus the full path, so 2 remotes on
+// different hosts or in different namespaces never merge. SSH, scp-style and
+// HTTPS forms of 1 repository give the same identity. A github.com remote
+// shows as owner/name; any other host keeps its host in the name.
+export function parseRemoteUrl(value) {
   if (!value) return null;
   const remote = value.trim();
+  let host;
   let path;
 
-  const scp = remote.match(/^([^@]+@)?[^:]+:(.+)$/);
+  const scp = remote.match(/^(?:[^@/]+@)?([^:/]+):(.+)$/);
   if (scp && !remote.includes("://")) {
+    host = scp[1];
     path = scp[2];
   } else {
     try {
       const url = new URL(remote);
-      path = url.pathname;
+      host = url.hostname;
+      path = decodeURIComponent(url.pathname);
     } catch {
-      path = null;
+      return null;
     }
   }
 
-  if (!path) return null;
+  if (!host || !path) return null;
+  host = host.toLowerCase();
   const parts = path.replace(/^\/+|\/+$/g, "").split("/").filter(Boolean);
   if (parts.length < 2) return null;
-  let owner = parts.at(-2);
-  let name = parts.at(-1);
-  if (name.endsWith(".git")) name = name.slice(0, -4);
-  if (!owner || !name) return null;
-  return `${owner}/${name}`;
+  if (parts.at(-1).endsWith(".git")) parts[parts.length - 1] = parts.at(-1).slice(0, -4);
+  if (!parts.at(-1)) return null;
+  if (host === "github.com") return parts.join("/").toLowerCase();
+  return `${host}/${parts.join("/")}`;
 }
 
 function remoteName(folder) {
@@ -220,25 +227,56 @@ function buildReport(root, maxDepth) {
   const unreadable = [];
   let repositoriesScanned = checkouts.length;
 
+  // Only "no such path" means "no corrections": every other error (a denied
+  // folder, a symbolic link out of the checkout) is listed as unreadable, so
+  // a checkout is never left out without a trace.
+  const absent = (error) => error?.code === "ENOENT" || error?.code === "ENOTDIR";
+  const repositoryFor = (checkout) => {
+    const name = remoteName(checkout.absolute) || `local:${checkout.path}`;
+    if (!repositoryMap.has(name)) repositoryMap.set(name, { name, checkouts: [] });
+    return repositoryMap.get(name);
+  };
+  const skip = (checkout, path, reason) => {
+    const repository = repositoryFor(checkout);
+    repository.checkouts.push({ path: checkout.path, lines: [] });
+    unreadable.push({ repository: repository.name, path: `${checkout.path}/${path}`, line: null, reason });
+  };
+
   for (const checkout of checkouts) {
-    const correctionsFile = resolve(checkout.absolute, ".memory/corrections.jsonl");
+    const memoryFolder = resolve(checkout.absolute, ".memory");
+    const correctionsFile = resolve(memoryFolder, "corrections.jsonl");
     let stat;
     try {
+      stat = lstatSync(memoryFolder);
+    } catch (error) {
+      if (!absent(error)) skip(checkout, ".memory", `cannot read: ${error.code ?? error.message}`);
+      continue;
+    }
+    if (stat.isSymbolicLink()) {
+      skip(checkout, ".memory", "symbolic link, not followed");
+      continue;
+    }
+    if (!stat.isDirectory()) continue;
+    try {
       stat = lstatSync(correctionsFile);
-    } catch {
+    } catch (error) {
+      if (!absent(error)) skip(checkout, ".memory/corrections.jsonl", `cannot read: ${error.code ?? error.message}`);
+      continue;
+    }
+    if (stat.isSymbolicLink()) {
+      skip(checkout, ".memory/corrections.jsonl", "symbolic link, not followed");
       continue;
     }
     if (!stat.isFile()) continue;
 
-    const name = remoteName(checkout.absolute) || checkout.path;
-    if (!repositoryMap.has(name)) repositoryMap.set(name, { name, checkouts: [] });
-    const repository = repositoryMap.get(name);
+    const repository = repositoryFor(checkout);
+    const name = repository.name;
 
     let text;
     try {
       text = readFileSync(correctionsFile, "utf8");
     } catch {
-      unreadable.push({ repository: name, path: checkout.path, line: 1, reason: "cannot read file" });
+      unreadable.push({ repository: name, path: `${checkout.path}/.memory/corrections.jsonl`, line: null, reason: "cannot read file" });
       repository.checkouts.push({ path: checkout.path, lines: [] });
       continue;
     }
@@ -248,7 +286,7 @@ function buildReport(root, maxDepth) {
       const lineNumber = index + 1;
       const parsed = parseLine(lineText);
       if (parsed.error) {
-        unreadable.push({ repository: name, path: checkout.path, line: lineNumber, reason: parsed.error });
+        unreadable.push({ repository: name, path: `${checkout.path}/.memory/corrections.jsonl`, line: lineNumber, reason: parsed.error });
         continue;
       }
       const value = parsed.value;
@@ -286,7 +324,7 @@ function buildReport(root, maxDepth) {
   unreadable.sort((a, b) =>
     compareText(a.repository, b.repository)
     || compareText(a.path, b.path)
-    || a.line - b.line
+    || (a.line ?? 0) - (b.line ?? 0)
     || compareText(a.reason, b.reason)
   );
 
@@ -366,7 +404,7 @@ function textReport(report) {
     lines.push("(none)");
   } else {
     for (const item of report.unreadable) {
-      lines.push(`- ${clean(item.repository)} ${clean(item.path)}:${item.line}: ${clean(item.reason)}`);
+      lines.push(`- ${clean(item.repository)} ${clean(item.path)}${item.line === null ? "" : `:${item.line}`}: ${clean(item.reason)}`);
     }
   }
 
