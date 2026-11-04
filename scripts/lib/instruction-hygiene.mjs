@@ -3,17 +3,103 @@
 export function stripFencedBlocks(text) {
   const lines = String(text).split("\n");
   let open = null;
+  let listIndent = 0;
+  let quoteDepth = 0;
+
+  function splitQuote(line) {
+    const prefix = /^(?: {0,3}> ?)*/.exec(line)?.[0] ?? "";
+    const rest = line.slice(prefix.length);
+    const q = (prefix.match(/>/g) ?? []).length;
+    return { rest, q };
+  }
+
+  function leadingIndent(rest) {
+    let columns = 0;
+    let length = 0;
+    for (const character of rest) {
+      if (character === " ") {
+        columns += 1;
+        length += 1;
+      } else if (character === "\t") {
+        columns += 4;
+        length += 1;
+      } else {
+        break;
+      }
+    }
+    return { indent: columns, trimmed: rest.slice(length) };
+  }
+
+  function whitespaceWidth(value) {
+    let width = 0;
+    for (const character of value) width += character === "\t" ? 4 : 1;
+    return width;
+  }
+
+  function listContentIndent(rest, indent) {
+    const marker = /^([-+*]|\d+[.)])([ \t]+)/.exec(rest);
+    if (!marker) return null;
+    return indent + marker[1].length + whitespaceWidth(marker[2]);
+  }
+
+  function processOutside(line) {
+    const parts = splitQuote(line);
+    const { indent, trimmed } = leadingIndent(parts.rest);
+    const blank = /^[ \t]*$/.test(parts.rest);
+
+    if (parts.q !== quoteDepth) {
+      listIndent = 0;
+    }
+    quoteDepth = parts.q;
+
+    if (!blank) {
+      const itemIndent = listContentIndent(trimmed, indent);
+      if (itemIndent !== null) {
+        listIndent = itemIndent;
+      } else if (indent < listIndent) {
+        listIndent = 0;
+      }
+    }
+
+    const start = /^(`{3,}|~{3,})(.*)$/.exec(trimmed);
+    if (!start) return line;
+    if (start[1][0] === "`" && start[2].includes("`")) return line;
+
+    const fenceLength = start[1].length;
+    const allowed = indent <= 3 || (listIndent > 0 && indent >= listIndent && indent <= listIndent + 3);
+    if (!allowed) return line;
+
+    const containerIndent = indent > 3 || (listIndent > 0 && indent >= listIndent) ? listIndent : 0;
+    open = { char: start[1][0], length: fenceLength, q: parts.q, containerIndent };
+    return "";
+  }
+
   return lines
     .map((line) => {
-      if (open === null) {
-        const start = /^[ \t>]*(`{3,}|~{3,})(.*)$/.exec(line);
-        if (!start || (start[1][0] === "`" && start[2].includes("`"))) return line;
-        open = { char: start[1][0], length: start[1].length };
+      const parts = splitQuote(line);
+      const { indent, trimmed } = leadingIndent(parts.rest);
+      const blank = /^[ \t]*$/.test(parts.rest);
+
+      if (open !== null) {
+        if (parts.q < open.q || (!blank && indent < open.containerIndent)) {
+          open = null;
+          return processOutside(line);
+        }
+
+        const end = /^(`{3,}|~{3,})([ \t]*)$/.exec(trimmed);
+        if (
+          end &&
+          end[1][0] === open.char &&
+          end[1].length >= open.length &&
+          indent <= open.containerIndent + 3
+        ) {
+          open = null;
+          return "";
+        }
         return "";
       }
-      const end = /^[ \t>]*(`{3,}|~{3,})[ \t]*$/.exec(line);
-      if (end && end[1][0] === open.char && end[1].length >= open.length) open = null;
-      return "";
+
+      return processOutside(line);
     })
     .join("\n");
 }

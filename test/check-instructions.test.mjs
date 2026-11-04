@@ -147,9 +147,49 @@ test("dead path inside blockquote and nested-list fences is ignored", async () =
     const blockquote = await runGuard(dir, ["--root", dir, "--home", dir, "AGENTS.md"]);
     assert.equal(blockquote.code, 0);
 
-    writeFileSync(path.join(dir, "AGENTS.md"), "- item\n      ```text\n      `~/missing.md`\n      ```\n");
+    writeFileSync(path.join(dir, "AGENTS.md"), "  - item\n      ```text\n      `~/missing.md`\n      ```\n");
     const nested = await runGuard(dir, ["--root", dir, "--home", dir, "AGENTS.md"]);
     assert.equal(nested.code, 0);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("four-space fence does not hide an following reference", async () => {
+  const dir = tempDir();
+  try {
+    writeFileSync(path.join(dir, "AGENTS.md"), "    ```text\n\nSee `~/missing.md`.\n");
+    const result = await runGuard(dir, ["--root", dir, "--home", dir, "AGENTS.md"]);
+    assert.equal(result.code, 1);
+    assert.match(result.stdout, /dead_reference: AGENTS\.md:3:/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("ended blockquote fence does not hide an following reference", async () => {
+  const dir = tempDir();
+  try {
+    writeFileSync(path.join(dir, "AGENTS.md"), "> ```text\n> example\n\nSee `~/missing.md`.\n");
+    const result = await runGuard(dir, ["--root", dir, "--home", dir, "AGENTS.md"]);
+    assert.equal(result.code, 1);
+    assert.match(result.stdout, /dead_reference: AGENTS\.md:4:/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("fence in a list item and ended list item are handled", async () => {
+  const dir = tempDir();
+  try {
+    writeFileSync(path.join(dir, "AGENTS.md"), "1. Step\n\n   ```text\n   `~/missing.md`\n   ```\n");
+    const inList = await runGuard(dir, ["--root", dir, "--home", dir, "AGENTS.md"]);
+    assert.equal(inList.code, 0);
+
+    writeFileSync(path.join(dir, "AGENTS.md"), "1. Step\n\n   ```text\n   example\n\nSee `~/missing.md`.\n");
+    const afterList = await runGuard(dir, ["--root", dir, "--home", dir, "AGENTS.md"]);
+    assert.equal(afterList.code, 1);
+    assert.match(afterList.stdout, /dead_reference: AGENTS\.md:6:/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
