@@ -79,9 +79,14 @@ PR template ──► review rubric ──► CI gates ──► corrections ─
     Agent-private memory keeps only an agent's role, its owner's
     preferences, lessons that span repositories, and facts of one machine.
   - **Weekly promotion.** Each week (the Friday hygiene line) each owner runs
-    `node scripts/corrections-report.mjs --root ~/projects` against its local
-    checkouts. It reads only and lists, per repository, the lines with an
-    empty `promoted_to`, and the scopes that repeat (2 or more lines in 1
+    `node scripts/corrections-report.mjs --root ~/projects --ref origin/main`
+    against its local checkouts, after a `git fetch` in each. With `--ref` it
+    reads each `.memory/corrections.jsonl` at that ref, once per clone, so a
+    line on an unmerged branch, an uncommitted edit, or a second worktree is
+    not counted; a checkout that has the file but not the ref is listed as
+    unreadable. Without `--ref` it reads the working trees. It reads only
+    and lists, per repository, the lines with an empty `promoted_to`, and
+    the scopes that repeat (2 or more lines in 1
     repository, or 1 scope in 2 or more repositories). A repeat in 1
     repository becomes an `AGENTS.md` rule or a test; a repeat across
     repositories becomes a core skill or ADR; the owner then fills
