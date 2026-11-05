@@ -23,7 +23,9 @@ Contract:
   `node scripts/check-corrections.mjs --base origin/main` also checks that
   existing lines are unchanged except a filled `promoted_to`.
   `scripts/corrections-report.mjs` is the weekly promotion report for local
-  checkouts ([quality loop](../docs/design/quality-loop.md), Learn station).
+  checkouts ([quality loop](../docs/design/quality-loop.md), Learn station);
+  `--ref origin/main` reads each file at that ref, once per clone, not in
+  the working trees.
   A blocking
   review point adds a line here in the PR that fixes it
   ([quality loop](../docs/design/quality-loop.md), Learn station).

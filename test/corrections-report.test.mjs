@@ -24,10 +24,10 @@ async function initRepo(root, name) {
 const fixtures = [];
 const denied = [];
 test.after(() => {
-  for (const root of fixtures) {
-    for (const folder of denied) chmodSync(folder, 0o755);
-    rmSync(root, { recursive: true, force: true });
-  }
+  // Restore every denied folder first: a fixture removed before it would
+  // leave a later chmod with no folder (ENOENT).
+  for (const folder of denied) chmodSync(folder, 0o755);
+  for (const root of fixtures) rmSync(root, { recursive: true, force: true });
 });
 
 async function fixture() {
@@ -343,4 +343,208 @@ test("a denied .memory folder is listed as unreadable, not left out", { skip: pr
   chmodSync(memory, 0o755);
   assert.match(stdout, /- frostyard\/repo-a repo-a\/\.memory\/corrections\.jsonl: cannot read: EACCES/);
   assert.match(stdout, /with corrections: 1;/);
+});
+
+// --ref reads the file at a ref (such as origin/main), so a line on an
+// unmerged branch, an uncommitted edit, or a second worktree of 1 clone
+// is not counted (ACMM scorecard B6, 2026-11-04).
+const gitEnv = {
+  ...process.env,
+  GIT_AUTHOR_NAME: "test",
+  GIT_AUTHOR_EMAIL: "test@example.invalid",
+  GIT_COMMITTER_NAME: "test",
+  GIT_COMMITTER_EMAIL: "test@example.invalid",
+  GIT_CONFIG_NOSYSTEM: "1",
+};
+
+function gitIn(folder, args) {
+  return execFileAsync("git", ["-C", folder, "-c", "commit.gpgsign=false", ...args], { env: gitEnv });
+}
+
+async function commitAll(folder, message) {
+  await gitIn(folder, ["add", "-A"]);
+  await gitIn(folder, ["commit", "--quiet", "-m", message]);
+}
+
+// A clone whose origin/main holds 1 committed line, with a feature branch
+// that adds a second line in a second worktree, and an uncommitted third
+// line in the main worktree.
+async function cloneWithBranch(root) {
+  const repo = path.join(root, "repo-a");
+  mkdirSync(repo);
+  await initRepo(repo, "repo-a");
+  await gitIn(repo, ["checkout", "--quiet", "-b", "main"]);
+  writeJsonl(repo, [line("2026-11-01", "Merged", "Merged correction")]);
+  await commitAll(repo, "merged line");
+  await gitIn(repo, ["update-ref", "refs/remotes/origin/main", "HEAD"]);
+
+  const worktree = path.join(root, "repo-a-feature");
+  await gitIn(repo, ["worktree", "add", "--quiet", "-b", "feature", worktree]);
+  writeJsonl(worktree, [
+    line("2026-11-01", "Merged", "Merged correction"),
+    line("2026-11-02", "Branch", "Branch-only correction"),
+  ]);
+  await commitAll(worktree, "branch line");
+
+  writeJsonl(repo, [
+    line("2026-11-01", "Merged", "Merged correction"),
+    line("2026-11-03", "Edit", "Uncommitted correction"),
+  ]);
+  return { repo, worktree };
+}
+
+test("--ref reads only the file at the ref, once per clone", async () => {
+  const root = await fixture();
+  await cloneWithBranch(root);
+
+  const { stdout: trees } = await run(root, ["--json"]);
+  const treeReport = JSON.parse(trees);
+  assert.equal(treeReport.ref, null);
+  assert.equal(treeReport.lines, 3, "working trees count the branch and the uncommitted lines");
+
+  const { stdout } = await run(root, ["--ref", "origin/main", "--json"]);
+  const report = JSON.parse(stdout);
+  assert.equal(report.ref, "origin/main");
+  assert.equal(report.repositories_scanned, 2);
+  assert.equal(report.repositories_with_corrections, 1);
+  assert.equal(report.lines, 1);
+  assert.deepEqual(report.repositories[0].paths, ["repo-a", "repo-a-feature"]);
+  assert.deepEqual(report.repositories[0].pending.map((item) => item.correction), ["Merged correction"]);
+  assert.deepEqual(report.unreadable, []);
+
+  const { stdout: text } = await run(root, ["--ref", "origin/main"]);
+  assert.match(text, /^Corrections report: .* \(at origin\/main\)\n/);
+  assert.doesNotMatch(text, /Branch-only correction|Uncommitted correction/);
+});
+
+test("--ref lists a checkout with the file but without the ref, and skips one without both", async () => {
+  const root = await fixture();
+  const withFile = path.join(root, "repo-a");
+  const without = path.join(root, "repo-b");
+  for (const [folder, name] of [[withFile, "repo-a"], [without, "repo-b"]]) {
+    mkdirSync(folder);
+    await initRepo(folder, name);
+  }
+  writeJsonl(withFile, [line("2026-11-04", "Scope", "Local correction")]);
+
+  const { stdout } = await run(root, ["--ref", "origin/main", "--json"]);
+  const report = JSON.parse(stdout);
+  assert.equal(report.lines, 0);
+  assert.deepEqual(report.unreadable, [
+    { repository: "frostyard/repo-a", path: "repo-a/.memory/corrections.jsonl", line: null, reason: "ref not found: origin/main" },
+  ]);
+});
+
+test("--ref does not follow a committed symbolic link and reports bad lines at the ref", async () => {
+  const root = await fixture();
+  const linked = path.join(root, "repo-a");
+  mkdirSync(linked);
+  await initRepo(linked, "repo-a");
+  mkdirSync(path.join(linked, ".memory"));
+  symlinkSync("/etc/hostname", path.join(linked, ".memory/corrections.jsonl"));
+  await commitAll(linked, "link");
+
+  const bad = path.join(root, "repo-b");
+  mkdirSync(bad);
+  await initRepo(bad, "repo-b");
+  mkdirSync(path.join(bad, ".memory"));
+  writeFileSync(path.join(bad, ".memory/corrections.jsonl"), `${JSON.stringify(line("2026-11-04", "Ok", "Good"))}\nnot json\n`);
+  await commitAll(bad, "bad line");
+
+  const { stdout } = await run(root, ["--ref", "HEAD", "--json"]);
+  const report = JSON.parse(stdout);
+  assert.equal(report.lines, 1);
+  assert.deepEqual(report.unreadable, [
+    { repository: "frostyard/repo-a", path: "repo-a/.memory/corrections.jsonl", line: null, reason: "symbolic link, not followed" },
+    { repository: "frostyard/repo-b", path: "repo-b/.memory/corrections.jsonl", line: 2, reason: "invalid JSON" },
+  ]);
+});
+
+test("--ref refuses a value that git could read as an option", async () => {
+  const root = await fixture();
+  for (const value of ["-h", "--output=x", "main..x", "a b"]) {
+    await assert.rejects(run(root, ["--ref", value]), (error) =>
+      error.code === 2 && error.stderr.includes("Usage:"), value
+    );
+  }
+});
+
+test("--ref checks each worktree for a file when the clone has no such ref", async () => {
+  const root = await fixture();
+  const repo = path.join(root, "repo-a");
+  mkdirSync(repo);
+  await initRepo(repo, "repo-a");
+  writeFileSync(path.join(repo, "README"), "x\n");
+  await commitAll(repo, "first");
+  const worktree = path.join(root, "repo-a-wt");
+  await gitIn(repo, ["worktree", "add", "--quiet", "-b", "feature", worktree]);
+  writeJsonl(worktree, [line("2026-11-04", "Scope", "Uncommitted correction")]);
+
+  const { stdout } = await run(root, ["--ref", "origin/main", "--json"]);
+  const report = JSON.parse(stdout);
+  assert.equal(report.lines, 0);
+  assert.deepEqual(report.unreadable, [
+    { repository: "frostyard/repo-a", path: "repo-a-wt/.memory/corrections.jsonl", line: null, reason: "ref not found: origin/main" },
+  ]);
+});
+
+test("--ref names a clone by the remote of any of its worktrees", async () => {
+  const root = await fixture();
+  const repo = path.join(root, "repo-a");
+  mkdirSync(repo);
+  await gitIn(repo, ["init", "--quiet"]);
+  await gitIn(repo, ["config", "extensions.worktreeConfig", "true"]);
+  writeJsonl(repo, [line("2026-11-01", "Merged", "Merged correction")]);
+  await commitAll(repo, "merged line");
+  await gitIn(repo, ["update-ref", "refs/remotes/origin/main", "HEAD"]);
+  const worktree = path.join(root, "repo-a-wt");
+  await gitIn(repo, ["worktree", "add", "--quiet", "-b", "feature", worktree]);
+  await gitIn(worktree, ["config", "--worktree", "remote.origin.url", "https://github.com/frostyard/repo-a.git"]);
+
+  const { stdout } = await run(root, ["--ref", "origin/main", "--json"]);
+  const report = JSON.parse(stdout);
+  assert.deepEqual(report.repositories.map((repository) => [repository.name, repository.paths]), [
+    ["frostyard/repo-a", ["repo-a", "repo-a-wt"]],
+  ]);
+  assert.equal(report.lines, 1);
+});
+
+test("--ref never fetches a blob that a partial clone does not hold", async () => {
+  const source = await fixture();
+  await gitIn(source, ["init", "--quiet", "-b", "main"]);
+  await gitIn(source, ["config", "uploadpack.allowFilter", "true"]);
+  writeJsonl(source, [line("2026-11-01", "Remote", "Remote-only correction")]);
+  await commitAll(source, "line");
+
+  const root = await fixture();
+  const clone = path.join(root, "repo-a");
+  await execFileAsync("git", ["clone", "--quiet", "--filter=blob:none", "--no-checkout", `file://${source}`, clone], { env: gitEnv });
+  const { stdout: oid } = await gitIn(clone, ["rev-parse", "origin/main:.memory/corrections.jsonl"]);
+  const missing = () => execFileAsync("git", ["-C", clone, "cat-file", "-e", oid.trim()], { env: { ...gitEnv, GIT_NO_LAZY_FETCH: "1" } });
+  await assert.rejects(missing(), "the fixture's blob starts missing");
+
+  const { stdout } = await run(root, ["--ref", "origin/main", "--json"]);
+  const report = JSON.parse(stdout);
+  assert.equal(report.lines, 0);
+  assert.equal(report.unreadable.length, 1);
+  assert.equal(report.unreadable[0].reason, "cannot read file at origin/main");
+  await assert.rejects(missing(), "the report must not fetch the blob");
+});
+
+test("--ref lists a checkout without the ref whose .memory folder is denied", { skip: process.getuid?.() === 0 && "root reads any folder" }, async () => {
+  const root = await fixture();
+  const repo = path.join(root, "repo-a");
+  mkdirSync(repo);
+  await initRepo(repo, "repo-a");
+  writeJsonl(repo, [line("2026-11-04", "Scope", "Hidden correction")]);
+  const memory = path.join(repo, ".memory");
+  chmodSync(memory, 0o000);
+  denied.push(memory);
+
+  const { stdout } = await run(root, ["--ref", "origin/main", "--json"]);
+  chmodSync(memory, 0o755);
+  const report = JSON.parse(stdout);
+  assert.deepEqual(report.unreadable, [
+    { repository: "frostyard/repo-a", path: "repo-a/.memory/corrections.jsonl", line: null, reason: "ref not found: origin/main; cannot read: EACCES" },
+  ]);
 });
