@@ -6,11 +6,15 @@ const DAY_MS = 86_400_000;
 
 // --- Words ---------------------------------------------------------------
 
-// A word is a run of letters, digits, "-" and "_", so every word test uses
-// that boundary rather than \b (which stops at "-" and "_").
-const WORD_CHARS = "A-Za-z0-9_-";
-const REVERT_WORD = new RegExp(`(?<![${WORD_CHARS}])reverts?(?![${WORD_CHARS}])|(?<![${WORD_CHARS}])rever(?:ted|ting)(?![${WORD_CHARS}])`, "i");
-const REVERT_WORD_ALL = new RegExp(REVERT_WORD.source, "gi");
+// A word is a run of letters, digits, "-" and "_" (the spec: a letter is any
+// Unicode letter and a digit any Unicode number). Every word test uses that
+// boundary, so "éfix" and "revertß" are 1 word each, not a fix or revert word.
+const WORD_CLASS = "\\p{L}\\p{N}_-";
+const REVERT_WORD = new RegExp(
+  `(?<![${WORD_CLASS}])reverts?(?![${WORD_CLASS}])|(?<![${WORD_CLASS}])rever(?:ted|ting)(?![${WORD_CLASS}])`,
+  "iu",
+);
+const REVERT_WORD_ALL = new RegExp(REVERT_WORD.source, "giu");
 const FIX_WORDS = new Set([
   "fix", "fixes", "fixed", "fixing", "fixup", "hotfix", "bugfix", "bug",
   "regression", "regressed", "broke", "broken", "breaks", "breakage",
@@ -41,14 +45,15 @@ function isoOrNull(date) {
 
 // The 3 reference forms of the spec, matched left to right in 1 pass so the
 // "owner/name#N" form is never also seen as "#N". A bare "#N" that follows a
-// letter, a digit, "/" or "&" is no reference.
+// letter, a digit, "/" or "&" is no reference, and an "owner/name#N" that
+// follows a letter, a digit, ".", "_", "-" or "/" is none.
 const REFERENCE = new RegExp(
   [
-    String.raw`https:\/\/github\.com\/([A-Za-z0-9][A-Za-z0-9._-]*)\/([A-Za-z0-9][A-Za-z0-9._-]*)\/pull\/(\d+)`,
-    String.raw`(?<![A-Za-z0-9._\/-])([A-Za-z0-9][A-Za-z0-9._-]*)\/([A-Za-z0-9][A-Za-z0-9._-]*)#(\d+)`,
-    String.raw`(?<![A-Za-z0-9\/&])#(\d+)`,
+    String.raw`https://github\.com/([A-Za-z0-9][A-Za-z0-9._-]*)/([A-Za-z0-9][A-Za-z0-9._-]*)/pull/(\d+)`,
+    String.raw`(?<![\p{L}\p{N}._/-])([A-Za-z0-9][A-Za-z0-9._-]*)/([A-Za-z0-9][A-Za-z0-9._-]*)#(\d+)`,
+    String.raw`(?<![\p{L}\p{N}/&])#(\d+)`,
   ].join("|"),
-  "g",
+  "gu",
 );
 
 export function parseReferences(text, repository) {
@@ -84,6 +89,18 @@ export function prCommitNumber(subject) {
 
 // --- Changes -------------------------------------------------------------
 
+function oidOf(value) {
+  if (typeof value === "string") return value.trim().toLowerCase() || null;
+  if (value !== null && typeof value === "object" && typeof value.oid === "string") {
+    return value.oid.trim().toLowerCase() || null;
+  }
+  return null;
+}
+
+function branchOf(value) {
+  return typeof value === "string" && value !== "" ? value : null;
+}
+
 function toChange(item) {
   if (item === null || typeof item !== "object" || Array.isArray(item)) return null;
   const kind = item.kind;
@@ -105,7 +122,14 @@ function toChange(item) {
   if (kind === "pr") {
     const number = Number(item.number);
     if (!Number.isFinite(number)) return null;
+    const base = branchOf(item.base);
+    const defaultBranch = branchOf(item.defaultBranch);
+    // A PR merged into another branch than the default one is no change.
+    if (base !== null && defaultBranch !== null && base !== defaultBranch) return null;
     change.number = number;
+    change.mergeCommit = oidOf(item.mergeCommit);
+    change.base = base;
+    change.defaultBranch = defaultBranch;
   } else {
     const sha = String(item.sha ?? "");
     if (sha === "") return null;
@@ -115,21 +139,62 @@ function toChange(item) {
 }
 
 function changeKey(change) {
-  return change.kind === "pr" ? `${change.repository}#${change.number}` : `${change.repository}@${change.sha}`;
+  return change.kind === "pr"
+    ? `${change.repository}#${change.number}`
+    : `${change.repository}@${change.sha.toLowerCase()}`;
 }
 
 function prKey(repository, number) {
   return `${String(repository).toLowerCase()}#${Number(number)}`;
 }
 
+// The fields 2 records of 1 PR must agree on.
+const PR_FIELDS = ["title", "body", "mergedAt", "author", "mergeCommit"];
+
+function sameMoment(a, b) {
+  const left = a.getTime();
+  const right = b.getTime();
+  return left === right || (Number.isNaN(left) && Number.isNaN(right));
+}
+
+function differingFields(a, b) {
+  return PR_FIELDS.filter((field) => (field === "mergedAt"
+    ? !sameMoment(a.mergedAt, b.mergedAt)
+    : a[field] !== b[field]));
+}
+
+// 1 PR (repository and number) is 1 change, however often the input holds it;
+// 2 records that disagree about the PR are an error, not a guess. A commit is
+// no change of its own when its SHA is a PR's merge commit of the same input.
 export function normalizeChanges(raw) {
   if (!Array.isArray(raw)) throw new TypeError("changes must be an array");
-  const changes = [];
+  const byKey = new Map();
+  const order = [];
+
   for (const item of raw) {
     const change = toChange(item);
-    if (change !== null) changes.push(change);
+    if (change === null) continue;
+    const key = changeKey(change);
+    const existing = byKey.get(key);
+    if (existing === undefined) {
+      byKey.set(key, change);
+      order.push(change);
+      continue;
+    }
+    if (change.kind !== "pr") continue;
+    const fields = differingFields(existing, change);
+    if (fields.length > 0) {
+      throw new TypeError(`PR ${change.repository}#${change.number} has 2 records in the input that differ in ${fields.join(", ")}`);
+    }
   }
-  return changes;
+
+  const mergeCommits = new Set();
+  for (const change of order) {
+    if (change.kind === "pr" && change.mergeCommit !== null) {
+      mergeCommits.add(`${change.repository}@${change.mergeCommit}`);
+    }
+  }
+  return order.filter((change) => change.kind === "pr" || !mergeCommits.has(changeKey(change)));
 }
 
 function compareText(a, b) {
@@ -156,6 +221,22 @@ function bySummary(change) {
 
 // --- Reverts -------------------------------------------------------------
 
+// The PR of a quoted title that merged last before the change: with 2 or more
+// PRs of 1 repository holding the same title, rule 1 names only that one.
+function latestBefore(candidates, change) {
+  let best = null;
+  for (const pr of candidates) {
+    if (changeKey(pr) === changeKey(change)) continue;
+    if (!(pr.mergedAt.getTime() < change.mergedAt.getTime())) continue;
+    if (best === null
+      || pr.mergedAt.getTime() > best.mergedAt.getTime()
+      || (pr.mergedAt.getTime() === best.mergedAt.getTime() && pr.number > best.number)) {
+      best = pr;
+    }
+  }
+  return best;
+}
+
 // 1 entry per (change C, reverted PR P) pair, by the first rule that matches:
 // "quoted-title", then "title", then "body". P is a merged PR in the input, C
 // merges after P, and a change never reverts itself.
@@ -168,14 +249,15 @@ export function findReverts(changes) {
 
   // Rule 1 quotes a title and holds no reference, so it is read inside the
   // change's own repository (the GitHub "Revert" button only reverts there).
+  // Identical titles keep every PR, and latestBefore picks 1 of them.
   const quoted = new Map();
   const quote = (key, pr) => {
-    const full = `${pr.repository}|${key}`;
-    if (!quoted.has(full)) quoted.set(full, pr);
+    if (!quoted.has(key)) quoted.set(key, []);
+    quoted.get(key).push(pr);
   };
   for (const pr of merged.values()) {
-    quote(`Revert "${pr.title}"`, pr);
-    quote(`Revert "${pr.title} (#${pr.number})"`, pr);
+    quote(`${pr.repository}|Revert "${pr.title}"`, pr);
+    quote(`${pr.repository}|Revert "${pr.title} (#${pr.number})"`, pr);
   }
 
   const found = [];
@@ -197,8 +279,11 @@ export function findReverts(changes) {
 
   for (const change of normalized) {
     // Rule 1: C's title is Revert "T", T P's title or P's squash subject.
-    const cited = quoted.get(`${change.repository}|${change.title}`);
-    if (cited) record(change, cited, "quoted-title", change.title);
+    const candidates = quoted.get(`${change.repository}|${change.title}`);
+    if (candidates !== undefined) {
+      const target = latestBefore(candidates, change);
+      if (target !== null) record(change, target, "quoted-title", change.title);
+    }
 
     // Rule 2: C's title holds a revert word and a reference to P, any order.
     if (hasRevertWord(change.title)) {
@@ -248,7 +333,7 @@ function sentenceEndLength(line, index) {
   return 0;
 }
 
-const WORD = /[A-Za-z0-9_-]+/y;
+const WORD = new RegExp(`[${WORD_CLASS}]+`, "uy");
 
 // 1 token per word, per reference and per sentence end, in order. A reference
 // counts as 1 word.
@@ -284,45 +369,44 @@ function tokenizeLine(line, repository) {
   return tokens;
 }
 
-// Words strictly between 2 tokens, or null when a sentence end stands between
-// them (which breaks the fix-word relation).
-function wordsBetween(tokens, a, b) {
-  const [low, high] = a < b ? [a, b] : [b, a];
-  let words = 0;
-  for (let position = low + 1; position < high; position += 1) {
-    if (tokens[position].type === "end") return null;
-    words += 1;
+// A reference names a fix when a fix word stands at most 3 words away on
+// either side and no sentence end stands between. The scan reads at most 4
+// tokens each way, so 1 line is read in linear time, and namesAsFixed and the
+// escaped-defect count share it.
+function referenceNamesFix(tokens, position) {
+  for (let offset = 1; offset <= 4; offset += 1) {
+    const token = tokens[position - offset];
+    if (token === undefined || token.type === "end") break;
+    if (token.type === "word" && isFixWord(token.text)) return true;
   }
-  return words;
-}
-
-function lineNamesTarget(line, repository, target) {
-  const tokens = tokenizeLine(line, repository);
-  const targetKey = prKey(target.repository, target.number);
-  const fixPositions = [];
-  const referencePositions = [];
-  tokens.forEach((token, position) => {
-    if (token.type === "word") {
-      if (isFixWord(token.text)) fixPositions.push(position);
-    } else if (token.type === "ref" && prKey(token.reference.repository, token.reference.number) === targetKey) {
-      referencePositions.push(position);
-    }
-  });
-  for (const position of referencePositions) {
-    for (const fixPosition of fixPositions) {
-      const words = wordsBetween(tokens, fixPosition, position);
-      if (words !== null && words <= 3) return true;
-    }
+  for (let offset = 1; offset <= 4; offset += 1) {
+    const token = tokens[position + offset];
+    if (token === undefined || token.type === "end") break;
+    if (token.type === "word" && isFixWord(token.text)) return true;
   }
   return false;
+}
+
+// The PRs 1 line names as fixed, 1 per reference that a fix word reaches.
+function lineFixedKeys(line, repository) {
+  const tokens = tokenizeLine(line, repository);
+  const keys = new Set();
+  tokens.forEach((token, position) => {
+    if (token.type !== "ref" || !referenceNamesFix(tokens, position)) return;
+    keys.add(prKey(token.reference.repository, token.reference.number));
+  });
+  return keys;
 }
 
 function fixMatchWhere(change, target) {
   const normalized = toChange(change);
   if (normalized === null) return null;
-  if (lineNamesTarget(normalized.title, normalized.repository, target)) return { where: "title", line: normalized.title };
+  const targetKey = prKey(target.repository, target.number);
+  if (lineFixedKeys(normalized.title, normalized.repository).has(targetKey)) {
+    return { where: "title", line: normalized.title };
+  }
   for (const line of bodyLines(normalized.body)) {
-    if (lineNamesTarget(line, normalized.repository, target)) return { where: "body", line };
+    if (lineFixedKeys(line, normalized.repository).has(targetKey)) return { where: "body", line };
   }
   return null;
 }
@@ -338,27 +422,7 @@ function fixedTargets(change) {
   const matches = [];
   const lines = [["title", change.title], ...bodyLines(change.body).map((line) => ["body", line])];
   for (const [where, line] of lines) {
-    const tokens = tokenizeLine(line, change.repository);
-    const fixPositions = [];
-    const referencePositions = [];
-    tokens.forEach((token, position) => {
-      if (token.type === "word") {
-        if (isFixWord(token.text)) fixPositions.push(position);
-      } else if (token.type === "ref") {
-        referencePositions.push(position);
-      }
-    });
-    for (const position of referencePositions) {
-      const reference = tokens[position].reference;
-      const key = prKey(reference.repository, reference.number);
-      for (const fixPosition of fixPositions) {
-        const words = wordsBetween(tokens, fixPosition, position);
-        if (words !== null && words <= 3) {
-          matches.push({ key, where, line });
-          break;
-        }
-      }
-    }
+    for (const key of lineFixedKeys(line, change.repository)) matches.push({ key, where, line });
   }
   return matches;
 }

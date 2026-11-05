@@ -120,9 +120,13 @@ export function parseSlurpedPages(text) {
 
 async function fetchRepository(repository, from, to, exec) {
   const window = `${utcStamp(from)}..${utcStamp(to)}`;
+  // Only a PR merged into the default branch is a change (the spec).
+  const defaultBranch = String(await exec(["api", `repos/${repository}`, "--jq", ".default_branch"])).trim();
+
   const prText = await exec([
     "pr", "list", "--repo", repository, "--state", "merged", "--limit", String(PR_LIMIT),
-    "--search", `merged:${window}`, "--json", "number,title,body,mergedAt,author",
+    "--search", `merged:${window} base:${defaultBranch}`,
+    "--json", "number,title,body,mergedAt,author,mergeCommit,baseRefName",
   ]);
   const prs = JSON.parse(prText === "" ? "[]" : prText);
   // A full page means more merged PRs may exist: a partial count would be
@@ -139,6 +143,9 @@ async function fetchRepository(repository, from, to, exec) {
     body: pr.body ?? "",
     mergedAt: pr.mergedAt ?? "",
     author: pr.author?.login ?? "",
+    mergeCommit: pr.mergeCommit?.oid ?? null,
+    base: pr.baseRefName ?? null,
+    defaultBranch,
   }));
 
   const commitText = await exec([
@@ -173,6 +180,26 @@ async function readInput(file) {
   const value = JSON.parse(text);
   if (!Array.isArray(value)) throw new TypeError(`${file} must hold a JSON array of changes`);
   return value;
+}
+
+function timeOf(value) {
+  if (value instanceof Date) return value.getTime();
+  if (typeof value === "number") return value;
+  if (typeof value === "string" && value !== "") return new Date(value).getTime();
+  return Number.NaN;
+}
+
+// Both modes keep the same changes after they are read, however they were
+// read: the repositories of --repo, and the window that was read.
+function selectChanges(changes, { repositories, from, to }) {
+  const fromMs = from.getTime();
+  const toMs = to.getTime();
+  return changes.filter((change) => {
+    const repository = String(change?.repository ?? "").toLowerCase();
+    if (repositories !== null && !repositories.includes(repository)) return false;
+    const at = timeOf(change?.mergedAt);
+    return at >= fromMs && at <= toMs;
+  });
 }
 
 // Text output goes to a terminal: a title or a body line from GitHub must not
@@ -247,11 +274,20 @@ async function main() {
       return;
     }
 
+    let reverts;
+    try {
+      reverts = findReverts(selectChanges(changes, { repositories, from: args.fromDate, to: until }));
+    } catch (error) {
+      console.error(`Error: ${error.message}`);
+      process.exitCode = 1;
+      return;
+    }
+
     const report = {
       since: args.fromDate.toISOString(),
       until: until.toISOString(),
       repositories,
-      reverts: findReverts(changes),
+      reverts,
     };
     const output = args.json ? `${JSON.stringify(report, null, 2)}\n` : revertsText(report);
     if (args.out !== null) {
@@ -286,7 +322,7 @@ async function main() {
 
   let result;
   try {
-    result = escapedDefects(changes, {
+    result = escapedDefects(selectChanges(changes, { repositories, from: fetchFrom, to: fetchTo }), {
       from: args.fromDate,
       to: args.toDate,
       asOf: args.asOfDate,

@@ -26,8 +26,11 @@ test.after(async () => {
   for (const folder of tempFolders) await rm(folder, { recursive: true, force: true });
 });
 
-function pr(repository, number, title, mergedAt, { body = "", author = "frostyard-machines" } = {}) {
-  return { repository, kind: "pr", number, title, body, mergedAt, author };
+function pr(repository, number, title, mergedAt, { body = "", author = "frostyard-machines", mergeCommit = null, base, defaultBranch } = {}) {
+  const change = { repository, kind: "pr", number, title, body, mergedAt, author, mergeCommit };
+  if (base !== undefined) change.base = base;
+  if (defaultBranch !== undefined) change.defaultBranch = defaultBranch;
+  return change;
 }
 
 function commit(repository, sha, title, mergedAt, { body = "", author = "someone" } = {}) {
@@ -105,6 +108,50 @@ test("normalizeChanges lower-cases, dates, and drops a PR's own commit", () => {
   assert.equal(normalized[1].sha, "c".repeat(40));
 });
 
+test("a commit whose SHA is a PR's merge commit is no change, whatever its subject", () => {
+  const sha = "a".repeat(40);
+  const target = pr("bketelsen/fleet", 94, "Escape regex backslashes in Jinja string literals", "2026-10-28T19:51:51Z", { mergeCommit: sha });
+  const byOid = commit("bketelsen/fleet", sha.toUpperCase(), "fix: hand-written subject", "2026-10-29T00:00:00Z", {
+    body: "Fixes #94",
+  });
+  assert.equal(normalizeChanges([target, byOid]).length, 1);
+
+  const asObject = commit("bketelsen/fleet", sha, "fix: another hand-written subject", "2026-10-29T00:00:00Z", {
+    body: "Fixes #94",
+  });
+  const withObject = pr("bketelsen/fleet", 94, "Escape regex backslashes in Jinja string literals", "2026-10-28T19:51:51Z", { mergeCommit: { oid: sha.toUpperCase() } });
+  assert.equal(normalizeChanges([withObject, asObject]).length, 1);
+  assert.deepEqual(findReverts([target, byOid]), []);
+  assert.equal(escaped([target, byOid]).escaped, 0);
+
+  // Another SHA is a change of its own, and it does escape the PR.
+  const other = commit("bketelsen/fleet", "b".repeat(40), "fix: hand-written subject", "2026-10-29T00:00:00Z", {
+    body: "Fixes #94",
+  });
+  assert.equal(escaped([target, other]).escaped, 1);
+});
+
+test("duplicates: 1 PR is 1 change, and 2 records that disagree are an error", () => {
+  const target = pr("frostyard/core", 12, "Fix the flag", "2026-10-02T00:00:00Z");
+  const fix = pr("frostyard/core", 20, "Restore the flag", "2026-10-03T00:00:00Z", { body: "Fixes #12", author: "bketelsen" });
+
+  const result = escaped([target, { ...target }, fix]);
+  assert.equal(result.merged, 1);
+  assert.equal(result.escaped, 1);
+  assert.equal(result.rate, 1);
+  assert.equal(normalizeChanges([target, { ...target }]).length, 1);
+  assert.equal(normalizeChanges([target, { ...target }, fix]).length, 2);
+
+  assert.throws(
+    () => normalizeChanges([target, { ...target, title: "Fix the flag again" }]),
+    (error) => {
+      assert.equal(error instanceof TypeError, true);
+      assert.match(error.message, /frostyard\/core#12/);
+      return true;
+    },
+  );
+});
+
 // --- The fleet#99 vector --------------------------------------------------
 
 test("fleet#99 reverts fleet#94 by the title rule", () => {
@@ -160,6 +207,24 @@ test("rule 1: the GitHub button quoted title alone, and with a body line", () =>
   assert.equal(reverts.length, 1);
   assert.equal(reverts[0].rule, "quoted-title");
   assert.equal(reverts[0].evidence, 'Revert "Fix the flag"');
+});
+
+test("rule 1 with 2 identical titles reverts the PR that merged last before the change", () => {
+  const earlier = pr("frostyard/core", 12, "Fix the flag", "2026-10-02T00:00:00Z");
+  const later = pr("frostyard/core", 13, "Fix the flag", "2026-10-04T00:00:00Z");
+  const afterBoth = pr("frostyard/core", 20, 'Revert "Fix the flag"', "2026-10-05T00:00:00Z");
+  const between = pr("frostyard/core", 21, 'Revert "Fix the flag"', "2026-10-03T00:00:00Z");
+
+  for (const input of [[earlier, later, afterBoth], [later, earlier, afterBoth]]) {
+    const reverts = findReverts(input);
+    assert.equal(reverts.length, 1);
+    assert.equal(reverts[0].reverted.number, 13);
+  }
+  for (const input of [[earlier, later, between], [later, earlier, between]]) {
+    const reverts = findReverts(input);
+    assert.equal(reverts.length, 1);
+    assert.equal(reverts[0].reverted.number, 12);
+  }
 });
 
 test("rule 3 alone: a body line with the revert word before the reference", () => {
@@ -223,6 +288,22 @@ test("negative: a cross-repository #N resolves to the change's own repository", 
   assert.deepEqual(findReverts([target, change]), []);
 });
 
+// --- Unicode -------------------------------------------------------------
+
+test("Unicode letters and digits hold the word and reference boundaries", () => {
+  // "é" is a letter, so "#94" after it is no reference.
+  assert.deepEqual(parseReferences("Fixes é#94", "frostyard/core"), []);
+  // "٣" is a number, so "#94" after it is no reference.
+  assert.deepEqual(parseReferences("Fixes ٣#94", "frostyard/core"), []);
+  // "éfix" is 1 word, so it is no fix word.
+  assert.equal(namesAsFixed(pr("frostyard/core", 21, "éfix #94", "2026-10-03T00:00:00Z"), { repository: "frostyard/core", number: 94 }), null);
+  // A letter after the reference does not hide it.
+  assert.equal(namesAsFixed(pr("frostyard/core", 22, "Fixes #94 ünd", "2026-10-03T00:00:00Z"), { repository: "frostyard/core", number: 94 }), "Fixes #94 ünd");
+  // "revertß" is 1 word, so it is no revert word.
+  const target = pr("frostyard/core", 94, "X", "2026-10-02T00:00:00Z");
+  assert.deepEqual(findReverts([target, pr("frostyard/core", 95, "revertß #94", "2026-10-03T00:00:00Z")]), []);
+});
+
 // --- Names P as fixed ----------------------------------------------------
 
 function fixLine(line, repository = "frostyard/core", number = 94) {
@@ -252,6 +333,21 @@ test("fix-name lines are read in the body too, and another repository does not m
   assert.equal(namesAsFixed(commit("frostyard/core", "d".repeat(40), "fix: escape (#94)", "2026-10-03T00:00:00Z"), { repository: "frostyard/core", number: 94 }), null);
 });
 
+test("fix-name matching reads at most 4 tokens each way", () => {
+  // 1000 fix words that stand 5 tokens from every reference: no match, and a
+  // pair-by-pair scan would read the line a quadratic number of times.
+  const units = 2_000;
+  const line = Array.from({ length: units }, () => "bug a b c d #1 zzz zzz zzz zzz").join(" ");
+  const change = pr("frostyard/core", 2, "Restore the flag", "2026-10-03T00:00:00Z", { body: line });
+
+  const started = Date.now();
+  const matched = namesAsFixed(change, { repository: "frostyard/core", number: 1 });
+  const elapsed = Date.now() - started;
+
+  assert.equal(matched, null);
+  assert.ok(elapsed < 2000, `${units} fix words 5 tokens from each reference took ${elapsed} ms`);
+});
+
 // --- Windows and cohort bounds ------------------------------------------
 
 test("escape window: 7 days exactly counts, 1 ms later does not, and before P does not", () => {
@@ -277,6 +373,17 @@ test("cohort window: a PR at from is in, a PR at to is out, and the author filte
 
   const another = pr("frostyard/core", 3, "Third", "2026-10-02T00:00:00Z", { author: "someone" });
   assert.equal(escaped([another]).merged, 0);
+});
+
+test("a PR merged into another branch than the default one is no change and is in no cohort", () => {
+  const elsewhere = pr("frostyard/core", 12, "Fix the flag", "2026-10-02T00:00:00Z", { base: "release", defaultBranch: "main" });
+  const onMain = pr("frostyard/core", 20, "Restore the flag", "2026-10-03T00:00:00Z", { base: "main", defaultBranch: "main" });
+
+  assert.equal(normalizeChanges([elsewhere]).length, 0);
+  assert.equal(normalizeChanges([onMain]).length, 1);
+  const result = escaped([elsewhere, onMain]);
+  assert.equal(result.merged, 1);
+  assert.equal(result.escaped, 0);
 });
 
 test("a change by another author still escapes a cohort PR", () => {
@@ -361,33 +468,35 @@ test("repositories limits the cohort, not the changes that escape it", () => {
 
 // --- Reads through gh ----------------------------------------------------
 
-test("fetch: the PR search and the commits API use the window, and 1000 PRs is an error", async () => {
+test("fetch: the default branch, the PR search, and the commits API use the window", async () => {
   const calls = [];
-  // --slurp: 1 array of pages. The second page's message holds "] [", which
-  // a split of back-to-back pages would break.
-  const commitBody = JSON.stringify([[{
-    sha: "a".repeat(40),
-    commit: {
-      message: 'Revert "X"\n\nThis reverts #94.\n',
-      committer: { date: "2026-10-29T01:50:45Z" },
-      author: { name: "Frostyard Machines" },
+  const mergeCommit = "c".repeat(40);
+  const commitBody = JSON.stringify([[
+    {
+      sha: "a".repeat(40),
+      commit: {
+        message: 'Revert "X"\n\nThis reverts #94.\n',
+        committer: { date: "2026-10-29T01:50:45Z" },
+        author: { name: "Frostyard Machines" },
+      },
+      author: null,
     },
-    author: null,
-  }], [{
-    sha: "b".repeat(40),
-    commit: {
-      message: "docs: tick [x] [y]\n\n]\n[",
-      committer: { date: "2026-10-30T00:00:00Z" },
-      author: { name: "Frostyard Machines" },
-    },
-    author: { login: "frostyard-machines" },
-  }]]);
+  ], []]);
   const exec = async (args) => {
     calls.push(args);
+    if (args[0] === "api" && args[1] === "repos/bketelsen/fleet") return "main\n";
     if (args[0] === "pr") {
-      return JSON.stringify([{ number: 94, title: "Escape regex backslashes", body: null, mergedAt: "2026-10-28T19:51:51Z", author: { login: "frostyard-machines" } }]);
+      return JSON.stringify([{
+        number: 94,
+        title: "Escape regex backslashes",
+        body: null,
+        mergedAt: "2026-10-28T19:51:51Z",
+        author: { login: "frostyard-machines" },
+        mergeCommit: { oid: mergeCommit },
+        baseRefName: "main",
+      }]);
     }
-    if (args[0] === "api") return commitBody;
+    if (args[0] === "api" && args[1] === "--paginate") return commitBody;
     throw new Error(`unexpected: ${args.join(" ")}`);
   };
 
@@ -398,31 +507,45 @@ test("fetch: the PR search and the commits API use the window, and 1000 PRs is a
     exec,
   });
 
-  assert.deepEqual(calls[0], [
-    "pr", "list", "--repo", "bketelsen/fleet", "--state", "merged", "--limit", "1000",
-    "--search", "merged:2026-10-01T00:00:00Z..2026-11-08T00:00:00Z",
-    "--json", "number,title,body,mergedAt,author",
-  ]);
+  assert.deepEqual(calls[0], ["api", "repos/bketelsen/fleet", "--jq", ".default_branch"]);
   assert.deepEqual(calls[1], [
+    "pr", "list", "--repo", "bketelsen/fleet", "--state", "merged", "--limit", "1000",
+    "--search", "merged:2026-10-01T00:00:00Z..2026-11-08T00:00:00Z base:main",
+    "--json", "number,title,body,mergedAt,author,mergeCommit,baseRefName",
+  ]);
+  assert.deepEqual(calls[2], [
     "api", "--paginate", "--slurp", "repos/bketelsen/fleet/commits?since=2026-10-01T00:00:00Z&until=2026-11-08T00:00:00Z&per_page=100",
   ]);
 
   const normalized = normalizeChanges(changes);
-  assert.equal(normalized.length, 3);
-  assert.equal(normalized[2].title, "docs: tick [x] [y]");
+  assert.equal(normalized.length, 2);
+  assert.equal(normalized[0].mergeCommit, mergeCommit);
+  assert.equal(normalized[0].base, "main");
+  assert.equal(normalized[0].defaultBranch, "main");
   assert.equal(normalized[1].title, 'Revert "X"');
   assert.equal(normalized[1].body, "This reverts #94.\n");
   assert.equal(normalized[1].author, "frostyard machines");
   assert.equal(findReverts(normalized).length, 1);
+});
 
-  const truncatedExec = async (args) => {
+test("fetch: 1000 merged PRs is an error, never a quiet shortfall", async () => {
+  const exec = async (args) => {
+    if (args[0] === "api" && args[1] === "repos/bketelsen/fleet") return "main\n";
     if (args[0] === "pr") {
-      return JSON.stringify(Array.from({ length: 1000 }, (_, index) => ({ number: index + 1, title: "t", body: null, mergedAt: "2026-10-05T00:00:00Z", author: { login: "frostyard-machines" } })));
+      return JSON.stringify(Array.from({ length: 1000 }, (_, index) => ({
+        number: index + 1,
+        title: "t",
+        body: null,
+        mergedAt: "2026-10-05T00:00:00Z",
+        author: { login: "frostyard-machines" },
+        mergeCommit: { oid: `${index}`.padStart(40, "0") },
+        baseRefName: "main",
+      })));
     }
     return "[]";
   };
   await assert.rejects(
-    fetchChanges({ repositories: ["bketelsen/fleet"], from: new Date("2026-10-01T00:00:00Z"), to: new Date("2026-11-08T00:00:00Z"), exec: truncatedExec }),
+    fetchChanges({ repositories: ["bketelsen/fleet"], from: new Date("2026-10-01T00:00:00Z"), to: new Date("2026-11-08T00:00:00Z"), exec }),
     /truncated/,
   );
 });
@@ -477,6 +600,42 @@ test("CLI: text output names the window, the rate and the evidence, with no cont
   ], { cwd: repoRoot });
   assert.match(incomplete.stdout, /incomplete: escapes are not final until 2026-11-08T00:00:00\.000Z/);
   assert.match(incomplete.stdout, /rate: no rate \(incomplete cohort\)/);
+});
+
+test("CLI: both modes drop a change of another repository and a change outside the read window", async () => {
+  const otherRepository = pr("frostyard/other", 30, "Revert bketelsen/fleet#94", "2026-10-29T00:00:00Z");
+  const lateRevert = pr("bketelsen/fleet", 98, "Revert #94", "2026-12-01T00:00:00Z");
+  const file = await fixtureFile([FLEET_94, otherRepository, lateRevert]);
+
+  const scoped = await execFileAsync(process.execPath, [
+    cli, "escaped", "--input", file, "--repo", "bketelsen/fleet",
+    "--from", WINDOW.from, "--to", WINDOW.to, "--as-of", WINDOW.asOf, "--json",
+  ], { cwd: repoRoot });
+  const scopedResult = JSON.parse(scoped.stdout);
+  assert.equal(scopedResult.merged, 1);
+  assert.equal(scopedResult.escaped, 0);
+
+  const allRepositories = await execFileAsync(process.execPath, [
+    cli, "escaped", "--input", file, "--from", WINDOW.from, "--to", WINDOW.to, "--as-of", WINDOW.asOf, "--json",
+  ], { cwd: repoRoot });
+  const allResult = JSON.parse(allRepositories.stdout);
+  assert.equal(allResult.escaped, 1);
+  assert.equal(allResult.items[0].by.length, 1);
+  assert.equal(allResult.items[0].by[0].repository, "frostyard/other");
+
+  const inWindow = await execFileAsync(process.execPath, [
+    cli, "reverts", "--input", file, "--repo", "bketelsen/fleet",
+    "--since", WINDOW.from, "--until", WINDOW.to, "--json",
+  ], { cwd: repoRoot });
+  assert.deepEqual(JSON.parse(inWindow.stdout).reverts, []);
+
+  const revertsAll = await execFileAsync(process.execPath, [
+    cli, "reverts", "--input", file, "--since", WINDOW.from, "--until", WINDOW.to, "--json",
+  ], { cwd: repoRoot });
+  const reverts = JSON.parse(revertsAll.stdout).reverts;
+  assert.equal(reverts.length, 1);
+  assert.equal(reverts[0].by.repository, "frostyard/other");
+  assert.equal(reverts[0].reverted.number, 94);
 });
 
 test("CLI: reverts --input lists the revert, and a usage error exits 2", async () => {
