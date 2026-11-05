@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 // Read-only report for .memory/corrections.jsonl files in local git checkouts.
 import { execFileSync } from "node:child_process";
-import { lstatSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { dirname, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const usage = "Usage: node scripts/corrections-report.mjs --root DIR [--depth N] [--json] [--out FILE]";
+const usage = "Usage: node scripts/corrections-report.mjs --root DIR [--depth N] [--ref REF] [--json] [--out FILE]";
 const requiredFields = ["date", "scope", "correction", "evidence", "promoted_to"];
 
 function plainObject(value) {
@@ -76,6 +76,60 @@ function remoteName(folder) {
     return parseRemoteUrl(output);
   } catch {
     return null;
+  }
+}
+
+function git(folder, args) {
+  return execFileSync("git", ["-C", folder, ...args], { stdio: "pipe", encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+}
+
+// The shared git folder of a checkout: every worktree of 1 clone has the same
+// one, so its refs and its file at a ref are read once.
+function commonDir(folder) {
+  try {
+    return git(folder, ["rev-parse", "--path-format=absolute", "--git-common-dir"]).trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+// Reads .memory/corrections.jsonl at a ref (such as origin/main), not in the
+// working tree, so a line on an unmerged branch or an uncommitted edit is not
+// counted. Returns { text }, { absent: true } or { error }.
+function readAtRef(folder, ref) {
+  let commit;
+  try {
+    commit = git(folder, ["rev-parse", "--verify", "--quiet", "--end-of-options", `${ref}^{commit}`]).trim();
+  } catch {
+    return { error: `ref not found: ${ref}`, missingRef: true };
+  }
+  // 1 tree at a time: `ls-tree` given a folder path lists the folder's
+  // content, not the folder's own entry.
+  const entry = (tree, name) => {
+    for (const item of git(folder, ["ls-tree", "-z", tree]).split("\0")) {
+      const match = item.match(/^(\d+) (\w+) ([0-9a-f]+)\t(.*)$/s);
+      if (match && match[4] === name) return { mode: match[1], type: match[2], oid: match[3] };
+    }
+    return null;
+  };
+  let memory;
+  let file;
+  try {
+    memory = entry(commit, ".memory");
+    if (!memory) return { absent: true };
+    if (memory.mode === "120000") return { error: "symbolic link, not followed", path: ".memory" };
+    if (memory.type !== "tree") return { absent: true };
+    file = entry(memory.oid, "corrections.jsonl");
+  } catch (error) {
+    return { error: `cannot read ${ref}: ${String(error.stderr || error.message).trim().split("\n")[0]}` };
+  }
+  if (!file) return { absent: true };
+  if (file.mode === "120000") return { error: "symbolic link, not followed" };
+  if (file.type !== "blob") return { absent: true };
+  try {
+    return { text: git(folder, ["cat-file", "blob", file.oid]) };
+  } catch {
+    return { error: "cannot read file" };
   }
 }
 
@@ -225,7 +279,30 @@ function compareLines(a, b) {
     || compareText(a.evidence, b.evidence);
 }
 
-function buildReport(root, maxDepth) {
+function parseCorrections(text, name, checkout, unreadable) {
+  const lines = [];
+  for (const [index, lineText] of splitLines(text).entries()) {
+    const lineNumber = index + 1;
+    const parsed = parseLine(lineText);
+    if (parsed.error) {
+      unreadable.push({ repository: name, path: `${checkout.path}/.memory/corrections.jsonl`, line: lineNumber, reason: parsed.error });
+      continue;
+    }
+    const value = parsed.value;
+    lines.push({
+      date: value.date,
+      scope: value.scope,
+      correction: value.correction,
+      evidence: value.evidence,
+      promoted_to: value.promoted_to,
+      path: checkout.path,
+      line: lineNumber,
+    });
+  }
+  return lines;
+}
+
+function buildReport(root, maxDepth, ref = null) {
   const checkouts = discoverRepositories(root, maxDepth);
   const repositoryMap = new Map();
   const unreadable = [];
@@ -246,7 +323,35 @@ function buildReport(root, maxDepth) {
     unreadable.push({ repository: repository.name, path: `${checkout.path}/${path}`, line: null, reason });
   };
 
+  // With a ref, the worktrees of 1 clone share their refs: read the file once
+  // per shared git folder and list the other worktrees as paths only.
+  const readClones = new Map();
+
   for (const checkout of checkouts) {
+    if (ref !== null) {
+      const shared = commonDir(checkout.absolute);
+      if (shared !== null && readClones.has(shared)) {
+        readClones.get(shared)?.checkouts.push({ path: checkout.path, lines: [] });
+        continue;
+      }
+      const result = readAtRef(checkout.absolute, ref);
+      // A checkout without the ref and without a working-tree file has
+      // nothing to report; with the file, the missing ref is listed.
+      if (result.missingRef && !existsSync(resolve(checkout.absolute, ".memory/corrections.jsonl"))) result.absent = true;
+      if (result.absent) {
+        if (shared !== null) readClones.set(shared, null);
+        continue;
+      }
+      const repository = repositoryFor(checkout);
+      if (shared !== null) readClones.set(shared, repository);
+      if (result.error) {
+        skip(checkout, result.path ?? ".memory/corrections.jsonl", result.error);
+        continue;
+      }
+      repository.checkouts.push({ path: checkout.path, lines: parseCorrections(result.text, repository.name, checkout, unreadable) });
+      continue;
+    }
+
     const memoryFolder = resolve(checkout.absolute, ".memory");
     const correctionsFile = resolve(memoryFolder, "corrections.jsonl");
     let stat;
@@ -285,26 +390,7 @@ function buildReport(root, maxDepth) {
       continue;
     }
 
-    const lines = [];
-    for (const [index, lineText] of splitLines(text).entries()) {
-      const lineNumber = index + 1;
-      const parsed = parseLine(lineText);
-      if (parsed.error) {
-        unreadable.push({ repository: name, path: `${checkout.path}/.memory/corrections.jsonl`, line: lineNumber, reason: parsed.error });
-        continue;
-      }
-      const value = parsed.value;
-      lines.push({
-        date: value.date,
-        scope: value.scope,
-        correction: value.correction,
-        evidence: value.evidence,
-        promoted_to: value.promoted_to,
-        path: checkout.path,
-        line: lineNumber,
-      });
-    }
-    repository.checkouts.push({ path: checkout.path, lines });
+    repository.checkouts.push({ path: checkout.path, lines: parseCorrections(text, name, checkout, unreadable) });
   }
 
   const repositories = [];
@@ -340,6 +426,7 @@ function buildReport(root, maxDepth) {
   return {
     schema_version: 1,
     root,
+    ref,
     repositories_scanned: repositoriesScanned,
     repositories_with_corrections: repositoriesWithCorrections,
     lines: lineCount,
@@ -359,7 +446,7 @@ function clean(value) {
 
 function textReport(report) {
   const lines = [];
-  lines.push(`Corrections report: ${report.root}`);
+  lines.push(`Corrections report: ${report.root}${report.ref === null ? " (working trees)" : ` (at ${clean(report.ref)})`}`);
   lines.push(`Repositories scanned: ${report.repositories_scanned}; with corrections: ${report.repositories_with_corrections}; lines: ${report.lines}; pending: ${report.pending}`);
 
   lines.push("");
@@ -453,6 +540,7 @@ function jsonReport(report) {
   return `${JSON.stringify({
     schema_version: 1,
     root: report.root,
+    ref: report.ref,
     repositories_scanned: report.repositories_scanned,
     repositories_with_corrections: report.repositories_with_corrections,
     lines: report.lines,
@@ -474,11 +562,12 @@ function main() {
   let depth = 3;
   let json = false;
   let out;
+  let ref = null;
   const args = process.argv.slice(2);
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
-    if (arg === "--root" || arg === "--depth" || arg === "--out") {
+    if (arg === "--root" || arg === "--depth" || arg === "--out" || arg === "--ref") {
       if (i + 1 >= args.length) usageError();
       const value = args[++i];
       if (!value || value.startsWith("--")) usageError();
@@ -489,6 +578,12 @@ function main() {
         if (!Number.isInteger(depth) || depth < 0) usageError();
       }
       if (arg === "--out") out = resolve(value);
+      if (arg === "--ref") {
+        // A ref name or a revision such as origin/main or HEAD~1: never an
+        // option for git, and never a range.
+        if (!/^[A-Za-z0-9][A-Za-z0-9._\/@{}~^-]*$/.test(value) || value.includes("..")) usageError();
+        ref = value;
+      }
     } else if (arg === "--json") {
       json = true;
     } else {
@@ -520,7 +615,7 @@ function main() {
     }
   }
 
-  const report = buildReport(root, depth);
+  const report = buildReport(root, depth, ref);
   const output = json ? jsonReport(report) : textReport(report);
 
   if (out) {
