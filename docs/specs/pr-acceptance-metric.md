@@ -65,8 +65,9 @@ of these is true:
 1. **Quoted title.** C's title is `Revert "T"`, where T is P's title, or
    P's title followed by ` (#P)` (the subject of P's squash commit). When
    2 or more merged PRs of C's repository have title T, C reverts by this
-   rule only the one that merged last before C (rules 2 and 3 can still
-   name another).
+   rule only the one that merged last before C, and of 2 merged at the same
+   instant the one with the larger number (rules 2 and 3 can still name
+   another).
 2. **Revert word and reference in the title.** C's title holds a revert
    word and a reference to P, in any order (`Revert #94: …`,
    `revert: undo frostyard/updex#12`, `Revert "Title (#94)"`).

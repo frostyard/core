@@ -227,6 +227,31 @@ test("rule 1 with 2 identical titles reverts the PR that merged last before the 
   }
 });
 
+test("rule 1 with identical titles merged at the same instant names the larger number", () => {
+  const smaller = pr("frostyard/core", 12, "Fix the flag", "2026-10-02T00:00:00Z");
+  const larger = pr("frostyard/core", 13, "Fix the flag", "2026-10-02T00:00:00Z");
+  const revert = pr("frostyard/core", 20, 'Revert "Fix the flag"', "2026-10-05T00:00:00Z");
+  for (const input of [[smaller, larger, revert], [larger, smaller, revert], [revert, smaller, larger]]) {
+    const reverts = findReverts(input);
+    assert.deepEqual(reverts.map((item) => item.reverted.number), [13]);
+  }
+});
+
+test("the merge commit of a PR on another branch is no change, though that PR is none either", () => {
+  const target = pr("frostyard/core", 12, "Add the flag", "2026-10-02T00:00:00Z", { base: "main", defaultBranch: "main" });
+  const release = pr("frostyard/core", 30, "Backport the flag", "2026-10-03T00:00:00Z", {
+    base: "release", defaultBranch: "main", mergeCommit: "c".repeat(40),
+  });
+  // The release squash commit later reaches main; its custom subject would
+  // name #12 as fixed if it were a change of its own.
+  const squash = commit("frostyard/core", "C".repeat(40), "fix: the regression broken by #12", "2026-10-04T00:00:00Z");
+  const normalized = normalizeChanges([target, release, squash]);
+  assert.deepEqual(normalized.map((change) => change.number ?? change.sha), [12]);
+  const result = escaped([target, release, squash], { authors: ["frostyard-machines"] });
+  assert.equal(result.merged, 1);
+  assert.equal(result.escaped, 0);
+});
+
 test("rule 3 alone: a body line with the revert word before the reference", () => {
   const target = pr("frostyard/core", 12, "Fix the flag", "2026-10-02T00:00:00Z");
   const change = pr("frostyard/core", 20, "Undo the flag change", "2026-10-03T00:00:00Z", {
@@ -481,7 +506,19 @@ test("fetch: the default branch, the PR search, and the commits API use the wind
       },
       author: null,
     },
-  ], []]);
+  ], [
+    // A second page, whose message holds "] [": a split of back-to-back
+    // pages would break on it, and a reader of page 1 only would miss it.
+    {
+      sha: "b".repeat(40),
+      commit: {
+        message: "docs: tick [x] [y]\n\n]\n[",
+        committer: { date: "2026-10-30T00:00:00Z" },
+        author: { name: "Frostyard Machines" },
+      },
+      author: { login: "frostyard-machines" },
+    },
+  ]]);
   const exec = async (args) => {
     calls.push(args);
     if (args[0] === "api" && args[1] === "repos/bketelsen/fleet") return "main\n";
@@ -510,7 +547,7 @@ test("fetch: the default branch, the PR search, and the commits API use the wind
   assert.deepEqual(calls[0], ["api", "repos/bketelsen/fleet", "--jq", ".default_branch"]);
   assert.deepEqual(calls[1], [
     "pr", "list", "--repo", "bketelsen/fleet", "--state", "merged", "--limit", "1000",
-    "--search", "merged:2026-10-01T00:00:00Z..2026-11-08T00:00:00Z base:main",
+    "--search", "merged:2026-10-01T00:00:00Z..2026-11-08T00:00:00Z",
     "--json", "number,title,body,mergedAt,author,mergeCommit,baseRefName",
   ]);
   assert.deepEqual(calls[2], [
@@ -518,7 +555,9 @@ test("fetch: the default branch, the PR search, and the commits API use the wind
   ]);
 
   const normalized = normalizeChanges(changes);
-  assert.equal(normalized.length, 2);
+  assert.equal(normalized.length, 3);
+  assert.equal(normalized[2].sha, "b".repeat(40));
+  assert.equal(normalized[2].title, "docs: tick [x] [y]");
   assert.equal(normalized[0].mergeCommit, mergeCommit);
   assert.equal(normalized[0].base, "main");
   assert.equal(normalized[0].defaultBranch, "main");

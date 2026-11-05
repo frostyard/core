@@ -124,9 +124,11 @@ function toChange(item) {
     if (!Number.isFinite(number)) return null;
     const base = branchOf(item.base);
     const defaultBranch = branchOf(item.defaultBranch);
-    // A PR merged into another branch than the default one is no change.
-    if (base !== null && defaultBranch !== null && base !== defaultBranch) return null;
     change.number = number;
+    // A PR merged into another branch than the default one is no change, but
+    // its merge commit still marks a commit as no change of its own:
+    // normalizeChanges drops the PR only after it has read that SHA.
+    change.offBranch = base !== null && defaultBranch !== null && base !== defaultBranch;
     change.mergeCommit = oidOf(item.mergeCommit);
     change.base = base;
     change.defaultBranch = defaultBranch;
@@ -194,7 +196,13 @@ export function normalizeChanges(raw) {
       mergeCommits.add(`${change.repository}@${change.mergeCommit}`);
     }
   }
-  return order.filter((change) => change.kind === "pr" || !mergeCommits.has(changeKey(change)));
+  return order
+    .filter((change) => (change.kind === "pr" ? !change.offBranch : !mergeCommits.has(changeKey(change))))
+    .map((change) => {
+      if (change.kind !== "pr") return change;
+      const { offBranch, ...rest } = change;
+      return rest;
+    });
 }
 
 function compareText(a, b) {

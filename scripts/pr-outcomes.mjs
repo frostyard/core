@@ -120,12 +120,14 @@ export function parseSlurpedPages(text) {
 
 async function fetchRepository(repository, from, to, exec) {
   const window = `${utcStamp(from)}..${utcStamp(to)}`;
-  // Only a PR merged into the default branch is a change (the spec).
+  // Only a PR merged into the default branch is a change (the spec). All
+  // merged PRs are read, so that the merge commit of a PR on another branch
+  // still marks its commit as no change; normalizeChanges drops the PR.
   const defaultBranch = String(await exec(["api", `repos/${repository}`, "--jq", ".default_branch"])).trim();
 
   const prText = await exec([
     "pr", "list", "--repo", repository, "--state", "merged", "--limit", String(PR_LIMIT),
-    "--search", `merged:${window} base:${defaultBranch}`,
+    "--search", `merged:${window}`,
     "--json", "number,title,body,mergedAt,author,mergeCommit,baseRefName",
   ]);
   const prs = JSON.parse(prText === "" ? "[]" : prText);
