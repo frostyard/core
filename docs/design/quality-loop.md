@@ -97,7 +97,9 @@ PR template ──► review rubric ──► CI gates ──► corrections ─
   releases (`gh release`), and pushing to `main`; session state lives in
   [.claude/session-summary.md](../../.claude/session-summary.md) (ADR-0025).
 - **Observe** — the [PR acceptance metric](../specs/pr-acceptance-metric.md)
-  summarizes the stream; it informs, never gates. The weekly
+  summarizes the stream; it informs, never gates. Its revert rule and its
+  escaped-defect count (PRs reverted, or named as fixed, within 7 days of
+  merge) are computed by `scripts/pr-outcomes.mjs`, read-only. The weekly
   [flaky-test scan](../specs/flaky-test-scan.md)
   (`scripts/flaky-scan.mjs`) finds Actions jobs that failed and then passed
   on the same SHA, files 1 issue per flaky test in the repository where it
