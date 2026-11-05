@@ -151,7 +151,7 @@ function prKey(repository, number) {
 }
 
 // The fields 2 records of 1 PR must agree on.
-const PR_FIELDS = ["title", "body", "mergedAt", "author", "mergeCommit"];
+const PR_FIELDS = ["title", "body", "mergedAt", "author", "mergeCommit", "base", "defaultBranch"];
 
 function sameMoment(a, b) {
   const left = a.getTime();

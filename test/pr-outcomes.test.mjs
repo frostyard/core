@@ -252,6 +252,18 @@ test("the merge commit of a PR on another branch is no change, though that PR is
   assert.equal(result.escaped, 0);
 });
 
+test("2 records of 1 PR that disagree about its branch are an error in any order", () => {
+  const onRelease = pr("frostyard/core", 12, "Add the flag", "2026-10-02T00:00:00Z", { base: "release", defaultBranch: "main" });
+  const onMain = pr("frostyard/core", 12, "Add the flag", "2026-10-02T00:00:00Z", { base: "main", defaultBranch: "main" });
+  for (const input of [[onRelease, onMain], [onMain, onRelease]]) {
+    assert.throws(() => normalizeChanges(input), (error) =>
+      error instanceof TypeError && /frostyard\/core#12/.test(error.message) && /base/.test(error.message));
+    assert.throws(() => escaped(input), TypeError);
+  }
+  const otherDefault = pr("frostyard/core", 12, "Add the flag", "2026-10-02T00:00:00Z", { base: "main", defaultBranch: "trunk" });
+  assert.throws(() => normalizeChanges([onMain, otherDefault]), /defaultBranch/);
+});
+
 test("rule 3 alone: a body line with the revert word before the reference", () => {
   const target = pr("frostyard/core", 12, "Fix the flag", "2026-10-02T00:00:00Z");
   const change = pr("frostyard/core", 20, "Undo the flag change", "2026-10-03T00:00:00Z", {

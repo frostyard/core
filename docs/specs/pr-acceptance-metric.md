@@ -41,7 +41,9 @@ title is its subject line and its body is the rest of its message. A
 commit is the commit of PR N, not a change of its own, when its SHA is PR
 N's merge commit, or its subject ends with ` (#N)` or starts with
 `Merge pull request #N`. 1 PR (repository and number) is 1 change, however
-often the input holds it.
+often the input holds it; 2 records of 1 PR that differ in any field (title,
+body, merge time, author, merge commit, base or default branch) are an
+error, not a choice.
 
 A **reference** to PR N of repository `owner/name` is 1 of these forms:
 
