@@ -52,6 +52,10 @@ optional member:
   expands to that group's skill names. An unknown group stops the run before
   any clone, like an unknown skill name. A group holds skill names only: it
   does not nest another `@name`.
+- The script checks this shape (string arrays, object members, no nested
+  group) before it resolves any list or clones any repository; invalid JSON
+  or a wrong shape stops the run with an `::error::` line and exit 1. A
+  consumer whose effective set is empty is left alone.
 - A consumer's effective set is `defaults` plus its repository-specific
   entries, expanded and deduplicated. Every name must identify an existing
   directory under core's `.agents/skills/`.

@@ -33,7 +33,7 @@ test("an up-to-date consumer performs no push or pull-request creation", async (
 
   assert.match(stdout, /consumer: up to date/);
   const invocations = await readLog(fixture.log);
-  assert.equal(invocations.some((line) => line.startsWith("git push")), false);
+  assert.equal(invocations.some((line) => isGitSubcommand(line, "push")), false);
   assert.equal(invocations.some((line) => line.startsWith("gh ")), false);
 });
 
@@ -46,7 +46,9 @@ test("a changed managed skill follows the sync branch and pull-request path", as
   assert.match(stdout, /consumer: synced/);
   const invocations = await readLog(fixture.log);
   assert.ok(
-    invocations.some((line) => /^git (-c \S.* )?push -qf origin chore\/sync-core-skills$/.test(line)),
+    invocations.some(
+      (line) => isGitSubcommand(line, "push") && line.includes("chore/sync-core-skills"),
+    ),
     `expected a push of chore/sync-core-skills, got: ${invocations.join("\n")}`,
   );
   assert.ok(
@@ -125,14 +127,101 @@ test("a repository entry naming an unknown group fails the run before any clone"
 
   const invocations = await readLog(fixture.log);
   assert.equal(
-    // The clone runs as `git -c credential.helper=<helper with spaces> clone`.
-    invocations.some((line) => line.startsWith("git ") && line.includes(" clone ")),
+    invocations.some((line) => isGitSubcommand(line, "clone")),
     false,
     `expected no clone, got: ${invocations.join("\n")}`,
   );
-  assert.equal(invocations.some((line) => / (push|add) /.test(line)), false);
+  assert.equal(invocations.some((line) => isGitSubcommand(line, "push")), false);
+  assert.equal(invocations.some((line) => isGitSubcommand(line, "add")), false);
   assert.equal(invocations.some((line) => line.startsWith("gh ")), false);
 });
+
+// An empty effective list must reach the sync as no arguments at all: one
+// empty string would resolve to the whole .agents/skills tree and mirror it.
+test("an empty effective skill list syncs nothing and leaves the consumer alone", async () => {
+  const fixture = await createFixture({ defaults: [], repos: { consumer: [] } });
+  await seedConsumerRemote(fixture.remotesDir, "consumer", { "README.md": "seed\n" });
+
+  const { stdout } = await runSync(fixture);
+
+  assert.match(stdout, /consumer: up to date/);
+  assert.doesNotMatch(stdout, /consumer: synced/);
+  const invocations = await readLog(fixture.log);
+  assert.equal(invocations.some((line) => isGitSubcommand(line, "clone")), false);
+  assert.equal(invocations.some((line) => isGitSubcommand(line, "push")), false);
+  assert.equal(invocations.some((line) => line.startsWith("gh ")), false);
+  // No marker file can exist: the sync never mirrored anything, so no sync
+  // branch was pushed and the fixture has none to clone.
+  await assert.rejects(cloneSyncBranch(fixture));
+});
+
+// `defaults` may name a group too, not only a repository entry.
+test("a group in defaults syncs every skill in the group", async () => {
+  const fixture = await createFixture({
+    defaults: ["@go"],
+    repos: { consumer: [] },
+    groups: { go: ["demo", "extra"] },
+    extraSkills: ["extra"],
+  });
+  await seedConsumerRemote(fixture.remotesDir, "consumer", { "README.md": "seed\n" });
+
+  const { stdout } = await runSync(fixture);
+
+  assert.match(stdout, /consumer: synced/);
+  const pushed = await cloneSyncBranch(fixture);
+  for (const skill of ["demo", "extra"]) {
+    const synced = await readFile(
+      path.join(pushed, `.agents/skills/${skill}/SKILL.md`),
+      "utf8",
+    );
+    assert.equal(synced, coreSkillContent(skill));
+    const marker = await readFile(
+      path.join(pushed, `.agents/skills/${skill}/.synced-from-core`),
+      "utf8",
+    );
+    assert.equal(marker, syncedMarker(skill));
+  }
+});
+
+// The config shape is validated before any skill is resolved and before the
+// first clone, and each problem names itself instead of showing a jq status.
+for (const { name, options } of [
+  {
+    name: "that is not JSON",
+    options: { rawConfig: '{ "defaults": ["demo"], "repos": { "consumer": [] }\n' },
+  },
+  { name: "whose group is not an array", options: { groups: { go: "demo" } } },
+  {
+    name: "whose group names another group",
+    options: { groups: { go: ["demo", "@other"] } },
+  },
+  {
+    name: "whose repository entry is not an array",
+    options: { repos: { consumer: "demo" } },
+  },
+]) {
+  test(`a config ${name} fails the run before any clone`, async () => {
+    const fixture = await createFixture(options);
+    await seedConsumerRemote(fixture.remotesDir, "consumer", { "README.md": "seed\n" });
+
+    await assert.rejects(runSync(fixture), (error) => {
+      assert.equal(error.code, 1);
+      assert.match(error.stderr, /::error::/);
+      // The preflight reports the problem itself, never jq's own message.
+      assert.doesNotMatch(error.stderr, /jq: error/);
+      return true;
+    });
+
+    const invocations = await readLog(fixture.log);
+    assert.equal(
+      invocations.some((line) => isGitSubcommand(line, "clone")),
+      false,
+      `expected no clone, got: ${invocations.join("\n")}`,
+    );
+    assert.equal(invocations.some((line) => isGitSubcommand(line, "push")), false);
+    assert.equal(invocations.some((line) => line.startsWith("gh ")), false);
+  });
+}
 
 // sync-skills.sh calls skills_sync_run_repo as an `if` condition, and bash
 // ignores `set -e` for every command run inside a function in that
@@ -184,7 +273,7 @@ test("a failed skill copy fails the run before anything is staged or pushed", as
     return true;
   });
   const invocations = await readLog(fixture.log);
-  assert.equal(invocations.some((line) => / push /.test(line)), false);
+  assert.equal(invocations.some((line) => isGitSubcommand(line, "push")), false);
   assert.equal(invocations.some((line) => line.startsWith("gh ")), false);
 });
 
@@ -220,10 +309,17 @@ exit 1
     return true;
   });
   const invocations = await readLog(fixture.log);
-  assert.equal(invocations.some((line) => / (add|push) /.test(line)), false);
+  assert.equal(invocations.some((line) => isGitSubcommand(line, "add")), false);
+  assert.equal(invocations.some((line) => isGitSubcommand(line, "push")), false);
   assert.equal(invocations.some((line) => line.startsWith("gh ")), false);
   await assert.rejects(readFile(rsyncLog, "utf8"), { code: "ENOENT" });
 });
+
+// The script runs git as `git -c credential.helper=<helper with spaces>
+// <subcommand> ...`, so a subcommand match cannot anchor at `git <sub>`.
+function isGitSubcommand(line, sub) {
+  return (line.startsWith("git ") && line.includes(` ${sub} `)) || line.endsWith(` ${sub}`);
+}
 
 function syncedMarker(skill) {
   return `Managed by frostyard/core — edit there, not here (ADR-0026).\nSource: https://github.com/frostyard/core/tree/main/.agents/skills/${skill}\n`;
@@ -258,8 +354,15 @@ async function cloneSyncBranch({ remotesDir }) {
 
 // `groups` is written to the config only when a test gives it, so the tests
 // that predate groups keep exercising a config without that member.
-// `extraSkills` names further core skills beside the default `demo` skill.
-async function createFixture({ repos = { consumer: [] }, groups, extraSkills = [] } = {}) {
+// `extraSkills` names further core skills beside the by-default `demo` skill;
+// `rawConfig` replaces the generated JSON, for an unparseable config.
+async function createFixture({
+  defaults = ["demo"],
+  repos = { consumer: [] },
+  groups,
+  extraSkills = [],
+  rawConfig,
+} = {}) {
   const base = await mkdtemp(path.join(os.tmpdir(), "sync-skills-test-"));
   const coreRepo = path.join(base, "core");
   const remotesDir = path.join(base, "remotes");
@@ -275,13 +378,16 @@ async function createFixture({ repos = { consumer: [] }, groups, extraSkills = [
       coreSkillContent(skill),
     );
   }
-  const config = { defaults: ["demo"] };
-  if (groups !== undefined) config.groups = groups;
-  config.repos = repos;
-  await writeFile(
-    path.join(coreRepo, ".github/skills-sync.json"),
-    JSON.stringify(config, null, 2) + "\n",
-  );
+  let configText;
+  if (rawConfig !== undefined) {
+    configText = rawConfig;
+  } else {
+    const config = { defaults };
+    if (groups !== undefined) config.groups = groups;
+    config.repos = repos;
+    configText = JSON.stringify(config, null, 2) + "\n";
+  }
+  await writeFile(path.join(coreRepo, ".github/skills-sync.json"), configText);
   await gitInit(coreRepo);
   await execFileAsync("git", ["add", "-A"], { cwd: coreRepo });
   await execFileAsync("git", ["commit", "--quiet", "-m", "seed core"], { cwd: coreRepo });

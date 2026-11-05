@@ -157,7 +157,7 @@ vendored skill. Each `SKILL.md` opens with an attribution and a
 ### Description budget
 
 A session loads each skill's `description`. The 20 vendored descriptions
-total 10,439 characters (upstream: 12,197 for the same 20). A Go
+total 10,437 characters (upstream: 12,195 for the same 20). A Go
 repository's session loads them; so does a session in core, where they also
 sit in `.agents/skills/`.
 

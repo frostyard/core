@@ -82,6 +82,61 @@ function stripFences(text) {
     })
     .join("\n");
 }
+// CommonMark code spans, simplified: a run of N backticks opens a span that
+// closes at the next run of exactly N backticks (a longer or shorter run does
+// not close it). A backtick escaped by an odd number of backslashes is
+// literal, not a delimiter, and an opener with no closer is literal text too.
+// A span may cross a newline but not a blank line. The span's content is
+// dropped, so a link-shaped example inside it is not read as a link, while a
+// real link between escaped backticks still is.
+function stripCodeSpans(text) {
+  let out = "";
+  let i = 0;
+  while (i < text.length) {
+    if (text[i] !== "`") {
+      out += text[i++];
+      continue;
+    }
+    let backslashes = 0;
+    while (i - backslashes - 1 >= 0 && text[i - backslashes - 1] === "\\") backslashes++;
+    if (backslashes % 2 === 1) {
+      out += text[i++]; // escaped backtick: literal text
+      continue;
+    }
+    let opener = 0;
+    while (text[i + opener] === "`") opener++;
+    let closeAt = -1;
+    let j = i + opener;
+    while (j < text.length) {
+      if (text[j] === "\n") {
+        const lineEnd = text.indexOf("\n", j + 1);
+        const nextLine = text.slice(j + 1, lineEnd === -1 ? text.length : lineEnd);
+        if (nextLine.trim() === "") break; // a blank line ends the search
+        j++;
+        continue;
+      }
+      if (text[j] !== "`") {
+        j++;
+        continue;
+      }
+      let run = 0;
+      while (text[j + run] === "`") run++;
+      if (run === opener) {
+        closeAt = j;
+        break;
+      }
+      j += run;
+    }
+    if (closeAt === -1) {
+      out += text.slice(i, i + opener); // no closer: literal backticks
+      i += opener;
+      continue;
+    }
+    i = closeAt + opener;
+  }
+  return out;
+}
+
 const anchorCache = new Map();
 function anchorsOf(path) {
   const cached = anchorCache.get(path);
@@ -128,9 +183,9 @@ let linksOk = 0;
 for (const file of mdFiles) {
   // Strip fenced code blocks and inline code spans so example links, and
   // code such as `errors.AsType[*T](err)`, aren't checked as links.
-  const text = readFileSync(file, "utf8")
-    .replace(/```[\s\S]*?```/g, "")
-    .replace(/`[^`\n]*`/g, "");
+  const text = stripCodeSpans(
+    readFileSync(file, "utf8").replace(/```[\s\S]*?```/g, ""),
+  );
   const isSkillDoc = file.startsWith(skillsRoot + sep);
   for (const m of text.matchAll(/\[[^\]]*\]\(([^)\s]+)\)/g)) {
     const target = m[1];

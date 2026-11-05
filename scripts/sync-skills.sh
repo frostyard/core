@@ -28,10 +28,38 @@ SELF_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # shellcheck source=lib/skills-sync-repo.sh
 source "${SELF_DIR}/lib/skills-sync-repo.sh"
 
+# Config preflight: the shape is validated before any skill list is resolved
+# and before the first clone, so a malformed config stops the run with a named
+# problem instead of a jq error status (4 for bad JSON, 5 for a jq error).
+# A group value must be an array of skill names and may not name another group.
+problem=$(jq -r '
+  def is_skill_list: type == "array" and all(.[]; type == "string");
+  def bad_repo: (.repos | to_entries[] | select(.value | is_skill_list | not) | .key);
+  def bad_group: ((.groups // {}) | to_entries[] | select(.value | is_skill_list | not) | .key);
+  def nested: ((.groups // {}) | [.[] | .[] | select(startswith("@"))] | first);
+
+  if type != "object" then "the config must be a JSON object"
+  elif (.defaults | is_skill_list | not) then "\"defaults\" must be an array of skill names"
+  elif ((.repos | type) != "object") then "\"repos\" must be an object keyed by repository slug"
+  elif ([bad_repo] | length) > 0 then "\"repos.\([bad_repo] | first)\" must be an array of skill names"
+  elif ((.groups != null) and ((.groups | type) != "object")) then "\"groups\" must be an object keyed by group name"
+  elif ([bad_group] | length) > 0 then "\"groups.\([bad_group] | first)\" must be an array of skill names"
+  elif (nested != null) then "a skill group must not name another group (\(nested))"
+  else "" end
+' "$CONFIG" 2>/dev/null) || {
+  echo "::error::cannot read ${CONFIG} as JSON" >&2
+  exit 1
+}
+if [ -n "$problem" ]; then
+  echo "::error::${CONFIG}: ${problem}" >&2
+  exit 1
+fi
+
 # resolve_skills <repo>: print the repo's effective skill names, one per line.
 # A group name is replaced by its skills before the deduplication; the
 # unknown-skill check in scripts/lib/skills-sync-repo.sh then rejects any name
-# that is absent under core's .agents/skills/ — a nested "@" name included.
+# that is absent under core's .agents/skills/ (the preflight already rejected a
+# group that names another group).
 resolve_skills() {
   jq -r --arg r "$1" '
     . as $c
@@ -52,8 +80,12 @@ resolve_skills() {
   ' "$CONFIG"
 }
 
-# A command substitution under set -e: a malformed config stops the run.
-repo_list=$(jq -r '.repos | keys[]' "$CONFIG")
+# A command substitution with an explicit status check: a malformed config
+# stops the run with its own message, never jq's status.
+if ! repo_list=$(jq -r '.repos | keys[]' "$CONFIG" 2>/dev/null); then
+  echo "::error::cannot read the repository list from ${CONFIG}" >&2
+  exit 1
+fi
 repos=()
 if [ -n "$repo_list" ]; then
   mapfile -t repos <<<"$repo_list"
@@ -76,6 +108,13 @@ for repo in "${repos[@]}"; do
   skills=()
   if [ -n "${skill_lists[$repo]}" ]; then
     mapfile -t skills <<<"${skill_lists[$repo]}"
+  fi
+  # An empty effective list mirrors nothing: an empty string here would
+  # resolve to the whole .agents/skills tree. Report the consumer unchanged
+  # rather than clone it.
+  if [ "${#skills[@]}" -eq 0 ]; then
+    echo "== ${repo}: up to date"
+    continue
   fi
   echo "== ${repo}: syncing ${skills[*]}"
 

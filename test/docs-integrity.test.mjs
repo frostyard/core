@@ -253,6 +253,55 @@ test("docs gate ignores a link-shaped inline code span and still checks a real b
   );
 });
 
+// CommonMark delimiters: an escaped backtick is literal, so it does not make
+// the link between the two of them a code span.
+test("docs gate checks a link between escaped backticks", async () => {
+  const root = await createFixture();
+  await writeFile(
+    path.join(root, ".agents/skills/example/SKILL.md"),
+    "# Example\n\n\\` [x](missing.md) \\`\n",
+  );
+
+  await assert.rejects(
+    runDocsGate(root),
+    (error) =>
+      error.stderr.includes(
+        "link: .agents/skills/example/SKILL.md -> missing.md does not resolve",
+      ),
+  );
+});
+
+// A double-backtick span holds a single backtick, and a shorter run inside it
+// does not close it.
+test("docs gate ignores a double-backtick span that holds a single backtick", async () => {
+  const root = await createFixture();
+  await writeFile(
+    path.join(root, ".agents/skills/example/SKILL.md"),
+    "# Example\n\n`` a ` [x](missing.md) ``\n",
+  );
+
+  const { stdout } = await runDocsGate(root);
+  assert.match(stdout, /ok   link_integrity: 1\.000/);
+});
+
+// A run of 2 backticks needs a closer of exactly 2: a single one leaves the
+// opener literal, so the link after it is a real link.
+test("docs gate checks a link after an unclosed double-backtick run", async () => {
+  const root = await createFixture();
+  await writeFile(
+    path.join(root, ".agents/skills/example/SKILL.md"),
+    "# Example\n\n`` [x](missing.md) `\n",
+  );
+
+  await assert.rejects(
+    runDocsGate(root),
+    (error) =>
+      error.stderr.includes(
+        "link: .agents/skills/example/SKILL.md -> missing.md does not resolve",
+      ),
+  );
+});
+
 async function createFixture() {
   const root = await mkdtemp(path.join(os.tmpdir(), "core-docs-gate-"));
   for (const dir of [
