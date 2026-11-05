@@ -12,10 +12,15 @@ defines the instruction-surface policy.
 1. Run the mechanical lint:
 
    ```text
-   node scripts/check-instructions.mjs --root <checkout> [--retired NAME]... [--budget FILE] [--base <ref of last month>] <files>
+   node scripts/check-instructions.mjs --root <checkout> [--retired NAME]... [--ignore-ref-file FILE] [--budget FILE] [--base <ref of last month>] <files>
    ```
 
-   Fix or list each error before the blind review.
+   A backticked path is checked when it starts with `~/`, `./`, `../` or
+   `/var/home/`, when its first folder exists, or when it has a file extension
+   or a top-level folder name (`docs/`, `scripts/`, `.github/`). A reference to
+   another repository that the lint cannot resolve goes in the
+   `--ignore-ref-file` list, 1 exact reference per line, after the owner checks
+   it. Fix or list each other error before the blind review.
 
 2. Prepare the blind input. The operator concatenates the CURRENT text of the
    selected files only. Each file starts with `=== <path> ===` and line numbers,

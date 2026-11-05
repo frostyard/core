@@ -172,6 +172,40 @@ export function isPathCandidate(span) {
   );
 }
 
+// File extensions that make a bare span a file reference. Kept short and
+// specific: `e.g.`, `v1.2`, `JSON.parse` and `process.env` are not paths.
+const FILE_EXTENSIONS = new Set([
+  "bash", "cfg", "cjs", "conf", "css", "go", "html", "ini", "js", "json", "jsonl",
+  "jsx", "lock", "md", "mdx", "mjs", "mod", "png", "py", "rs", "service", "sh",
+  "sum", "svg", "toml", "ts", "tsx", "txt", "yaml", "yml",
+]);
+
+// Top-level folder names that make a bare span with a slash a path even with no
+// file extension (`docs/agents`, `test/e2e`).
+const TOP_LEVEL_NAMES = new Set([".agents", ".github", ".memory", "docs", "scripts", "test", "tests"]);
+
+// A bare relative span (no `~/`, `/`, `./` or `../` prefix) is path-shaped
+// when every segment is a plain file name and either its last segment has a
+// known file extension or its first segment is a known top-level folder.
+// `owner/name`, host names (`github.com/x/y.md`), commands and code
+// identifiers stay out.
+export function isBarePathShaped(candidate) {
+  const value = String(candidate);
+  if (!value || value.startsWith("/") || value.startsWith("~")) return false;
+  const segments = value.split("/");
+  if (segments.some((segment) => !/^[A-Za-z0-9_.@+-]+$/u.test(segment) || segment === "." || segment === "..")) {
+    return false;
+  }
+  const first = segments[0];
+  if (segments.length > 1 && TOP_LEVEL_NAMES.has(first)) return true;
+  // A dotted first segment followed by more segments is a host name.
+  if (segments.length > 1 && !first.startsWith(".") && first.includes(".")) return false;
+  const last = segments.at(-1);
+  // `_test.go` is a suffix pattern, not a file name.
+  const match = /^([A-Za-z0-9.](?:.*[A-Za-z0-9_-])?)\.([A-Za-z][A-Za-z0-9]*)$/u.exec(last);
+  return Boolean(match && FILE_EXTENSIONS.has(match[2].toLowerCase()));
+}
+
 export function findRetiredOccurrences(text, name) {
   const source = String(text);
   const needle = String(name);
