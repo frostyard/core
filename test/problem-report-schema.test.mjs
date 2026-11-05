@@ -17,7 +17,7 @@ const specPath = path.join(repoRoot, "docs/specs/problem-report.md");
 
 // v1 is immutable after its first sender release (spec rule 5), so a change
 // to v1.json must also change this pin on purpose.
-const V1_SHA256 = "1d3a42692415d97d7d58e4e2f9d9e5a6fea27fd7530eae3b902bf6b0f8c78514";
+const V1_SHA256 = "6c053ee3a9b4fd399d1d011b2be833dc6b17f25e727161fc576b0ce64cc14c3a";
 
 const SCHEMA_ID = "https://frostyard.org/schemas/problem-report/v1.json";
 const MESSAGE_ID = "8915bdd215c84cbab0c31c05a1a33e7e";
@@ -170,6 +170,20 @@ test("a worst-case app_problem (32 frames of 160 characters) is under 8192 bytes
   assert.ok(Buffer.byteLength(JSON.stringify(doc)) < MAX_BYTES);
 });
 
+const longestLocation = () => {
+  const suffix = ".rs:999999";
+  return "src/" + "a".repeat(128 - "src/".length - suffix.length) + suffix;
+};
+
+test("a worst-case Rust panic (location of 128 characters) validates and is under 8192 bytes", () => {
+  const doc = rustPanic();
+  doc.detail.location = longestLocation();
+  assert.equal(doc.detail.location.length, 128);
+  doc.detail.app_version = "999999.999999.999999-alpha.9999";
+  assertValid(doc, "worst-case Rust panic");
+  assert.ok(Buffer.byteLength(JSON.stringify(doc)) < MAX_BYTES);
+});
+
 // ---- Rejections -----------------------------------------------------------
 
 const rejects = [
@@ -239,6 +253,28 @@ const rejects = [
   ["a Rust location that is an absolute path", () => {
     const doc = rustPanic();
     doc.detail.location = "/home/user/src/main.rs:12";
+    return doc;
+  }],
+  ["a Rust location of 129 characters", () => {
+    const doc = rustPanic();
+    doc.detail.location = "src/a" + longestLocation().slice(4);
+    return doc;
+  }],
+  ["a Rust location of 8 KB", () => {
+    const doc = rustPanic();
+    doc.detail.location = "src/" + "a".repeat(8192) + ".rs:1";
+    return doc;
+  }],
+  ["an image.version with a trailing newline", () => {
+    const doc = example("count");
+    doc.image.version += "\n";
+    return doc;
+  }],
+  ["an S8 code with a trailing newline", () => {
+    const doc = example("app_problem");
+    doc.detail.class = "error";
+    delete doc.detail.frames;
+    doc.detail.code = "store.migrate_failed\n";
     return doc;
   }],
   ["image.version 2026-11-04", () => {

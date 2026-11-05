@@ -92,7 +92,7 @@ A field is required unless the table says optional.
 | | `class` | enum | `panic`, `error` (closed) |
 | | `code` | string | `^[a-z][a-z0-9_.]{0,63}$`. Required when `class` is `error`; absent when `class` is `panic` |
 | | `frames` | array of strings | Go panics only (`runtime` `go`, `class` `panic`), optional. 1 to 32 function names, innermost first, each at most 160 characters, each `other` or a name in an allowed module (below) |
-| | `location` | string | Rust panics only (`runtime` `rust`, `class` `panic`), optional. Crate-relative `src/…rs:line`: `^src/([a-z0-9_]+/){0,8}[a-z0-9_]+\.rs:[1-9][0-9]{0,5}$` |
+| | `location` | string | Rust panics only (`runtime` `rust`, `class` `panic`), optional. Crate-relative `src/…rs:line`, at most 128 characters: `^src/([a-z0-9_]+/){0,8}[a-z0-9_]+\.rs:[1-9][0-9]{0,5}$` |
 | S9 `count` | `install_age` | enum | `<1w`, `<1m`, `<6m`, `>=6m` (closed) |
 | | `channel` | enum | `latest`, `other` |
 
@@ -127,8 +127,15 @@ starts with 1 of:
 After a standard library package or the go-imap fork, at most 4 more
 import path segments follow, each `[a-z0-9_]+`. After `github.com/frostyard`,
 1 to 6 segments follow, each `[A-Za-z0-9_-]+`. No segment holds a dot, so no
-`..` or file name fits. Every other frame is `other`. The schema pattern holds
-the same rules.
+`..` or file name with an extension fits. Every other frame is `other`. The
+schema pattern holds the same rules.
+
+The pattern bounds the shape of a frame; it cannot prove that a value is a
+real symbol. A lowercase token such as `fmt/home/brian/documents/taxes.x`
+matches it. The std writer takes frames only from the Go runtime's symbol
+names, so a real record holds no such value. A forged journal record can
+(rule 4): the user who can write to that journal can put a token-shaped name
+in it, and the sender shows the exact document before the first send.
 
 ### Journal record registry
 
@@ -206,9 +213,12 @@ never go into a report.
 8. **Portable patterns.** Every `pattern` is anchored with `^` and `$` and uses
    only syntax that ECMA-262, Go `regexp` (RE2) and the Rust `regex` crate read
    the same: literals, character classes, groups, alternation and bounded
-   repetition. No lookaround, backreference or `format` keyword.
+   repetition. No lookaround, backreference or `format` keyword. Patterns are
+   used with no flags: `$` then matches only at the end of the input in all 3
+   engines, so a value with a trailing newline fails.
 9. **Size.** A document stays under 8 KB serialized; the field limits above
-   keep every valid document under it.
+   keep every valid document under it. The longest S8 document (32 frames of
+   160 characters, or a `location` of 128 characters) is the largest.
 10. **Local record.** An app writes only to the local journal and never sends.
     1 record is 1 journal datagram; a record that does not fit is dropped.
 11. **The test.** `test/problem-report-schema.test.mjs` validates every example

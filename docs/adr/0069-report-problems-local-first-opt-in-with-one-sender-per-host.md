@@ -69,9 +69,10 @@ the schema copy and the aggregates). They need 1 contract.
 - **Aggregates only are public.** frostyard.org publishes the schema, the
   privacy page, the source of every component, and weekly aggregates with
   small cells and their complementary cells suppressed.
-- **Counts only from opted-in installs.** A host counts itself in the weekly
-  install count only while reporting is on, at most once a week. No download
-  log or registry log is used to count installs.
+- **Counts only from opted-in installs.** Each sender that has reporting on
+  sends at most 1 count a week: the host on Floe, each opted-in user on a
+  desktop. No count is sent while reporting is off. No download log or
+  registry log is used to count installs.
 
 ## Consequences
 
