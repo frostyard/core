@@ -468,3 +468,65 @@ test("--ref refuses a value that git could read as an option", async () => {
     );
   }
 });
+
+test("--ref checks each worktree for a file when the clone has no such ref", async () => {
+  const root = await fixture();
+  const repo = path.join(root, "repo-a");
+  mkdirSync(repo);
+  await initRepo(repo, "repo-a");
+  writeFileSync(path.join(repo, "README"), "x\n");
+  await commitAll(repo, "first");
+  const worktree = path.join(root, "repo-a-wt");
+  await gitIn(repo, ["worktree", "add", "--quiet", "-b", "feature", worktree]);
+  writeJsonl(worktree, [line("2026-11-04", "Scope", "Uncommitted correction")]);
+
+  const { stdout } = await run(root, ["--ref", "origin/main", "--json"]);
+  const report = JSON.parse(stdout);
+  assert.equal(report.lines, 0);
+  assert.deepEqual(report.unreadable, [
+    { repository: "frostyard/repo-a", path: "repo-a-wt/.memory/corrections.jsonl", line: null, reason: "ref not found: origin/main" },
+  ]);
+});
+
+test("--ref names a clone by the remote of any of its worktrees", async () => {
+  const root = await fixture();
+  const repo = path.join(root, "repo-a");
+  mkdirSync(repo);
+  await gitIn(repo, ["init", "--quiet"]);
+  await gitIn(repo, ["config", "extensions.worktreeConfig", "true"]);
+  writeJsonl(repo, [line("2026-11-01", "Merged", "Merged correction")]);
+  await commitAll(repo, "merged line");
+  await gitIn(repo, ["update-ref", "refs/remotes/origin/main", "HEAD"]);
+  const worktree = path.join(root, "repo-a-wt");
+  await gitIn(repo, ["worktree", "add", "--quiet", "-b", "feature", worktree]);
+  await gitIn(worktree, ["config", "--worktree", "remote.origin.url", "https://github.com/frostyard/repo-a.git"]);
+
+  const { stdout } = await run(root, ["--ref", "origin/main", "--json"]);
+  const report = JSON.parse(stdout);
+  assert.deepEqual(report.repositories.map((repository) => [repository.name, repository.paths]), [
+    ["frostyard/repo-a", ["repo-a", "repo-a-wt"]],
+  ]);
+  assert.equal(report.lines, 1);
+});
+
+test("--ref never fetches a blob that a partial clone does not hold", async () => {
+  const source = await fixture();
+  await gitIn(source, ["init", "--quiet", "-b", "main"]);
+  await gitIn(source, ["config", "uploadpack.allowFilter", "true"]);
+  writeJsonl(source, [line("2026-11-01", "Remote", "Remote-only correction")]);
+  await commitAll(source, "line");
+
+  const root = await fixture();
+  const clone = path.join(root, "repo-a");
+  await execFileAsync("git", ["clone", "--quiet", "--filter=blob:none", "--no-checkout", `file://${source}`, clone], { env: gitEnv });
+  const { stdout: oid } = await gitIn(clone, ["rev-parse", "origin/main:.memory/corrections.jsonl"]);
+  const missing = () => execFileAsync("git", ["-C", clone, "cat-file", "-e", oid.trim()], { env: { ...gitEnv, GIT_NO_LAZY_FETCH: "1" } });
+  await assert.rejects(missing(), "the fixture's blob starts missing");
+
+  const { stdout } = await run(root, ["--ref", "origin/main", "--json"]);
+  const report = JSON.parse(stdout);
+  assert.equal(report.lines, 0);
+  assert.equal(report.unreadable.length, 1);
+  assert.equal(report.unreadable[0].reason, "cannot read file at origin/main");
+  await assert.rejects(missing(), "the report must not fetch the blob");
+});

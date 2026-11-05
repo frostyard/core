@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Read-only report for .memory/corrections.jsonl files in local git checkouts.
 import { execFileSync } from "node:child_process";
-import { existsSync, lstatSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { lstatSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { dirname, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -79,8 +79,16 @@ function remoteName(folder) {
   }
 }
 
+// GIT_NO_LAZY_FETCH: in a partial clone, a missing object is an error, not
+// a fetch from the promisor remote. The report never touches the network
+// and never writes objects into a clone.
 function git(folder, args) {
-  return execFileSync("git", ["-C", folder, ...args], { stdio: "pipe", encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+  return execFileSync("git", ["-C", folder, ...args], {
+    stdio: "pipe",
+    encoding: "utf8",
+    maxBuffer: 64 * 1024 * 1024,
+    env: { ...process.env, GIT_NO_LAZY_FETCH: "1" },
+  });
 }
 
 // The shared git folder of a checkout: every worktree of 1 clone has the same
@@ -93,16 +101,20 @@ function commonDir(folder) {
   }
 }
 
-// Reads .memory/corrections.jsonl at a ref (such as origin/main), not in the
-// working tree, so a line on an unmerged branch or an uncommitted edit is not
-// counted. Returns { text }, { absent: true } or { error }.
-function readAtRef(folder, ref) {
-  let commit;
+// The commit a ref names in 1 checkout, or null. Most refs (origin/main) are
+// the same in every worktree of a clone; HEAD is not.
+function resolveRef(folder, ref) {
   try {
-    commit = git(folder, ["rev-parse", "--verify", "--quiet", "--end-of-options", `${ref}^{commit}`]).trim();
+    return git(folder, ["rev-parse", "--verify", "--quiet", "--end-of-options", `${ref}^{commit}`]).trim() || null;
   } catch {
-    return { error: `ref not found: ${ref}`, missingRef: true };
+    return null;
   }
+}
+
+// Reads .memory/corrections.jsonl at a commit, not in the working tree, so a
+// line on an unmerged branch or an uncommitted edit is not counted. Returns
+// { text }, { absent: true } or { error }.
+function readAtCommit(folder, commit, ref) {
   // 1 tree at a time: `ls-tree` given a folder path lists the folder's
   // content, not the folder's own entry.
   const entry = (tree, name) => {
@@ -129,7 +141,8 @@ function readAtRef(folder, ref) {
   try {
     return { text: git(folder, ["cat-file", "blob", file.oid]) };
   } catch {
-    return { error: "cannot read file" };
+    // Also a blob that a partial clone does not hold: it is not fetched.
+    return { error: `cannot read file at ${ref}` };
   }
 }
 
@@ -312,8 +325,8 @@ function buildReport(root, maxDepth, ref = null) {
   // folder, a symbolic link out of the checkout) is listed as unreadable, so
   // a checkout is never left out without a trace.
   const absent = (error) => error?.code === "ENOENT" || error?.code === "ENOTDIR";
-  const repositoryFor = (checkout) => {
-    const name = remoteName(checkout.absolute) || `local:${checkout.path}`;
+  const repositoryFor = (checkout, known = null) => {
+    const name = known ?? (remoteName(checkout.absolute) || `local:${checkout.path}`);
     if (!repositoryMap.has(name)) repositoryMap.set(name, { name, checkouts: [] });
     return repositoryMap.get(name);
   };
@@ -323,32 +336,60 @@ function buildReport(root, maxDepth, ref = null) {
     unreadable.push({ repository: repository.name, path: `${checkout.path}/${path}`, line: null, reason });
   };
 
-  // With a ref, the worktrees of 1 clone share their refs: read the file once
-  // per shared git folder and list the other worktrees as paths only.
-  const readClones = new Map();
+  // With a ref, the worktrees of 1 clone are 1 group (their shared git
+  // folder). The group's identity is the first remote that any of its
+  // worktrees names, and a file at 1 commit is read once per group.
+  const groupOf = new Map();
+  if (ref !== null) {
+    const groups = new Map();
+    for (const checkout of checkouts) {
+      const key = commonDir(checkout.absolute) ?? `checkout:${checkout.absolute}`;
+      if (!groups.has(key)) groups.set(key, { key, firstPath: checkout.path, remote: null, read: new Map() });
+      const group = groups.get(key);
+      group.remote ??= remoteName(checkout.absolute);
+      groupOf.set(checkout, group);
+    }
+  }
+  const present = (path) => {
+    try {
+      lstatSync(path);
+      return true;
+    } catch {
+      return false;
+    }
+  };
 
   for (const checkout of checkouts) {
     if (ref !== null) {
-      const shared = commonDir(checkout.absolute);
-      if (shared !== null && readClones.has(shared)) {
-        readClones.get(shared)?.checkouts.push({ path: checkout.path, lines: [] });
+      const group = groupOf.get(checkout);
+      const name = group.remote ?? `local:${group.firstPath}`;
+      const commit = resolveRef(checkout.absolute, ref);
+      if (commit === null) {
+        // Without the ref, a checkout with a working-tree file is listed, so
+        // it is never left out without a trace; one without the file has
+        // nothing to report.
+        if (present(resolve(checkout.absolute, ".memory/corrections.jsonl"))) {
+          const repository = repositoryFor(checkout, name);
+          repository.checkouts.push({ path: checkout.path, lines: [] });
+          unreadable.push({ repository: name, path: `${checkout.path}/.memory/corrections.jsonl`, line: null, reason: `ref not found: ${ref}` });
+        }
         continue;
       }
-      const result = readAtRef(checkout.absolute, ref);
-      // A checkout without the ref and without a working-tree file has
-      // nothing to report; with the file, the missing ref is listed.
-      if (result.missingRef && !existsSync(resolve(checkout.absolute, ".memory/corrections.jsonl"))) result.absent = true;
-      if (result.absent) {
-        if (shared !== null) readClones.set(shared, null);
+      const seen = group.read.has(commit);
+      if (!seen) group.read.set(commit, readAtCommit(checkout.absolute, commit, ref));
+      const result = group.read.get(commit);
+      if (result.absent) continue;
+      const repository = repositoryFor(checkout, name);
+      if (seen) {
+        repository.checkouts.push({ path: checkout.path, lines: [] });
         continue;
       }
-      const repository = repositoryFor(checkout);
-      if (shared !== null) readClones.set(shared, repository);
       if (result.error) {
-        skip(checkout, result.path ?? ".memory/corrections.jsonl", result.error);
+        repository.checkouts.push({ path: checkout.path, lines: [] });
+        unreadable.push({ repository: name, path: `${checkout.path}/${result.path ?? ".memory/corrections.jsonl"}`, line: null, reason: result.error });
         continue;
       }
-      repository.checkouts.push({ path: checkout.path, lines: parseCorrections(result.text, repository.name, checkout, unreadable) });
+      repository.checkouts.push({ path: checkout.path, lines: parseCorrections(result.text, name, checkout, unreadable) });
       continue;
     }
 
