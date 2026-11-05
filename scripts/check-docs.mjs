@@ -82,43 +82,43 @@ function stripFences(text) {
     })
     .join("\n");
 }
-// CommonMark code spans, simplified: a run of N backticks opens a span that
-// closes at the next run of exactly N backticks (a longer or shorter run does
-// not close it). A backtick escaped by an odd number of backslashes is
-// literal, not a delimiter, and an opener with no closer is literal text too.
-// A span stays on 1 line. The span's content is
-// dropped, so a link-shaped example inside it is not read as a link, while a
-// real link between escaped backticks still is.
-function stripCodeSpans(text) {
-  let out = "";
+// Code spans, conservatively. The text is cut into runs of non-blank lines;
+// every Markdown block lies inside 1 run, and no block crosses a line inside
+// it. In each line, a run of N backticks opens a span that closes at the next
+// run of exactly N backticks (CommonMark); a backtick after an odd number of
+// backslashes is literal. When every backtick run of every line in the run is
+// paired, those pairs are exactly CommonMark's pairs for any split of the run
+// into blocks, so the spans are dropped and a link-shaped example in them is
+// not read as a link. When any line has an unpaired run (a span that wraps, or
+// a literal backtick), the whole run stays as it is: its links are all
+// checked, and a real link is never hidden.
+function lineCodeSpans(line) {
+  const spans = [];
+  let unpaired = false;
   let i = 0;
-  while (i < text.length) {
-    if (text[i] !== "`") {
-      out += text[i++];
+  while (i < line.length) {
+    if (line[i] !== "`") {
+      i++;
       continue;
     }
     let backslashes = 0;
-    while (i - backslashes - 1 >= 0 && text[i - backslashes - 1] === "\\") backslashes++;
+    while (i - backslashes - 1 >= 0 && line[i - backslashes - 1] === "\\") backslashes++;
+    let opener = 0;
+    while (line[i + opener] === "`") opener++;
     if (backslashes % 2 === 1) {
-      out += text[i++]; // escaped backtick: literal text
+      // The first backtick is escaped; the rest of the run opens a span.
+      i++;
       continue;
     }
-    let opener = 0;
-    while (text[i + opener] === "`") opener++;
-    let closeAt = -1;
     let j = i + opener;
-    while (j < text.length) {
-      // A span ends at its line: pairing backticks across lines could join
-      // 2 blocks (adjacent headings) and hide a real link. A code span that
-      // wraps over lines is then not stripped, which can only add a link to
-      // check, never hide one.
-      if (text[j] === "\n") break;
-      if (text[j] !== "`") {
+    let closeAt = -1;
+    while (j < line.length) {
+      if (line[j] !== "`") {
         j++;
         continue;
       }
       let run = 0;
-      while (text[j + run] === "`") run++;
+      while (line[j + run] === "`") run++;
       if (run === opener) {
         closeAt = j;
         break;
@@ -126,13 +126,47 @@ function stripCodeSpans(text) {
       j += run;
     }
     if (closeAt === -1) {
-      out += text.slice(i, i + opener); // no closer: literal backticks
+      unpaired = true;
       i += opener;
       continue;
     }
+    spans.push([i, closeAt + opener]);
     i = closeAt + opener;
   }
-  return out;
+  return { spans, unpaired };
+}
+
+function stripCodeSpans(text) {
+  const lines = text.split("\n");
+  const out = [];
+  let block = [];
+  const flush = () => {
+    const parsed = block.map(lineCodeSpans);
+    if (parsed.some((p) => p.unpaired)) {
+      out.push(...block);
+    } else {
+      block.forEach((line, k) => {
+        let kept = "";
+        let at = 0;
+        for (const [from, to] of parsed[k].spans) {
+          kept += line.slice(at, from);
+          at = to;
+        }
+        out.push(kept + line.slice(at));
+      });
+    }
+    block = [];
+  };
+  for (const line of lines) {
+    if (line.trim() === "") {
+      flush();
+      out.push(line);
+    } else {
+      block.push(line);
+    }
+  }
+  flush();
+  return out.join("\n");
 }
 
 const anchorCache = new Map();

@@ -318,6 +318,33 @@ test("docs gate does not pair backticks across 2 adjacent headings", async () =>
   );
 });
 
+test("docs gate checks a link after a code span that wraps over 2 lines", async () => {
+  const root = await createFixture();
+  await writeFile(
+    path.join(root, ".agents/skills/example/SKILL.md"),
+    "# Example\n\n`code\ncontinued` [x](missing.md) `tail`\n",
+  );
+
+  await assert.rejects(
+    runDocsGate(root),
+    (error) =>
+      error.stderr.includes(
+        "link: .agents/skills/example/SKILL.md -> missing.md does not resolve",
+      ),
+  );
+});
+
+test("docs gate ignores a link-shaped code span in a paragraph whose lines all pair", async () => {
+  const root = await createFixture();
+  await writeFile(
+    path.join(root, ".agents/skills/example/SKILL.md"),
+    "# Example\n\nUse `errors.AsType[*T](err)` here\nand `reflect.TypeAssert[T](v)` there.\n",
+  );
+
+  const { stdout } = await runDocsGate(root);
+  assert.match(stdout, /ok   link_integrity: 1\.000/);
+});
+
 async function createFixture() {
   const root = await mkdtemp(path.join(os.tmpdir(), "core-docs-gate-"));
   for (const dir of [
