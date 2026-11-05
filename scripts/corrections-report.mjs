@@ -350,12 +350,14 @@ function buildReport(root, maxDepth, ref = null) {
       groupOf.set(checkout, group);
     }
   }
-  const present = (path) => {
+  // null when the path is absent; else the reason to list the checkout.
+  const workingFile = (folder) => {
     try {
-      lstatSync(path);
-      return true;
-    } catch {
-      return false;
+      lstatSync(resolve(folder, ".memory/corrections.jsonl"));
+      return `ref not found: ${ref}`;
+    } catch (error) {
+      if (absent(error)) return null;
+      return `ref not found: ${ref}; cannot read: ${error.code ?? error.message}`;
     }
   };
 
@@ -368,10 +370,11 @@ function buildReport(root, maxDepth, ref = null) {
         // Without the ref, a checkout with a working-tree file is listed, so
         // it is never left out without a trace; one without the file has
         // nothing to report.
-        if (present(resolve(checkout.absolute, ".memory/corrections.jsonl"))) {
+        const reason = workingFile(checkout.absolute);
+        if (reason !== null) {
           const repository = repositoryFor(checkout, name);
           repository.checkouts.push({ path: checkout.path, lines: [] });
-          unreadable.push({ repository: name, path: `${checkout.path}/.memory/corrections.jsonl`, line: null, reason: `ref not found: ${ref}` });
+          unreadable.push({ repository: name, path: `${checkout.path}/.memory/corrections.jsonl`, line: null, reason });
         }
         continue;
       }

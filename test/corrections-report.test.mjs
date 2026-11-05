@@ -530,3 +530,21 @@ test("--ref never fetches a blob that a partial clone does not hold", async () =
   assert.equal(report.unreadable[0].reason, "cannot read file at origin/main");
   await assert.rejects(missing(), "the report must not fetch the blob");
 });
+
+test("--ref lists a checkout without the ref whose .memory folder is denied", { skip: process.getuid?.() === 0 && "root reads any folder" }, async () => {
+  const root = await fixture();
+  const repo = path.join(root, "repo-a");
+  mkdirSync(repo);
+  await initRepo(repo, "repo-a");
+  writeJsonl(repo, [line("2026-11-04", "Scope", "Hidden correction")]);
+  const memory = path.join(repo, ".memory");
+  chmodSync(memory, 0o000);
+  denied.push(memory);
+
+  const { stdout } = await run(root, ["--ref", "origin/main", "--json"]);
+  chmodSync(memory, 0o755);
+  const report = JSON.parse(stdout);
+  assert.deepEqual(report.unreadable, [
+    { repository: "frostyard/repo-a", path: "repo-a/.memory/corrections.jsonl", line: null, reason: "ref not found: origin/main; cannot read: EACCES" },
+  ]);
+});
