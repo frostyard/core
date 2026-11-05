@@ -11,6 +11,7 @@ import { fileURLToPath } from "node:url";
 import {
   extractInlineCodeSpans,
   extractProseSentences,
+  isBarePathShaped,
   isPathCandidate,
   normalizePathSpan,
   stripFencedBlocks,
@@ -36,10 +37,10 @@ function runGuard(cwd, args) {
   });
 }
 
-function withTemp(run) {
+async function withTemp(run) {
   const dir = tempDir();
   try {
-    return run(dir);
+    return await run(dir);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -69,6 +70,84 @@ test("dead docs/missing.md reference passes after the file exists", async () => 
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test("dead docs/missing.md reference fails when docs does not exist (T863)", async () => {
+  await withTemp(async (dir) => {
+    writeFileSync(path.join(dir, "AGENTS.md"), "See `docs/missing.md` here.\n");
+    const missing = await runGuard(dir, ["--root", dir, "AGENTS.md"]);
+    assert.equal(missing.code, 1, missing.stdout);
+    assert.match(missing.stdout, /FAIL dead_reference: AGENTS\.md:1: `docs\/missing\.md` does not exist/);
+
+    mkdirSync(path.join(dir, "docs"));
+    writeFileSync(path.join(dir, "docs/missing.md"), "exists\n");
+    const present = await runGuard(dir, ["--root", dir, "AGENTS.md"]);
+    assert.equal(present.code, 0, present.stdout);
+  });
+});
+
+test("a missing root-level file fails and passes once it exists (T863)", async () => {
+  await withTemp(async (dir) => {
+    mkdirSync(path.join(dir, "sub"));
+    writeFileSync(path.join(dir, "sub/AGENTS.md"), "Read `MISSING.md` and `mise.toml` first.\n");
+    const missing = await runGuard(dir, ["--root", dir, "sub/AGENTS.md"]);
+    assert.equal(missing.code, 1, missing.stdout);
+    assert.match(missing.stdout, /FAIL dead_reference: sub\/AGENTS\.md:1: `MISSING\.md` does not exist/);
+    assert.match(missing.stdout, /FAIL dead_reference: sub\/AGENTS\.md:1: `mise\.toml` does not exist/);
+
+    writeFileSync(path.join(dir, "MISSING.md"), "exists\n");
+    writeFileSync(path.join(dir, "mise.toml"), "[tools]\n");
+    const present = await runGuard(dir, ["--root", dir, "sub/AGENTS.md"]);
+    assert.equal(present.code, 0, present.stdout);
+  });
+});
+
+test("a top-level folder name makes an extensionless span a path (T863)", async () => {
+  await withTemp(async (dir) => {
+    writeFileSync(path.join(dir, "AGENTS.md"), "See `test/e2e/` and `.github/workflows`.\n");
+    const missing = await runGuard(dir, ["--root", dir, "AGENTS.md"]);
+    assert.equal(missing.code, 1, missing.stdout);
+    assert.match(missing.stdout, /`test\/e2e\/` does not exist/);
+    assert.match(missing.stdout, /`\.github\/workflows` does not exist/);
+  });
+});
+
+test("plain words, versions, commands, URLs, globs and identifiers stay unreported (T863)", async () => {
+  await withTemp(async (dir) => {
+    const text = [
+      "Use `e.g.` and `i.e.` and `v1.2` and `v1.2.3` and `1.24` here.",
+      "Run `make ci`, `npm run check`, `gh`, `git`, `node --test` and `mise install`.",
+      "See `frostyard/core`, `bketelsen/stomp#4`, `owner/name#12` and `origin/main`.",
+      "See `https://example.com/a.md`, `github.com/frostyard/std/x.go` and `repository.frostyard.org`.",
+      "Globs: `*.md`, `src/**/*.ts`, `docs/*.md` and `{a,b}.json`.",
+      "Code: `JSON.parse`, `process.env`, `options.root`, `os.homedir`, `.md`, `_test.go` and `.env`.",
+      "Models: `deepseek/deepseek-flash`, `github-copilot/gpt-6.1-sol` and `@scope/pkg`.",
+      "",
+    ].join("\n");
+    writeFileSync(path.join(dir, "AGENTS.md"), text);
+    const result = await runGuard(dir, ["--root", dir, "AGENTS.md"]);
+    assert.equal(result.code, 0, result.stdout);
+    assert.doesNotMatch(result.stdout, /dead_reference/);
+  });
+});
+
+test("--ignore-ref and --ignore-ref-file skip exact references", async () => {
+  await withTemp(async (dir) => {
+    writeFileSync(path.join(dir, "AGENTS.md"), "Edit `go.mod` and `docs/tenets.md:4`.\n");
+    const flagged = await runGuard(dir, ["--root", dir, "AGENTS.md"]);
+    assert.equal(flagged.code, 1, flagged.stdout);
+
+    const ignored = await runGuard(dir, ["--root", dir, "--ignore-ref", "go.mod", "--ignore-ref", "docs/tenets.md", "AGENTS.md"]);
+    assert.equal(ignored.code, 0, ignored.stdout);
+
+    writeFileSync(path.join(dir, "ignore.txt"), "# cross-repository references\ngo.mod\ndocs/tenets.md\n");
+    const fromFile = await runGuard(dir, ["--root", dir, "--ignore-ref-file", "ignore.txt", "AGENTS.md"]);
+    assert.equal(fromFile.code, 0, fromFile.stdout);
+
+    const partial = await runGuard(dir, ["--root", dir, "--ignore-ref", "go.mod", "AGENTS.md"]);
+    assert.equal(partial.code, 1, partial.stdout);
+    assert.match(partial.stdout, /`docs\/tenets\.md:4` does not exist/);
+  });
 });
 
 test("home-relative dead and present paths", async () => {
@@ -249,6 +328,10 @@ test("duplicate sentence warns only for 2 or more files and 8+ words", async () 
 test("prose punctuation inside code spans stays in the sentence", async () => {
   const dir = tempDir();
   try {
+    // The referenced files exist, so the run tests only duplicate detection.
+    mkdirSync(path.join(dir, "docs"));
+    writeFileSync(path.join(dir, "docs/alpha.md"), "alpha\n");
+    writeFileSync(path.join(dir, "docs/beta.md"), "beta\n");
     writeFileSync(path.join(dir, "A.md"), "Read `docs/alpha.md` before starting any work on this project.\n");
     writeFileSync(path.join(dir, "B.md"), "Read `docs/beta.md` before starting any work on this project.\n");
     const differing = await runGuard(dir, ["--root", dir, "A.md", "B.md"]);
@@ -366,6 +449,13 @@ test("library extracts spans and skips fenced blocks", () => {
   assert.equal(isPathCandidate("src/**/*.ts"), false);
   assert.equal(isPathCandidate("make ci"), false);
   assert.equal(isPathCandidate("docs/a.md"), true);
+  assert.equal(isBarePathShaped("MISSING.md"), true);
+  assert.equal(isBarePathShaped("docs/missing.md"), true);
+  assert.equal(isBarePathShaped("docs/agents"), true);
+  assert.equal(isBarePathShaped(".golangci.yml"), true);
+  for (const word of ["e.g.", "v1.2", "1.24", "make", "frostyard/core", "JSON.parse", "process.env", ".md", "_test.go", "github.com/a/b.md", "../a.md", "~/a.md"]) {
+    assert.equal(isBarePathShaped(word), false, word);
+  }
 
   assert.deepEqual(extractInlineCodeSpans("a ``x`y`` b"), [{ span: "x`y", line: 1 }]);
   assert.deepEqual(findRetiredOccurrences("https://github.com/bketelsen/stomp/issues/4", "bketelsen/stomp"), [{ name: "bketelsen/stomp", line: 1 }]);

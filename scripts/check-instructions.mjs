@@ -12,6 +12,7 @@ import {
   extractInlineCodeSpans,
   extractProseSentences,
   findRetiredOccurrences,
+  isBarePathShaped,
   isPathCandidate,
   normalizePathSpan,
 } from "./lib/instruction-hygiene.mjs";
@@ -26,6 +27,8 @@ function usage(message) {
   console.error("  --home DIR             value of ~ (default: os.homedir())");
   console.error("  --retired NAME         retired name; repeatable");
   console.error("  --retired-file FILE    file containing one retired name per line");
+  console.error("  --ignore-ref SPAN      backticked reference not to check (exact); repeatable");
+  console.error("  --ignore-ref-file FILE file containing one ignored reference per line");
   console.error("  --budget FILE          JSON size budget");
   console.error("  --base REF             compare line and word growth since REF");
   console.error("  --min-words N          minimum words in a duplicate sentence (default: 8)");
@@ -47,6 +50,8 @@ function parseArgs(argv) {
     home: os.homedir(),
     retired: [],
     retiredFiles: [],
+    ignoreRefs: [],
+    ignoreRefFiles: [],
     budget: null,
     base: null,
     minWords: 8,
@@ -58,7 +63,7 @@ function parseArgs(argv) {
     const arg = argv[index];
     if (arg === "--help") {
       options.help = true;
-    } else if (arg === "--root" || arg === "--home" || arg === "--retired-file" || arg === "--budget" || arg === "--base" || arg === "--min-words") {
+    } else if (arg === "--root" || arg === "--home" || arg === "--retired-file" || arg === "--ignore-ref-file" || arg === "--budget" || arg === "--base" || arg === "--min-words") {
       if (index + 1 >= argv.length) throw new UsageError(`missing value for ${arg}`);
       const value = argv[index + 1];
       if (value.startsWith("--")) throw new UsageError(`missing value for ${arg}`);
@@ -66,16 +71,18 @@ function parseArgs(argv) {
       if (arg === "--root") options.root = path.resolve(value);
       if (arg === "--home") options.home = path.resolve(value);
       if (arg === "--retired-file") options.retiredFiles.push(value);
+      if (arg === "--ignore-ref-file") options.ignoreRefFiles.push(value);
       if (arg === "--budget") options.budget = value;
       if (arg === "--base") options.base = value;
       if (arg === "--min-words") options.minWords = parsePositiveInteger(value, "--min-words");
-    } else if (arg === "--retired") {
-      if (index + 1 >= argv.length) throw new UsageError("missing value for --retired");
+    } else if (arg === "--retired" || arg === "--ignore-ref") {
+      if (index + 1 >= argv.length) throw new UsageError(`missing value for ${arg}`);
       const value = argv[index + 1];
-      if (value.startsWith("--")) throw new UsageError("missing value for --retired");
+      if (value.startsWith("--")) throw new UsageError(`missing value for ${arg}`);
       index += 1;
-      if (!value) throw new UsageError("--retired requires a name");
-      options.retired.push(value);
+      if (!value) throw new UsageError(`${arg} requires a value`);
+      if (arg === "--retired") options.retired.push(value);
+      else options.ignoreRefs.push(normalizePathSpan(value));
     } else if (arg.startsWith("-")) {
       throw new UsageError(`unknown option: ${arg}`);
     } else {
@@ -133,21 +140,23 @@ function collectMarkdownFiles(inputs, root) {
   return [...files].sort((left, right) => displayPath(left, root).localeCompare(displayPath(right, root)));
 }
 
-function loadRetiredNames(options) {
-  const names = [...options.retired];
-  for (const file of options.retiredFiles) {
+// Reads names from the command line and from list files (one per line, `#`
+// starts a comment line).
+function loadNameList(names, files, label, normalize = (name) => name) {
+  const all = [...names];
+  for (const file of files) {
     let text;
     try {
       text = readFileSync(path.resolve(file), "utf8");
     } catch (error) {
-      throw new UsageError(`cannot read retired-file ${file}: ${error.message}`);
+      throw new UsageError(`cannot read ${label} ${file}: ${error.message}`);
     }
     for (const line of text.split(/\r?\n/u)) {
       const name = line.trim();
-      if (name && !name.startsWith("#")) names.push(name);
+      if (name && !name.startsWith("#")) all.push(normalize(name));
     }
   }
-  return [...new Set(names)].sort((left, right) => left.localeCompare(right));
+  return [...new Set(all)].sort((left, right) => left.localeCompare(right));
 }
 
 function parseBudget(rawPath, root) {
@@ -262,7 +271,8 @@ try {
   if (options.inputs.length === 0) throw new UsageError("missing input path");
 
   const files = collectMarkdownFiles(options.inputs, options.root);
-  const retired = loadRetiredNames(options);
+  const retired = loadNameList(options.retired, options.retiredFiles, "retired-file");
+  const ignoredRefs = new Set(loadNameList(options.ignoreRefs, options.ignoreRefFiles, "ignore-ref-file", normalizePathSpan));
   const budget = options.budget ? parseBudget(options.budget, options.root) : null;
 
   const records = [];
@@ -280,8 +290,12 @@ try {
     const display = displayPath(file, options.root);
 
     for (const { span, line } of extractInlineCodeSpans(text)) {
-      if (!isPathCandidate(span) || !span.includes("/")) continue;
+      if (!isPathCandidate(span)) continue;
       const candidate = normalizePathSpan(span);
+      if (ignoredRefs.has(candidate)) continue;
+      // A span with no slash is checked only when it is a file name
+      // (`AGENTS.md`); plain words, commands and identifiers stay out.
+      if (!candidate.includes("/") && !isBarePathShaped(candidate)) continue;
       const fileDir = path.dirname(file);
       // The places the reference may resolve to; any one is enough.
       let targets;
@@ -294,12 +308,13 @@ try {
       } else if (candidate.startsWith("/")) {
         continue; // other absolute paths and slash commands are not checked
       } else {
-        // A bare relative span is a path only when its first segment exists;
-        // this skips `owner/name` and other slash-separated words.
+        // A bare relative span is a path when its first segment exists, or
+        // when it is path-shaped (a file extension or a known top-level
+        // folder); this skips `owner/name` and other slash-separated words.
         const first = candidate.split("/")[0];
-        if (!existsCandidate(path.resolve(options.root, first)) && !existsCandidate(path.resolve(fileDir, first))) {
-          continue;
-        }
+        const firstExists =
+          existsCandidate(path.resolve(options.root, first)) || existsCandidate(path.resolve(fileDir, first));
+        if (!firstExists && !isBarePathShaped(candidate)) continue;
         targets = [path.resolve(options.root, candidate), path.resolve(fileDir, candidate)];
       }
       if (!targets.some(existsCandidate)) {
