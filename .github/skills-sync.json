@@ -1,15 +1,40 @@
 {
   "defaults": ["frostyard-repo-docs", "frostyard-acmm-conformance"],
+  "groups": {
+    "go": [
+      "frostyard-go-repo",
+      "golang-cli",
+      "golang-code-style",
+      "golang-concurrency",
+      "golang-context",
+      "golang-data-structures",
+      "golang-dependency-management",
+      "golang-documentation",
+      "golang-error-handling",
+      "golang-lint",
+      "golang-modernize",
+      "golang-naming",
+      "golang-performance",
+      "golang-project-layout",
+      "golang-safety",
+      "golang-security",
+      "golang-spf13-cobra",
+      "golang-stretchr-testify",
+      "golang-structs-interfaces",
+      "golang-testing",
+      "golang-troubleshooting"
+    ]
+  },
   "repos": {
     "snosi": [],
-    "updex": ["frostyard-go-repo"],
-    "chairlift": ["frostyard-go-repo"],
-    "pilothouse": ["frostyard-go-repo"],
+    "updex": ["@go"],
+    "chairlift": ["@go"],
+    "pilothouse": ["@go"],
     "lab": [],
-    "repogen": ["frostyard-go-repo"],
-    "clix": ["frostyard-go-repo"],
-    "std": ["frostyard-go-repo"],
-    "intuneme": ["frostyard-go-repo"],
-    "firn": ["frostyard-go-repo"]
+    "repogen": ["@go"],
+    "clix": ["@go"],
+    "std": ["@go"],
+    "intuneme": ["@go"],
+    "firn": ["@go"]
   }
 }

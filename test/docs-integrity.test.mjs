@@ -226,6 +226,33 @@ test("docs gate still counts real headings around backtick and tilde fences", as
   assert.match(stdout, /ok   link_integrity: 1\.000/);
 });
 
+// A skill doc legitimately shows link-shaped code, e.g. a generic method in
+// backticks; only a link outside an inline code span is checked.
+test("docs gate ignores a link-shaped inline code span and still checks a real broken link", async () => {
+  const root = await createFixture();
+  const skillDoc = path.join(root, ".agents/skills/example/SKILL.md");
+  await writeFile(
+    skillDoc,
+    "# Example\n\nUse `errors.AsType[*T](err)` to inspect the error.\n",
+  );
+
+  const { stdout } = await runDocsGate(root);
+  assert.match(stdout, /ok   link_integrity: 1\.000/);
+
+  await writeFile(
+    skillDoc,
+    "# Example\n\nUse `errors.AsType[*T](err)` to inspect the error.\n\n[x](missing.md)\n",
+  );
+
+  await assert.rejects(
+    runDocsGate(root),
+    (error) =>
+      error.stderr.includes(
+        "link: .agents/skills/example/SKILL.md -> missing.md does not resolve",
+      ),
+  );
+});
+
 async function createFixture() {
   const root = await mkdtemp(path.join(os.tmpdir(), "core-docs-gate-"));
   for (const dir of [

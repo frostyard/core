@@ -126,8 +126,11 @@ const skillsRoot = join(root, ".agents", "skills");
 let linksTotal = 0;
 let linksOk = 0;
 for (const file of mdFiles) {
-  // Strip fenced code blocks so example links aren't checked.
-  const text = readFileSync(file, "utf8").replace(/```[\s\S]*?```/g, "");
+  // Strip fenced code blocks and inline code spans so example links, and
+  // code such as `errors.AsType[*T](err)`, aren't checked as links.
+  const text = readFileSync(file, "utf8")
+    .replace(/```[\s\S]*?```/g, "")
+    .replace(/`[^`\n]*`/g, "");
   const isSkillDoc = file.startsWith(skillsRoot + sep);
   for (const m of text.matchAll(/\[[^\]]*\]\(([^)\s]+)\)/g)) {
     const target = m[1];

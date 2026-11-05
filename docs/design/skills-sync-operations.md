@@ -25,7 +25,8 @@ skills, but edits within a managed skill are replaced on the next sync.
 
 ### Configuration contract
 
-`.github/skills-sync.json` is a JSON object with two required members:
+`.github/skills-sync.json` is a JSON object with two required members and one
+optional member:
 
 ```json
 {
@@ -33,9 +34,12 @@ skills, but edits within a managed skill are replaced on the next sync.
     "frostyard-repo-docs",
     "frostyard-acmm-conformance"
   ],
+  "groups": {
+    "go": ["frostyard-go-repo", "golang-testing"]
+  },
   "repos": {
     "lab": [],
-    "updex": ["frostyard-go-repo"]
+    "updex": ["@go"]
   }
 }
 ```
@@ -43,16 +47,23 @@ skills, but edits within a managed skill are replaced on the next sync.
 - `defaults` is an array of skill directory names assigned to every consumer.
 - `repos` maps a repository slug to an array of additional skill names. An
   empty array means the repository receives only the defaults.
+- `groups` is optional. Each key is a group name and each value an array of
+  skill names. A name written `@name` in `defaults` or in a repository entry
+  expands to that group's skill names. An unknown group stops the run before
+  any clone, like an unknown skill name. A group holds skill names only: it
+  does not nest another `@name`.
 - A consumer's effective set is `defaults` plus its repository-specific
-  entries, deduplicated. Every name must identify an existing directory under
-  core's `.agents/skills/`.
+  entries, expanded and deduplicated. Every name must identify an existing
+  directory under core's `.agents/skills/`.
 - Repository keys are unqualified slugs in the `frostyard` organization. The
   script does not accept another owner or an arbitrary clone URL.
 
 Only keys present in `repos` are consumers. The live file is authoritative;
 it includes `chairlift`, `clix`, `firn`, `intuneme`, `lab`, `pilothouse`,
 `repogen`, `snosi`, `std`, and `updex`. Every one except `lab` and `snosi`
-receives the `frostyard-go-repo` extra in addition to the default skills.
+receives the `@go` group in addition to the default skills: that group is
+`frostyard-go-repo` plus the vendored Go skills
+([shared skills](shared-skills.md#vendored-go-skills)).
 `snowcat` and `snowcat-cockpit` left the list when Snowcat was retired and
 both repositories were archived
 ([ADR-0064](../adr/0064-retire-snowcat.md)). A regular

@@ -69,15 +69,7 @@ test("a changed managed skill follows the sync branch and pull-request path", as
     `expected a pr create for the sync branch, got: ${invocations.join("\n")}`,
   );
 
-  const pushed = await mkdtemp(path.join(os.tmpdir(), "sync-skills-verify-"));
-  await execFileAsync("git", [
-    "clone",
-    "--quiet",
-    "--branch",
-    "chore/sync-core-skills",
-    path.join(fixture.remotesDir, "consumer.git"),
-    pushed,
-  ]);
+  const pushed = await cloneSyncBranch(fixture);
   const synced = await readFile(path.join(pushed, ".agents/skills/demo/SKILL.md"), "utf8");
   assert.equal(synced, "# Demo\n");
   const marker = await readFile(
@@ -85,6 +77,61 @@ test("a changed managed skill follows the sync branch and pull-request path", as
     "utf8",
   );
   assert.equal(marker, syncedMarker("demo"));
+});
+
+// A repository entry (or `defaults`) may name a group as "@<name>"; the script
+// replaces it with that group's skills before it syncs anything.
+test("a repository entry naming a group syncs every skill in the group", async () => {
+  const fixture = await createFixture({
+    repos: { consumer: ["@go"] },
+    groups: { go: ["demo", "extra"] },
+    extraSkills: ["extra"],
+  });
+  await seedConsumerRemote(fixture.remotesDir, "consumer", { "README.md": "seed\n" });
+
+  const { stdout } = await runSync(fixture);
+
+  assert.match(stdout, /consumer: synced/);
+  const pushed = await cloneSyncBranch(fixture);
+  for (const skill of ["demo", "extra"]) {
+    const synced = await readFile(
+      path.join(pushed, `.agents/skills/${skill}/SKILL.md`),
+      "utf8",
+    );
+    assert.equal(synced, coreSkillContent(skill));
+    const marker = await readFile(
+      path.join(pushed, `.agents/skills/${skill}/.synced-from-core`),
+      "utf8",
+    );
+    assert.equal(marker, syncedMarker(skill));
+  }
+});
+
+// Every repository's groups resolve before the first clone, so an unknown
+// group stops the run with no clone, push or PR.
+test("a repository entry naming an unknown group fails the run before any clone", async () => {
+  // "consumer" sorts before "later": every repository resolves before the
+  // first clone, so the valid one is not synced either.
+  const fixture = await createFixture({ repos: { consumer: [], later: ["@missing"] } });
+  await seedConsumerRemote(fixture.remotesDir, "consumer", { "README.md": "seed\n" });
+  await seedConsumerRemote(fixture.remotesDir, "later", { "README.md": "seed\n" });
+
+  await assert.rejects(runSync(fixture), (error) => {
+    assert.equal(error.code, 1);
+    assert.match(error.stderr, /unknown skill group '@missing'/);
+    assert.match(error.stderr, /::error::cannot resolve the skills for frostyard\/later/);
+    return true;
+  });
+
+  const invocations = await readLog(fixture.log);
+  assert.equal(
+    // The clone runs as `git -c credential.helper=<helper with spaces> clone`.
+    invocations.some((line) => line.startsWith("git ") && line.includes(" clone ")),
+    false,
+    `expected no clone, got: ${invocations.join("\n")}`,
+  );
+  assert.equal(invocations.some((line) => / (push|add) /.test(line)), false);
+  assert.equal(invocations.some((line) => line.startsWith("gh ")), false);
 });
 
 // sync-skills.sh calls skills_sync_run_repo as an `if` condition, and bash
@@ -191,7 +238,28 @@ async function readLog(log) {
   }
 }
 
-async function createFixture({ repos = { consumer: [] } } = {}) {
+function coreSkillContent(skill) {
+  return skill === "demo" ? "# Demo\n" : `# ${skill}\n`;
+}
+
+// clones the pushed sync branch so a test can read the mirrored skills.
+async function cloneSyncBranch({ remotesDir }) {
+  const pushed = await mkdtemp(path.join(os.tmpdir(), "sync-skills-verify-"));
+  await execFileAsync("git", [
+    "clone",
+    "--quiet",
+    "--branch",
+    "chore/sync-core-skills",
+    path.join(remotesDir, "consumer.git"),
+    pushed,
+  ]);
+  return pushed;
+}
+
+// `groups` is written to the config only when a test gives it, so the tests
+// that predate groups keep exercising a config without that member.
+// `extraSkills` names further core skills beside the default `demo` skill.
+async function createFixture({ repos = { consumer: [] }, groups, extraSkills = [] } = {}) {
   const base = await mkdtemp(path.join(os.tmpdir(), "sync-skills-test-"));
   const coreRepo = path.join(base, "core");
   const remotesDir = path.join(base, "remotes");
@@ -200,11 +268,19 @@ async function createFixture({ repos = { consumer: [] } } = {}) {
   await mkdir(remotesDir, { recursive: true });
 
   await mkdir(path.join(coreRepo, ".github"), { recursive: true });
-  await mkdir(path.join(coreRepo, ".agents/skills/demo"), { recursive: true });
-  await writeFile(path.join(coreRepo, ".agents/skills/demo/SKILL.md"), "# Demo\n");
+  for (const skill of ["demo", ...extraSkills]) {
+    await mkdir(path.join(coreRepo, ".agents/skills", skill), { recursive: true });
+    await writeFile(
+      path.join(coreRepo, ".agents/skills", skill, "SKILL.md"),
+      coreSkillContent(skill),
+    );
+  }
+  const config = { defaults: ["demo"] };
+  if (groups !== undefined) config.groups = groups;
+  config.repos = repos;
   await writeFile(
     path.join(coreRepo, ".github/skills-sync.json"),
-    JSON.stringify({ defaults: ["demo"], repos }, null, 2) + "\n",
+    JSON.stringify(config, null, 2) + "\n",
   );
   await gitInit(coreRepo);
   await execFileAsync("git", ["add", "-A"], { cwd: coreRepo });

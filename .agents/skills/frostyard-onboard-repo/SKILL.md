@@ -34,7 +34,8 @@ assigning the repository to an agent's roster (Brian's decision: an ask).
    release` (start small: `quality, ci, dependencies, docs`); the CI check
    contexts to require on the default branch (compare with `gh pr checks`
    on a recent PR: a name no PR produces makes every merge wait forever);
-   and the skills-sync extras (`frostyard-go-repo` for a Go repository).
+   and the skills-sync group: `@go` for a Go repository, which is
+   `frostyard-go-repo` plus the vendored `golang-*` skills.
 
 2. **Audit, read-only.** Report the gaps before drafting anything:
    - `gh api repos/OWNER/NAME --jq '{id,private,default_branch,archived}'`.
@@ -53,8 +54,10 @@ assigning the repository to an agent's roster (Brian's decision: an ask).
      ([ADR-0042](https://github.com/frostyard/core/blob/main/docs/adr/0042-adopt-a-merge-queue-on-the-default-branch.md));
      the merge-queue rollout skips the repository otherwise.
    - Missing docs shape or instruction aliases: run the
-     `frostyard-repo-docs` (and, if wanted, `frostyard-acmm-conformance` or
-     `frostyard-go-repo`) skills first, each as its own pull request.
+     `frostyard-repo-docs` (and, if wanted, `frostyard-acmm-conformance`)
+     skills first, each as its own pull request. A Go repository receives
+     `frostyard-go-repo`, and the rest of the `@go` group, from the skills
+     sync.
 
 3. **Repository pull request.** One PR to the repository:
    `policies/agent-governance.json` started from core's valid fixture
@@ -69,7 +72,9 @@ assigning the repository to an agent's roster (Brian's decision: an ask).
      `fleet_state: "enabled"`, the programs and the action ceiling.
    - `test/organization-validation.test.mjs`: bump `repositoryCount` (the
      count is pinned; `npm test` fails otherwise).
-   - `.github/skills-sync.json`: add the repository with its extras.
+   - `.github/skills-sync.json`: add the repository with its extras —
+     `["@go"]` for a Go repository — and update `groups` only if a new
+     group is needed.
    Run `npm ci && npm run check` and `npm run check:fleet` (it fetches the
    new repository's `mise.toml`, `mise.lock` and verify gate) before opening.
    Ask Brian, in the report's asks, to give the `ORG_PAT` secret access to

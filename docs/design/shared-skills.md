@@ -32,6 +32,7 @@ linked canonical skill rather than a copied version:
 | [frostyard-plan-project](../../.agents/skills/frostyard-plan-project/SKILL.md) | Planning a multi-step project into an approved task graph |
 | [frostyard-suite-app-release](../../.agents/skills/frostyard-suite-app-release/SKILL.md) | Releasing a suite app's Flatpak and its daemon's sysext |
 | [frostyard-write-adr](../../.agents/skills/frostyard-write-adr/SKILL.md) | Writing, accepting, amending or superseding an ADR |
+| `golang-*` (20 skills, [list](#vendored-go-skills)) | General Go practice in Go repositories, vendored from samber/cc-skills-golang |
 | [frostyard-repo-docs](../../.agents/skills/frostyard-repo-docs/SKILL.md) | Maintaining a repository's documentation tree |
 
 Core owns the canonical copy of every managed skill. A consumer directory with
@@ -44,6 +45,142 @@ Only repositories named in
 The default assignments apply to every listed consumer, while the repository
 entry adds any extra skills. A skill being present in core does not by itself
 make it available in every consumer.
+
+## Vendored Go skills
+
+Core vendors 20 general Go skills from
+[samber/cc-skills-golang](https://github.com/samber/cc-skills-golang)
+(MIT) at commit `bb1d43d98a3f8ab639a0042f90d0ec524e39a477`. Each lives in
+`.agents/skills/golang-<name>/` with the upstream `LICENSE`, its `SKILL.md`
+and the `references/` files it links. `evals/` and `assets/` are not
+vendored, except `golang-cli/assets/examples/` (a separate Go module that
+the skill links to). The skills sync delivers them, with
+`frostyard-go-repo`, only to Go repositories: the `@go` group in
+[skills-sync.json](../../.github/skills-sync.json)
+([skills sync operations](skills-sync-operations.md#configuration-contract)).
+
+### Selection
+
+| Vendored | Why |
+| --- | --- |
+| `golang-code-style` | Style rules for every Go change |
+| `golang-naming` | Naming rules for every Go change |
+| `golang-error-handling` | Error creation, wrapping and logging |
+| `golang-concurrency` | Goroutines, channels and sync primitives |
+| `golang-context` | `context.Context` propagation; SDK methods take a context |
+| `golang-testing` | Table-driven tests, fuzzing, coverage |
+| `golang-stretchr-testify` | testify in pilothouse (direct dependency) |
+| `golang-lint` | golangci-lint use and `nolint` rules |
+| `golang-modernize` | Current Go idioms (`frostyard-go-repo` asks for them) |
+| `golang-safety` | Nil, aliasing and conversion bugs |
+| `golang-security` | Injection, crypto, path traversal, gosec |
+| `golang-performance` | Optimization patterns after profiling |
+| `golang-troubleshooting` | Root-cause debugging, race detection, Delve |
+| `golang-structs-interfaces` | Type and interface design |
+| `golang-data-structures` | Slices, maps and containers |
+| `golang-documentation` | Godoc comments and examples |
+| `golang-cli` | CLI structure, exit codes, I/O, signals |
+| `golang-spf13-cobra` | cobra, which every frostyard CLI uses through clix |
+| `golang-project-layout` | Module and package layout |
+| `golang-dependency-management` | `go.mod`, upgrades, govulncheck |
+
+| Not vendored | Why |
+| --- | --- |
+| `golang-benchmark` | `golang-performance` covers the method; its CI regression setup adds tools and workflows |
+| `golang-gopls` | Needs a gopls MCP server or a Claude Code plugin; the longest description |
+| `golang-refactoring` | Its workflow uses stacked PRs, which the org's squash merges forbid, and leans on gopls |
+| `golang-continuous-integration` | Its templates hold Dependabot auto-merge and an AI review workflow, against core's rules |
+| `golang-dependency-injection`, `golang-google-wire`, `golang-uber-dig`, `golang-uber-fx` | No frostyard repository uses a DI library |
+| `golang-samber-do`, `-hot`, `-lo`, `-mo`, `-oops`, `-ro`, `-slog` | The author's own libraries; no frostyard repository uses them |
+| `golang-graphql`, `golang-grpc`, `golang-swagger` | No frostyard repository serves these APIs |
+| `golang-database` | No frostyard repository uses `database/sql` |
+| `golang-observability` | No frostyard repository exports metrics or traces |
+| `golang-spf13-viper` | Only clix uses Viper; consumers get configuration from clix |
+| `golang-design-patterns` | Overlaps `golang-structs-interfaces` and `frostyard-go-repo`; leans on the DI skills |
+| `golang-how-to` | Writes an always-load directive into a repository's agent files |
+| `golang-pkg-go-dev` | A research helper with its own tool dependencies |
+| `golang-popular-libraries` | A library catalogue; a new dependency needs the owner's approval |
+| `golang-stay-updated` | News feeds, not repository practice |
+
+### Overrides
+
+Core's ADRs, a repository's `AGENTS.md` and `frostyard-go-repo` win over a
+vendored skill. Each `SKILL.md` opens with an attribution and a
+**Frostyard override** block that says so; `grep -rn "Frostyard override"
+.agents/skills/golang-*` lists every edit. The changes from upstream are:
+
+- Every skill: the `allowed-tools` front-matter field is removed (it
+  pre-approves `Bash(git:*)` and similar in Claude Code); description pointers
+  to unvendored skills are removed and `samber/cc-skills-golang@golang-x`
+  becomes `golang-x`; tools are pinned in mise
+  ([ADR-0043](../adr/0043-pin-repository-tools-in-mise-and-name-the-verify-gate.md)),
+  never `go install …@latest`, `go get -tool` or `brew`; the gate is
+  `make verify`/`check`/`ci`
+  ([ADR-0044](../adr/0044-expose-the-make-gate-triad-in-every-repository.md));
+  a third-party module a skill suggests needs the owner's approval.
+- `golang-error-handling`: standard-library wrapping per
+  `frostyard-go-repo`; no `samber/oops` or `samber/slog-*`.
+- `golang-testing` and its `integration-testing.md`: live-environment tests
+  self-skip on `<PRODUCT>_LIVE_*`
+  ([ADR-0038](../adr/0038-scope-the-test-name-filter-to-chairlift.md)), not
+  a `//go:build integration` tag; assertions follow the repository.
+- `golang-stretchr-testify`: only where testify is a direct dependency.
+- `golang-lint`: the repository's own `.golangci.yml` (from updex) decides;
+  upstream's recommended configuration is not vendored; no extra Makefile
+  targets.
+- `golang-modernize` and its `tooling.md`: `go.mod` holds the only, full
+  `1.x.y` Go pin and moves with golangci-lint as one change; actions stay
+  SHA-pinned ([ADR-0021](../adr/0021-sha-pinned-actions-and-least-privilege-ci.md));
+  no AI review workflow
+  ([ADR-0020](../adr/0020-ai-automation-trust-boundaries.md)).
+- `golang-documentation` and its references: the `docs/` shape of
+  `frostyard-repo-docs`
+  ([ADR-0025](../adr/0025-consolidate-repository-docs-into-docs.md));
+  `CONTRIBUTING.md` stays a symlink to `AGENTS.md`
+  ([ADR-0029](../adr/0029-acmm-conformance-via-canonical-aliases.md)); no
+  `CHANGELOG.md` (GoReleaser groups) and no `llms.txt` without approval;
+  install docs name the APT repository
+  ([ADR-0055](../adr/0055-publish-debian-packages-through-the-apt-publisher.md)).
+- `golang-cli`, `golang-spf13-cobra` and `golang-project-layout`
+  (`config.md`, `directory-layouts.md`): clix and the SDK-first layout of
+  `frostyard-go-repo`; no `pkg/`, no Viper layering, no always-load
+  directive written into agent files.
+- `golang-dependency-management` and its `automated-updates.md`: tools in
+  mise, not `tool` directives; nothing auto-merges
+  ([ADR-0042](../adr/0042-adopt-a-merge-queue-on-the-default-branch.md)).
+- `golang-performance`: the example alert rules are not vendored.
+- Link fixes: links to assets that are not vendored become plain text;
+  `golang-documentation` links `#readmemd` and `#distribution`, and
+  `golang-troubleshooting/references/methodology.md` links `../SKILL.md`
+  (upstream's anchors and path do not resolve).
+
+### Description budget
+
+A session loads each skill's `description`. The 20 vendored descriptions
+total 10,439 characters (upstream: 12,197 for the same 20). A Go
+repository's session loads them; so does a session in core, where they also
+sit in `.agents/skills/`.
+
+### Refresh from upstream
+
+Refresh about once a quarter, or when a Go release changes the advice
+(a repository-hygiene pass is a good moment). In one pull request:
+
+1. Clone upstream and pick the new commit `NEW`; the old one is `OLD` (the
+   SHA above and in each attribution line).
+2. For each vendored skill, apply only upstream's change:
+   `git -C <upstream> diff OLD NEW -- skills/golang-<name>/SKILL.md
+   skills/golang-<name>/references | git apply -p2
+   --directory=.agents/skills --reject` (for `golang-cli`, add
+   `skills/golang-cli/assets/examples`). The overrides are small and
+   marked, so most hunks apply; resolve each `.rej` file by hand in favour
+   of the override, then delete it.
+3. Read upstream's diff for new advice that conflicts with core and add a
+   marked override for it; re-check new description pointers.
+4. Replace `OLD` with `NEW` in every attribution line and in this section;
+   update the description budget.
+5. Run `make verify` and a cross-review. After the merge, the sync opens
+   the consumer pull requests.
 
 ## Operational notes
 
