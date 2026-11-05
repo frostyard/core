@@ -16,8 +16,9 @@ defines the instruction-surface policy.
    ```
 
    A backticked path is checked when it starts with `~/`, `./`, `../` or
-   `/var/home/`, when its first folder exists, or when it has a file extension
-   or a top-level folder name (`docs/`, `scripts/`, `.github/`). A reference to
+   `/var/home/`, when its first folder exists, or when it has a supported file
+   extension (`AGENTS.md`, `mise.toml`) or is a child path beneath a known
+   top-level folder (`docs/agents`, `.github/workflows`). A reference to
    another repository that the lint cannot resolve goes in the
    `--ignore-ref-file` list, 1 exact reference per line, after the owner checks
    it. Fix or list each other error before the blind review.
