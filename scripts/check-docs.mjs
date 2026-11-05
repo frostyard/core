@@ -86,7 +86,7 @@ function stripFences(text) {
 // closes at the next run of exactly N backticks (a longer or shorter run does
 // not close it). A backtick escaped by an odd number of backslashes is
 // literal, not a delimiter, and an opener with no closer is literal text too.
-// A span may cross a newline but not a blank line. The span's content is
+// A span stays on 1 line. The span's content is
 // dropped, so a link-shaped example inside it is not read as a link, while a
 // real link between escaped backticks still is.
 function stripCodeSpans(text) {
@@ -108,13 +108,11 @@ function stripCodeSpans(text) {
     let closeAt = -1;
     let j = i + opener;
     while (j < text.length) {
-      if (text[j] === "\n") {
-        const lineEnd = text.indexOf("\n", j + 1);
-        const nextLine = text.slice(j + 1, lineEnd === -1 ? text.length : lineEnd);
-        if (nextLine.trim() === "") break; // a blank line ends the search
-        j++;
-        continue;
-      }
+      // A span ends at its line: pairing backticks across lines could join
+      // 2 blocks (adjacent headings) and hide a real link. A code span that
+      // wraps over lines is then not stripped, which can only add a link to
+      // check, never hide one.
+      if (text[j] === "\n") break;
       if (text[j] !== "`") {
         j++;
         continue;

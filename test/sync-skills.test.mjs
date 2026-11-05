@@ -190,6 +190,15 @@ for (const { name, options } of [
     name: "that is not JSON",
     options: { rawConfig: '{ "defaults": ["demo"], "repos": { "consumer": [] }\n' },
   },
+  { name: "that is empty", options: { rawConfig: "" } },
+  {
+    name: "that holds 2 JSON documents",
+    options: {
+      rawConfig:
+        '{ "defaults": ["demo"], "repos": { "consumer": [] } }\n' +
+        '{ "defaults": ["demo"], "repos": { "consumer": [] } }\n',
+    },
+  },
   { name: "whose group is not an array", options: { groups: { go: "demo" } } },
   {
     name: "whose group names another group",

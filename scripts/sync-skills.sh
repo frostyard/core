@@ -31,13 +31,17 @@ source "${SELF_DIR}/lib/skills-sync-repo.sh"
 # Config preflight: the shape is validated before any skill list is resolved
 # and before the first clone, so a malformed config stops the run with a named
 # problem instead of a jq error status (4 for bad JSON, 5 for a jq error).
-# A group value must be an array of skill names and may not name another group.
-problem=$(jq -r '
+# The file must hold exactly 1 JSON document (jq -s: an empty file or a stream
+# of objects is refused). A group value must be an array of skill names and may
+# not name another group.
+problem=$(jq -rs '
   def is_skill_list: type == "array" and all(.[]; type == "string");
   def bad_repo: (.repos | to_entries[] | select(.value | is_skill_list | not) | .key);
   def bad_group: ((.groups // {}) | to_entries[] | select(.value | is_skill_list | not) | .key);
   def nested: ((.groups // {}) | [.[] | .[] | select(startswith("@"))] | first);
 
+  if length != 1 then "the config must hold exactly 1 JSON document, not \(length)"
+  else .[0] |
   if type != "object" then "the config must be a JSON object"
   elif (.defaults | is_skill_list | not) then "\"defaults\" must be an array of skill names"
   elif ((.repos | type) != "object") then "\"repos\" must be an object keyed by repository slug"
@@ -46,6 +50,7 @@ problem=$(jq -r '
   elif ([bad_group] | length) > 0 then "\"groups.\([bad_group] | first)\" must be an array of skill names"
   elif (nested != null) then "a skill group must not name another group (\(nested))"
   else "" end
+  end
 ' "$CONFIG" 2>/dev/null) || {
   echo "::error::cannot read ${CONFIG} as JSON" >&2
   exit 1

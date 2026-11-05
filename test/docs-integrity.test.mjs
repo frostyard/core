@@ -302,6 +302,22 @@ test("docs gate checks a link after an unclosed double-backtick run", async () =
   );
 });
 
+test("docs gate does not pair backticks across 2 adjacent headings", async () => {
+  const root = await createFixture();
+  await writeFile(
+    path.join(root, ".agents/skills/example/SKILL.md"),
+    "# First `\n# [x](missing.md) `\n",
+  );
+
+  await assert.rejects(
+    runDocsGate(root),
+    (error) =>
+      error.stderr.includes(
+        "link: .agents/skills/example/SKILL.md -> missing.md does not resolve",
+      ),
+  );
+});
+
 async function createFixture() {
   const root = await mkdtemp(path.join(os.tmpdir(), "core-docs-gate-"));
   for (const dir of [
