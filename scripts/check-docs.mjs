@@ -87,14 +87,18 @@ function stripFences(text) {
 // it. In each line, a run of N backticks opens a span that closes at the next
 // run of exactly N backticks (CommonMark); a backtick after an odd number of
 // backslashes is literal. When every backtick run of every line in the run is
-// paired, those pairs are exactly CommonMark's pairs for any split of the run
-// into blocks, so the spans are dropped and a link-shaped example in them is
-// not read as a link. When any line has an unpaired run (a span that wraps, or
-// a literal backtick), the whole run stays as it is: its links are all
-// checked, and a real link is never hidden.
+// paired, and no line holds a table cell boundary or a possible HTML tag or
+// autolink, those pairs are CommonMark's pairs for any split of the run into
+// blocks, so the spans are dropped and a link-shaped example in them is not
+// read as a link. Otherwise (a span that wraps, a literal backtick, a table
+// row, inline HTML) the whole run stays as it is: its links are all checked.
+// A line with another inline context in it (a GFM table cell boundary `|`,
+// or a `<` that may open raw HTML or an autolink, whose attribute or URL can
+// hold a literal backtick) counts as ambiguous, like an unpaired run.
+const AMBIGUOUS_LINE = /(^|[^\\])(\\\\)*(\||<[A-Za-z\/!?])/;
 function lineCodeSpans(line) {
   const spans = [];
-  let unpaired = false;
+  let unpaired = AMBIGUOUS_LINE.test(line) && line.includes("`");
   let i = 0;
   while (i < line.length) {
     if (line[i] !== "`") {

@@ -345,6 +345,24 @@ test("docs gate ignores a link-shaped code span in a paragraph whose lines all p
   assert.match(stdout, /ok   link_integrity: 1\.000/);
 });
 
+for (const [name, body] of [
+  ["a table cell boundary", "| A | B |\n| --- | --- |\n| ` | [x](missing.md) ` |\n"],
+  ["an HTML attribute", '<span title="`">[x](missing.md)`</span>\n'],
+]) {
+  test(`docs gate checks a link when a backtick pair crosses ${name}`, async () => {
+    const root = await createFixture();
+    await writeFile(path.join(root, ".agents/skills/example/SKILL.md"), `# Example\n\n${body}`);
+
+    await assert.rejects(
+      runDocsGate(root),
+      (error) =>
+        error.stderr.includes(
+          "link: .agents/skills/example/SKILL.md -> missing.md does not resolve",
+        ),
+    );
+  });
+}
+
 async function createFixture() {
   const root = await mkdtemp(path.join(os.tmpdir(), "core-docs-gate-"));
   for (const dir of [
