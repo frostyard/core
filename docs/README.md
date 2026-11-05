@@ -84,6 +84,7 @@ no ADR, spec, or plan covers yet.
 - [0066 — Build only the omarchy-apps packages that Snosi uses](adr/0066-build-only-the-omarchy-apps-packages-that-snosi-uses.md)
 - [0067 — Publish omarchy-apps packages on change, and keep the newest two](adr/0067-publish-omarchy-apps-on-change-and-keep-the-newest-two.md)
 - [0068 — Label pull requests that touch high-risk paths](adr/0068-label-pull-requests-that-touch-high-risk-paths.md)
+- [0069 — Report problems local first, opt-in, with one sender per host](adr/0069-report-problems-local-first-opt-in-with-one-sender-per-host.md)
 
 ### Design
 
@@ -93,6 +94,7 @@ no ADR, spec, or plan covers yet.
 - [Organization authority](design/organization-authority.md)
 - [Stable repository drift alarm](design/stable-repository-drift-alarm.md)
 - [Debian publication](design/debian-publication.md)
+- [Problem reports](design/problem-reports.md)
 
 ### Specs
 
@@ -104,6 +106,7 @@ no ADR, spec, or plan covers yet.
 - [Stable repository drift alarm](specs/stable-repository-drift-alarm.md)
 - [Risk paths](specs/risk-paths.md)
 - [Flaky-test scan](specs/flaky-test-scan.md)
+- [Problem report `frostyard.problem/1`](specs/problem-report.md)
 
 ### Plans
 
