@@ -53,8 +53,11 @@ Core vendors 20 general Go skills from
 (MIT) at commit `bb1d43d98a3f8ab639a0042f90d0ec524e39a477`. Each lives in
 `.agents/skills/golang-<name>/` with the upstream `LICENSE`, its `SKILL.md`
 and the `references/` files it links. `evals/` and `assets/` are not
-vendored, except `golang-cli/assets/examples/` (a separate Go module that
-the skill links to). The skills sync delivers them, with
+vendored. Upstream's `golang-cli/assets/examples/` Go files are vendored as
+1 Markdown file, `golang-cli/references/examples.md`, because a managed
+skill must hold no `.go` file or `go.mod`: consumer guards, gofmt and lint
+walk the repository. `test/managed-skills-go-free.test.mjs` enforces it.
+The skills sync delivers them, with
 `frostyard-go-repo`, only to Go repositories: the `@go` group in
 [skills-sync.json](../../.github/skills-sync.json)
 ([skills sync operations](skills-sync-operations.md#configuration-contract)).
@@ -118,6 +121,10 @@ vendored skill. Each `SKILL.md` opens with an attribution and a
   `make verify`/`check`/`ci`
   ([ADR-0044](../adr/0044-expose-the-make-gate-triad-in-every-repository.md));
   a third-party module a skill suggests needs the owner's approval.
+- `golang-cli`: upstream's `assets/examples/` Go files are 1 Markdown file,
+  `references/examples.md`, with the code unchanged in fenced blocks, so no
+  managed skill holds a `.go` file or `go.mod`
+  (`test/managed-skills-go-free.test.mjs`).
 - `golang-error-handling`: standard-library wrapping per
   `frostyard-go-repo`; no `samber/oops` or `samber/slog-*`.
 - `golang-testing` and its `integration-testing.md`: live-environment tests
@@ -177,8 +184,10 @@ Refresh about once a quarter, or when a Go release changes the advice
 2. For each vendored skill, apply only upstream's change:
    `git -C <upstream> diff OLD NEW -- skills/golang-<name>/SKILL.md
    skills/golang-<name>/references | git apply -p2
-   --directory=.agents/skills --reject` (for `golang-cli`, add
-   `skills/golang-cli/assets/examples`). The overrides are small and
+   --directory=.agents/skills --reject`. For `golang-cli`, diff
+   upstream's `skills/golang-cli/assets/examples` by hand and copy the
+   changes into the fenced blocks of `references/examples.md`; `git apply`
+   must never create a `.go` file there. The overrides are small and
    marked, so most hunks apply; resolve each `.rej` file by hand in favour
    of the override, then delete it.
 3. Read upstream's diff for new advice that conflicts with core and add a
