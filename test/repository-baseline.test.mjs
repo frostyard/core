@@ -78,8 +78,10 @@ export function workflowCommands(workflowText) {
     const line = lines[i];
     if (line.trim() === "" || line.trim().startsWith("#")) continue;
     const indent = indentOf(line);
-    if (stepsIndent >= 0 && indent <= stepsIndent) stepsIndent = itemIndent = -1;
-    if (/^\s*steps:\s*$/.test(line)) {
+    // A step list can be indented under `steps:` or start at its indent.
+    const indentlessItem = indent === stepsIndent && /^\s*-\s/.test(line);
+    if (stepsIndent >= 0 && indent <= stepsIndent && !indentlessItem) stepsIndent = itemIndent = -1;
+    if (/^\s*steps:\s*(#.*)?$/.test(line)) {
       stepsIndent = indent;
       continue;
     }
@@ -97,10 +99,17 @@ export function workflowCommands(workflowText) {
       keyIndent = indent;
     }
     if (value === null) continue;
-    value = value.replace(/\s+#.*$/, "").trim();
-    const block = /^([|>])[-+]?$/.exec(value);
+    value = value.trim();
+    const quoted = /^'((?:[^']|'')*)'|^"((?:[^"\\]|\\.)*)"/.exec(value);
+    if (quoted) {
+      // A quoted YAML scalar: its text, decoded; a # inside the quotes is not a YAML comment.
+      value = quoted[1] !== undefined ? quoted[1].replace(/''/g, "'") : quoted[2].replace(/\\(.)/g, "$1");
+    } else {
+      value = value.replace(/(^|\s+)#.*$/, "").trim();
+    }
+    const block = quoted ? null : /^([|>])[-+]?$/.exec(value);
     if (!block) {
-      const command = stripShellComment(value.replace(/^(["'])(.*)\1$/, "$2"));
+      const command = stripShellComment(value);
       if (command) commands.push(command);
       continue;
     }
@@ -331,6 +340,21 @@ test("B12: ciCoverageGaps ignores run keys outside steps, folded text and shell 
   assert.deepEqual(ciCoverageGaps(makefile, comment), []);
   const commentOnly = comment.replace("echo '#' ; make verify", "echo done");
   assert.deepEqual(ciCoverageGaps(makefile, commentOnly), ["make verify"]);
+});
+
+test("B12: ciCoverageGaps reads commented steps keys, indentless step lists and quoted run values", () => {
+  const makefile = "ci: verify\n";
+  const commentedKey = "on: [pull_request]\njobs:\n  a:\n    steps: # required checks\n      - run: make ci\n";
+  assert.deepEqual(ciCoverageGaps(makefile, commentedKey), []);
+  const indentless = "on: [pull_request]\njobs:\n  a:\n    steps:\n    - name: checkout\n      uses: actions/checkout@v4\n    - run: make ci\n  b:\n    env:\n      run: make verify\n";
+  assert.deepEqual(ciCoverageGaps(makefile, indentless), []);
+  const singleQuoted = "on: [pull_request]\njobs:\n  a:\n    steps:\n      - run: 'make ci # full gate'\n";
+  assert.deepEqual(ciCoverageGaps(makefile, singleQuoted), []);
+  const doubleQuoted = "on: [pull_request]\njobs:\n  a:\n    steps:\n      - run: \"echo \\\"#\\\" ; make verify\" # a YAML comment\n";
+  assert.deepEqual(ciCoverageGaps(makefile, doubleQuoted), []);
+  // Outside the steps of the indentless list, a run key still does not count.
+  const afterSteps = indentless.replace("    - run: make ci\n", "    - run: echo\n");
+  assert.deepEqual(ciCoverageGaps(makefile, afterSteps), ["make verify"]);
 });
 
 test("B12: core's ci.yml runs make ci on pull requests", () => {
