@@ -12,6 +12,9 @@ Docs are split by the question they answer:
 [Tenets](tenets.md) sit above the four categories: they guide decisions that
 no ADR, spec, or plan covers yet.
 
+[Org ADRs in core](org-adrs.md) says which of these ADRs bind core itself, and
+which baseline rows do not apply here.
+
 ## Index
 
 ### Decisions (ADRs)
