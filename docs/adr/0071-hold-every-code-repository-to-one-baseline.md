@@ -67,6 +67,11 @@ against.
   10. License: every public repository has a `LICENSE` file. The default
       is MIT. A repository keeps GPL-3.0 where it inherits it or already
       uses it (chairlift, firn, igloo); no repository is relicensed.
+      File-level SPDX headers can differ from the root `LICENSE` (for
+      example, LGPL-2.1-or-later headers in bootc-debian, omarchy-apps and
+      snosi stay under a root MIT `LICENSE`), and vendored files keep their
+      upstream notices (for example, the MIT notice of the `golang-*`
+      skills).
   11. Go toolchain: all Go repositories use one Go minor version and one
       golangci-lint version. The `frostyard-go-repo` skill names both, in
       its "Fleet toolchain" section, and the `@go` skills-sync group
