@@ -106,10 +106,12 @@ function stripFences(text) {
 // - a line with an unpaired backtick run (a span may wrap lines, or a heading
 //   or other block may end it). Each line of a safe run pairs runs of equal
 //   length left to right, which is CommonMark's own pairing;
-// - a `](` or `][` outside a computed span, when a backtick comes later in the
-//   run. The link consumes that backtick in a destination, title or reference
-//   label, so it is not a span delimiter. A `](` inside a real span does not
-//   trigger this rule, because it belongs to code such as `AsType[T](err)`.
+// - a link, GFM autolink or inline-math marker outside a computed span, when
+//   a backtick comes later in the run. The marker starts are `](`, `][`, `www.`,
+//   `://`, or `$`. These constructs can consume a backtick as link destination,
+//   title, reference label, autolink path or math text, so it is not a span
+//   delimiter. A marker inside a real span does not trigger this rule; this keeps
+//   code such as `AsType[T](err)` and `See `https://example.com/x`` safe.
 function codeSpanRanges(text) {
   const lines = [];
   const lineEnding = /\r\n|\r|\n/g;
@@ -199,12 +201,12 @@ function codeSpanRanges(text) {
     }
 
     if (!unsafe) {
-      for (let i = 0; i < runText.length - 1; i++) {
-        if (runText[i] !== "]") continue;
-        if (runText[i + 1] !== "(" && runText[i + 1] !== "[") continue;
+      for (let i = 0; i < runText.length; i++) {
+        const markerEnd = consumedBacktickMarkerEnd(runText, i);
+        if (markerEnd === -1) continue;
         const position = runStart + i;
         if (isInCodeSpan(runRanges, position, position + 1)) continue;
-        if (runText.indexOf("`", i + 2) !== -1) {
+        if (runText.indexOf("`", markerEnd) !== -1) {
           unsafe = true;
           break;
         }
@@ -215,6 +217,14 @@ function codeSpanRanges(text) {
   }
 
   return ranges;
+}
+
+function consumedBacktickMarkerEnd(text, index) {
+  if (text.startsWith("](", index) || text.startsWith("][", index)) return index + 2;
+  if (text.startsWith("www.", index)) return index + 4;
+  if (text.startsWith("://", index)) return index + 3;
+  if (text[index] === "$") return index + 1;
+  return -1;
 }
 
 function isInCodeSpan(ranges, start, end) {

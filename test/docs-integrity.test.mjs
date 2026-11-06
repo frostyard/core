@@ -469,6 +469,50 @@ test("CRLF line endings still permit a paired code span", async () => {
   assert.match(stdout, /ok   link_integrity: 1\.000/);
 });
 
+test("a GFM www autolink consumes a backtick instead of making a span", async () => {
+  const root = await createFixture();
+  await writeFile(
+    path.join(root, ".agents/skills/example/SKILL.md"),
+    "www.example.com/a`b [x](missing.md) `tail\n",
+  );
+
+  await assert.rejects(runDocsGate(root), (error) =>
+    error.stderr.includes("-> missing.md does not resolve"));
+});
+
+test("a GFM https autolink consumes a backtick instead of making a span", async () => {
+  const root = await createFixture();
+  await writeFile(
+    path.join(root, ".agents/skills/example/SKILL.md"),
+    "https://example.com/a`b [x](missing.md) `tail\n",
+  );
+
+  await assert.rejects(runDocsGate(root), (error) =>
+    error.stderr.includes("-> missing.md does not resolve"));
+});
+
+test("inline math consumes a backtick instead of making a span", async () => {
+  const root = await createFixture();
+  await writeFile(
+    path.join(root, ".agents/skills/example/SKILL.md"),
+    "$a`$ [x](missing.md) `tail\n",
+  );
+
+  await assert.rejects(runDocsGate(root), (error) =>
+    error.stderr.includes("-> missing.md does not resolve"));
+});
+
+test("autolink and Go generic markers inside code spans stay paired", async () => {
+  const root = await createFixture();
+  await writeFile(
+    path.join(root, ".agents/skills/example/SKILL.md"),
+    "See `https://example.com/x` and `errors.AsType[T](err)`.\n",
+  );
+
+  const { stdout } = await runDocsGate(root);
+  assert.match(stdout, /ok   link_integrity: 1\.000/);
+});
+
 async function createFixture() {
   const root = await mkdtemp(path.join(os.tmpdir(), "core-docs-gate-"));
   for (const dir of [
