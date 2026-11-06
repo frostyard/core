@@ -27,9 +27,11 @@ export async function findGoFiles(dir) {
   return { found, checked };
 }
 
-function managedSkills(config) {
+// Every skill the sync can deliver: defaults, groups and repository entries,
+// with each `@group` reference expanded wherever it appears.
+export function managedSkills(config) {
   const groups = config.groups ?? {};
-  const names = new Set(config.defaults ?? []);
+  const names = new Set();
   const add = (list) => {
     for (const item of list) {
       if (item.startsWith("@")) {
@@ -40,6 +42,7 @@ function managedSkills(config) {
       }
     }
   };
+  add(config.defaults ?? []);
   for (const list of Object.values(groups)) add(list);
   for (const list of Object.values(config.repos ?? {})) add(list);
   return [...names].sort();
@@ -80,4 +83,14 @@ test("findGoFiles finds .go and go.mod files and ignores .md files", async () =>
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
+});
+
+test("managedSkills expands @group references in defaults and repos", () => {
+  const names = managedSkills({
+    defaults: ["base", "@go"],
+    groups: { go: ["golang-cli"], extra: ["frostyard-x"] },
+    repos: { a: ["@extra"], b: ["only-b"], c: [] },
+  });
+  assert.deepEqual(names, ["base", "frostyard-x", "golang-cli", "only-b"]);
+  assert.ok(!names.some((n) => n.startsWith("@")));
 });
