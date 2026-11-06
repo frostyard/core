@@ -121,8 +121,9 @@ persist credentials.
 The token is a fine-grained PAT owned by the machine account
 `frostyard-machines`, with resource owner `frostyard` and repository access
 limited to the consumers listed in [`.github/skills-sync.json`](../../.github/skills-sync.json).
-GitHub shows `frostyard-machines` as the author of every sync PR (the commit
-author stays `frostyard-core[bot]`). A maintainer other than
+GitHub shows `frostyard-machines` as the author of every sync PR that the
+token creates (the commit author stays `frostyard-core[bot]`); an update to an
+open sync PR keeps that PR's author. A maintainer other than
 `frostyard-machines` approves the PR under the default-branch ruleset;
 `frostyard-machines` cannot approve its own PR.
 
