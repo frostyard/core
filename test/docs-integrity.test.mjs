@@ -226,6 +226,293 @@ test("docs gate still counts real headings around backtick and tilde fences", as
   assert.match(stdout, /ok   link_integrity: 1\.000/);
 });
 
+test("escaped backticks guard a real link outside the code span", async () => {
+  const root = await createFixture();
+  await writeFile(
+    path.join(root, ".agents/skills/example/SKILL.md"),
+    "\\` [x](missing.md) \\`\n",
+  );
+
+  await assert.rejects(runDocsGate(root), (error) =>
+    error.stderr.includes("-> missing.md does not resolve"));
+});
+
+test("spans match by backtick run length and leave outside links checked", async () => {
+  const root = await createFixture();
+  await writeFile(
+    path.join(root, ".agents/skills/example/SKILL.md"),
+    "`` a ` `` [x](missing.md)\n",
+  );
+
+  await assert.rejects(runDocsGate(root), (error) =>
+    error.stderr.includes("-> missing.md does not resolve"));
+});
+
+test("an unclosed double-backtick run guards a real link", async () => {
+  const root = await createFixture();
+  await writeFile(
+    path.join(root, ".agents/skills/example/SKILL.md"),
+    "`` [x](missing.md) `\n",
+  );
+
+  await assert.rejects(runDocsGate(root), (error) =>
+    error.stderr.includes("-> missing.md does not resolve"));
+});
+
+test("adjacent headings with unpaired backticks guard a real link", async () => {
+  const root = await createFixture();
+  await writeFile(
+    path.join(root, ".agents/skills/example/SKILL.md"),
+    "# First `\n# [x](missing.md) `\n",
+  );
+
+  await assert.rejects(runDocsGate(root), (error) =>
+    error.stderr.includes("-> missing.md does not resolve"));
+});
+
+test("a span that wraps lines guards the link outside its pair", async () => {
+  const root = await createFixture();
+  await writeFile(
+    path.join(root, ".agents/skills/example/SKILL.md"),
+    "`code\ncontinued` [x](missing.md) `tail`\n",
+  );
+
+  await assert.rejects(runDocsGate(root), (error) =>
+    error.stderr.includes("-> missing.md does not resolve"));
+});
+
+test("a standalone GFM table row guards a real link", async () => {
+  const root = await createFixture();
+  await writeFile(
+    path.join(root, ".agents/skills/example/SKILL.md"),
+    "| ` | [x](missing.md) ` |\n",
+  );
+
+  await assert.rejects(runDocsGate(root), (error) =>
+    error.stderr.includes("-> missing.md does not resolve"));
+});
+
+test("a GFM table with header and delimiter guards a real link", async () => {
+  const root = await createFixture();
+  await writeFile(
+    path.join(root, ".agents/skills/example/SKILL.md"),
+    "| Code | Link |\n| --- | --- |\n| ` | [x](missing.md) ` |\n",
+  );
+
+  await assert.rejects(runDocsGate(root), (error) =>
+    error.stderr.includes("-> missing.md does not resolve"));
+});
+
+test("raw HTML with a backtick guards a real link", async () => {
+  const root = await createFixture();
+  await writeFile(
+    path.join(root, ".agents/skills/example/SKILL.md"),
+    "<span title=\"`\">[x](missing.md)`</span>\n",
+  );
+
+  await assert.rejects(runDocsGate(root), (error) =>
+    error.stderr.includes("-> missing.md does not resolve"));
+});
+
+test("an email autolink with a backtick guards a real link", async () => {
+  const root = await createFixture();
+  await writeFile(
+    path.join(root, ".agents/skills/example/SKILL.md"),
+    "<1`@example.com> [x](missing.md) `\n",
+  );
+
+  await assert.rejects(runDocsGate(root), (error) =>
+    error.stderr.includes("-> missing.md does not resolve"));
+});
+
+test("a code span inside link text does not hide the outer link", async () => {
+  const root = await createFixture();
+  await writeFile(
+    path.join(root, ".agents/skills/example/SKILL.md"),
+    "[`code`](missing.md)\n",
+  );
+
+  await assert.rejects(runDocsGate(root), (error) =>
+    error.stderr.includes("-> missing.md does not resolve"));
+});
+
+test("index coverage ignores a link only when it is in a code span", async () => {
+  const root = await createFixture();
+  await writeFile(path.join(root, "docs/adr/example.md"), "# Example\n");
+  await writeFile(
+    path.join(root, "docs/README.md"),
+    "[Metric](specs/pr-acceptance-metric.md)\n\n`[Example](adr/example.md)`\n",
+  );
+
+  await assert.rejects(runDocsGate(root), (error) =>
+    error.stderr.includes("index: docs/adr/example.md has no line in docs/README.md"));
+});
+
+test("Go generic calls in inline code spans pass link integrity", async () => {
+  const root = await createFixture();
+  await writeFile(
+    path.join(root, ".agents/skills/example/SKILL.md"),
+    "- `errors.AsType[T](err)`\n\n`reflect.TypeAssert[T](v)`\n",
+  );
+
+  const { stdout } = await runDocsGate(root);
+  assert.match(stdout, /ok   link_integrity: 1\.000/);
+});
+
+test("a double-backtick span contains a link by exact run length", async () => {
+  const root = await createFixture();
+  await writeFile(
+    path.join(root, ".agents/skills/example/SKILL.md"),
+    "`` a ` [x](missing.md) ``\n",
+  );
+
+  const { stdout } = await runDocsGate(root);
+  assert.match(stdout, /ok   link_integrity: 1\.000/);
+});
+
+test("a less-than sign without a later greater-than sign permits code spans", async () => {
+  const root = await createFixture();
+  await writeFile(
+    path.join(root, ".agents/skills/example/SKILL.md"),
+    "Go <1.26 and `errors.AsType[T](err)`\n",
+  );
+
+  const { stdout } = await runDocsGate(root);
+  assert.match(stdout, /ok   link_integrity: 1\.000/);
+});
+
+test("naive fence removal does not join a real link across a removed chunk", async () => {
+  const root = await createFixture();
+  await writeFile(
+    path.join(root, ".agents/skills/example/SKILL.md"),
+    "` ```x` y``` [l](missing.md) `\n",
+  );
+
+  await assert.rejects(runDocsGate(root), (error) =>
+    error.stderr.includes("-> missing.md does not resolve"));
+});
+
+test("a list item fence does not hide a later real link", async () => {
+  const root = await createFixture();
+  await writeFile(
+    path.join(root, ".agents/skills/example/SKILL.md"),
+    "- ```\n  code\n  ```\n[x](missing.md)\n\n```\nz\n```\n",
+  );
+
+  await assert.rejects(runDocsGate(root), (error) =>
+    error.stderr.includes("-> missing.md does not resolve"));
+});
+
+test("a backtick in a link destination is not a span delimiter", async () => {
+  const root = await createFixture();
+  await writeFile(
+    path.join(root, ".agents/skills/example/SKILL.md"),
+    "[a](https://example.com/a`b) [x](missing.md) `tail\n",
+  );
+
+  await assert.rejects(runDocsGate(root), (error) =>
+    error.stderr.includes("-> missing.md does not resolve"));
+});
+
+test("a backtick in a link title is not a span delimiter", async () => {
+  const root = await createFixture();
+  await writeFile(
+    path.join(root, ".agents/skills/example/SKILL.md"),
+    "[a](u \"t`\") [x](missing.md) `tail\n",
+  );
+
+  await assert.rejects(runDocsGate(root), (error) =>
+    error.stderr.includes("-> missing.md does not resolve"));
+});
+
+test("a backtick in a full reference label is not a span delimiter", async () => {
+  const root = await createFixture();
+  await writeFile(
+    path.join(root, ".agents/skills/example/SKILL.md"),
+    "[a][b`c] [x](missing.md) `tail\n\n[b`c]: https://example.com\n",
+  );
+
+  await assert.rejects(runDocsGate(root), (error) =>
+    error.stderr.includes("-> missing.md does not resolve"));
+});
+
+test("a Unicode blank line does not hide a real link", async () => {
+  const root = await createFixture();
+  await writeFile(
+    path.join(root, ".agents/skills/example/SKILL.md"),
+    "`head\n\u00a0\nend` [x](missing.md) `tail\n",
+  );
+
+  await assert.rejects(runDocsGate(root), (error) =>
+    error.stderr.includes("-> missing.md does not resolve"));
+});
+
+test("a lone CR line ending does not hide a real link", async () => {
+  const root = await createFixture();
+  await writeFile(
+    path.join(root, ".agents/skills/example/SKILL.md"),
+    "`head\r\r[x](missing.md) `tail\r",
+  );
+
+  await assert.rejects(runDocsGate(root), (error) =>
+    error.stderr.includes("-> missing.md does not resolve"));
+});
+
+test("CRLF line endings still permit a paired code span", async () => {
+  const root = await createFixture();
+  await writeFile(
+    path.join(root, ".agents/skills/example/SKILL.md"),
+    "Use `errors.AsType[T](err)` here.\r\n",
+  );
+
+  const { stdout } = await runDocsGate(root);
+  assert.match(stdout, /ok   link_integrity: 1\.000/);
+});
+
+test("a GFM www autolink consumes a backtick instead of making a span", async () => {
+  const root = await createFixture();
+  await writeFile(
+    path.join(root, ".agents/skills/example/SKILL.md"),
+    "www.example.com/a`b [x](missing.md) `tail\n",
+  );
+
+  await assert.rejects(runDocsGate(root), (error) =>
+    error.stderr.includes("-> missing.md does not resolve"));
+});
+
+test("a GFM https autolink consumes a backtick instead of making a span", async () => {
+  const root = await createFixture();
+  await writeFile(
+    path.join(root, ".agents/skills/example/SKILL.md"),
+    "https://example.com/a`b [x](missing.md) `tail\n",
+  );
+
+  await assert.rejects(runDocsGate(root), (error) =>
+    error.stderr.includes("-> missing.md does not resolve"));
+});
+
+test("inline math consumes a backtick instead of making a span", async () => {
+  const root = await createFixture();
+  await writeFile(
+    path.join(root, ".agents/skills/example/SKILL.md"),
+    "$a`$ [x](missing.md) `tail\n",
+  );
+
+  await assert.rejects(runDocsGate(root), (error) =>
+    error.stderr.includes("-> missing.md does not resolve"));
+});
+
+test("autolink and Go generic markers inside code spans stay paired", async () => {
+  const root = await createFixture();
+  await writeFile(
+    path.join(root, ".agents/skills/example/SKILL.md"),
+    "See `https://example.com/x` and `errors.AsType[T](err)`.\n",
+  );
+
+  const { stdout } = await runDocsGate(root);
+  assert.match(stdout, /ok   link_integrity: 1\.000/);
+});
+
 async function createFixture() {
   const root = await mkdtemp(path.join(os.tmpdir(), "core-docs-gate-"));
   for (const dir of [
