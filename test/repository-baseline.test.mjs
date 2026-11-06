@@ -47,6 +47,30 @@ export function missingEcosystems(files, dependabotText) {
   return [...required].filter((name) => !named.has(name)).sort();
 }
 
+// B12 (ADR-0073): the parts of `make ci` that a CI workflow does not run. A
+// `make ci` step covers all of them. Otherwise each prerequisite of the `ci`
+// target needs a `make <target>` step (extra variables allowed), and each
+// command of the `ci` recipe needs the same command in the workflow.
+export function ciCoverageGaps(makefileText, workflowText) {
+  const lines = makefileText.split("\n");
+  const start = lines.findIndex((line) => /^ci\s*:(?!=)/.test(line));
+  if (start === -1) return ["a ci target in the Makefile"];
+  const runsMake = (target) => new RegExp(`(^|[\\s;&|])make ${target.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(\\s|$)`, "m").test(workflowText);
+  if (runsMake("ci")) return [];
+  const prerequisites = lines[start].replace(/^ci\s*:/, "").replace(/#.*$/, "").trim().split(/\s+/).filter(Boolean);
+  const recipe = [];
+  for (let i = start + 1; i < lines.length && lines[i].startsWith("\t"); i++) {
+    const command = lines[i].trim().replace(/^[@-]+/, "").replace(/\$\(MAKE\)/g, "make");
+    if (command) recipe.push(command);
+  }
+  const gaps = prerequisites.filter((target) => !runsMake(target)).map((target) => `make ${target}`);
+  for (const command of recipe) {
+    const target = /^make (\S+)$/.exec(command);
+    if (target ? !runsMake(target[1]) : !workflowText.includes(command)) gaps.push(command);
+  }
+  return gaps;
+}
+
 // B5: the checkout steps of a workflow, and the 1-based line of each one that
 // does not set persist-credentials: false in its own `with:` mapping. Comments
 // do not count, and the same key under `env:` or another step does not count.
@@ -165,10 +189,41 @@ test("B7: the PR template has a risk tier section", () => {
   assert.match(read(".github/pull_request_template.md"), /^#+ .*Risk tier/m);
 });
 
-test("B12: ci.yml runs make ci on pull requests", () => {
+test("B12: ciCoverageGaps accepts 1 make ci step", () => {
+  const makefile = "ci: verify race ## gate\n\tgo test -race ./...\n";
+  assert.deepEqual(ciCoverageGaps(makefile, "on: [pull_request]\njobs:\n  ci:\n    steps:\n      - run: make ci\n"), []);
+});
+
+test("B12: ciCoverageGaps accepts separate jobs that run every part of make ci (ADR-0073)", () => {
+  const makefile = "verify: lint test\n\tgo vet ./...\nci: verify ui-check app-build ## verify plus the app\n\tgo test -race ./...\n\nother:\n\ttrue\n";
+  const ci = [
+    "on: [pull_request]",
+    "jobs:",
+    "  verify:",
+    "    steps:",
+    "      - run: make verify",
+    "  race:",
+    "    steps:",
+    "      - run: go test -race ./...",
+    "  ui:",
+    "    steps:",
+    "      - run: make ui-check IN_NSL='sh -c'",
+    "  app:",
+    "    steps:",
+    "      - run: make app-build IN_NSL='sh -c'",
+  ].join("\n");
+  assert.deepEqual(ciCoverageGaps(makefile, ci), []);
+  const noApp = ci.replace("make app-build IN_NSL='sh -c'", "make app-test");
+  assert.deepEqual(ciCoverageGaps(makefile, noApp), ["make app-build"]);
+  const noRace = ci.replace("go test -race ./...", "go test ./...");
+  assert.deepEqual(ciCoverageGaps(makefile, noRace), ["go test -race ./..."]);
+  assert.deepEqual(ciCoverageGaps("verify:\n\ttrue\n", ci), ["a ci target in the Makefile"]);
+});
+
+test("B12: core's ci.yml runs make ci on pull requests", () => {
   const ci = read(".github/workflows/ci.yml");
-  assert.match(ci, /make ci/);
   assert.match(ci, /pull_request/);
+  assert.deepEqual(ciCoverageGaps(read("Makefile"), ci), []);
 });
 
 test("B13: missingEcosystems names each manifest ecosystem that Dependabot skips", () => {
