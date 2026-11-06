@@ -108,9 +108,9 @@ assigning the repository to an agent's roster (Brian's decision: an ask).
 
 - **The declaration count test.** A declaration PR without the
   `repositoryCount` bump fails core's CI.
-- **`.agents/skills` as a symlink.** Fine for local tools; the surface
-  check needs a real tree. The skills sync follows an in-repository symlink
-  (chairlift and pilothouse point `.agents` at `docs/agents`).
+- **`.agents/skills` as a symlink.** The surface check needs a real tree,
+  and the skills sync refuses a symlinked `.agents` or `.agents/skills`
+  before it writes a file: make both real directories before enrollment.
 - **Missing `merge_group` trigger.** Every queue entry waits for checks that
   never run; fix CI before the merge queue.
 - **Required checks that no PR produces.** Merges block until the check

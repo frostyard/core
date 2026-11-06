@@ -49,19 +49,11 @@ skills_sync_run_repo() {
     fi
   done
 
-  # Some repos (chairlift, pilothouse) have .agents as a symlink to
-  # docs/agents — resolve to the physical dir so git pathspecs match the
-  # files, not the symlink. skills_sync_sync_repo rejects, before any
-  # mkdir/rsync/marker write, a resolved skills root or skill destination
-  # that escapes the clone root (e.g. an .agents symlink pointing outside
-  # $dir, or a pre-existing managed-skill destination symlink that does).
+  # The sync writes only to `.agents/skills/`, as real directories.
+  # skills_sync_sync_repo refuses, before any mkdir/rsync/marker write, a
+  # destination that escapes the clone root or that is a symlink at
+  # `.agents`, `.agents/skills` or a managed skill's directory (ADR-0026).
   if ! skills_sync_sync_repo "$dir" "$core_root" "${skills[@]}"; then
-    echo "::error::sync failed for frostyard/${repo}" >&2
-    return 1
-  fi
-  local skills_root rel_root
-  if ! skills_root=$(realpath -m "${dir}/.agents") ||
-    ! rel_root=$(realpath -m --relative-to="$dir" "${skills_root}/skills"); then
     echo "::error::sync failed for frostyard/${repo}" >&2
     return 1
   fi
@@ -76,7 +68,7 @@ skills_sync_run_repo() {
   local rc=0
   (
     cd "$dir" || exit 1
-    git add -A "$rel_root" || exit 1
+    git add -A .agents/skills || exit 1
     # 0: nothing staged; 1: a change; anything else is a git error.
     diff_rc=0
     git diff --cached --quiet || diff_rc=$?

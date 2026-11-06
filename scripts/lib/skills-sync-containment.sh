@@ -7,6 +7,10 @@
 # the sync's mkdir / `rsync --delete` / marker write into an escape from
 # the temporary clone root. Every resolved destination is checked here,
 # fail-closed, before any of those three operations run.
+#
+# The sync writes only to real directories at `.agents/skills/<name>/`
+# (ADR-0026): it refuses a symlink at `.agents`, at `.agents/skills`, or at
+# a managed skill's directory, in the clone or not.
 set -euo pipefail
 
 # skills_sync_require_contained <root> <path> <label>
@@ -44,16 +48,31 @@ skills_sync_require_contained() {
   esac
 }
 
+# skills_sync_require_real_dir <dir> <relative path>
+#
+# Refuses a symlink at <dir>/<relative path>. The sync stages, copies into
+# and marks real directories only (.agents/skills/<name>/), so a symlink at
+# any of the three managed levels is an error even when it stays inside the
+# clone: it puts the skill outside the path ADR-0026 names. <path> need not
+# exist.
+skills_sync_require_real_dir() {
+  local dir="$1" rel="$2"
+  if [ -L "${dir}/${rel}" ]; then
+    echo "::error::${rel} is a symlink: managed skills must be real directories at .agents/skills/<name>/ (ADR-0026)" >&2
+    return 1
+  fi
+  return 0
+}
+
 # skills_sync_sync_repo <dir> <core_root> <skill...>
 #
 # Mirrors each named skill from <core_root>/.agents/skills/<skill> into
-# <dir>/.agents/skills/<skill> — resolving a supported in-repo `.agents`
-# symlink (e.g. `.agents -> docs/agents`) — and writes its
-# `.synced-from-core` marker. Callers must have already validated that
-# each skill exists under <core_root>. Returns 1 without creating any
-# directory, deleting any file, or writing any marker when the resolved
-# `.agents/skills` root or a skill's destination is not contained in
-# <dir>.
+# <dir>/.agents/skills/<skill> and writes its `.synced-from-core` marker.
+# Callers must have already validated that each skill exists under
+# <core_root>. The destinations must be real directories: the sync refuses
+# a symlink at `.agents`, `.agents/skills` or a managed skill's directory
+# (ADR-0026). Returns 1 without creating any directory, deleting any file,
+# or writing any marker when a destination escapes <dir> or is a symlink.
 skills_sync_sync_repo() {
   local dir="$1" core_root="$2"
   shift 2
@@ -70,6 +89,15 @@ skills_sync_sync_repo() {
   for skill in "$@"; do
     dst="${skills_root}/${skill}"
     skills_sync_require_contained "$dir" "$dst" "managed-skill destination '${skill}'" || return 1
+  done
+
+  # Same no-mutation rule for symbolic links: every managed path is checked
+  # before the first mkdir, so a symlinked later skill cannot leave an
+  # earlier skill written behind.
+  skills_sync_require_real_dir "$dir" ".agents" || return 1
+  skills_sync_require_real_dir "$dir" ".agents/skills" || return 1
+  for skill in "$@"; do
+    skills_sync_require_real_dir "$dir" ".agents/skills/${skill}" || return 1
   done
 
   local src
