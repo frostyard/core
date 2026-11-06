@@ -90,6 +90,7 @@ which baseline rows do not apply here.
 - [0069 — Report problems local first, opt-in, with one sender per host](adr/0069-report-problems-local-first-opt-in-with-one-sender-per-host.md)
 - [0070 — Build tool docs sites with ProperDocs and MaterialX on GitHub Pages](adr/0070-build-tool-docs-sites-with-materialx-on-github-pages.md)
 - [0071 — Hold every code repository to one baseline](adr/0071-hold-every-code-repository-to-one-baseline.md)
+- [0072 — Write every README to one standard](adr/0072-write-every-readme-to-one-standard.md)
 - [0073 — Let CI run the `make ci` targets as separate jobs](adr/0073-let-ci-run-the-make-ci-targets-as-separate-jobs.md)
 
 ### Design
@@ -114,6 +115,7 @@ which baseline rows do not apply here.
 - [Flaky-test scan](specs/flaky-test-scan.md)
 - [Problem report `frostyard.problem/1`](specs/problem-report.md)
 - [Repository baseline](specs/repository-baseline.md)
+- [README](specs/readme.md)
 
 ### Plans
 

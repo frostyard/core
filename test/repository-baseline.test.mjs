@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 // Repository baseline (ADR-0071, docs/specs/repository-baseline.md) applied to
 // core itself, 1 test per row. B2 lives in scripts/check-corrections.mjs; B6 in
 // test/risk-paths.test.mjs and scripts/check-risk-paths.mjs; B16 in
-// test/no-leftover-agent-trees.test.mjs. B8, B9 and B11 do not apply to core
+// test/no-leftover-agent-trees.test.mjs; B17 in test/readme-check.test.mjs. B8, B9 and B11 do not apply to core
 // (docs/org-adrs.md says why); B10 is checked by the sweep with gh api.
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 

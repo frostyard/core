@@ -30,6 +30,7 @@ linked canonical skill rather than a copied version:
 | [frostyard-go-repo](../../.agents/skills/frostyard-go-repo/SKILL.md) | Creating or conforming a Frostyard Go repository |
 | [frostyard-onboard-repo](../../.agents/skills/frostyard-onboard-repo/SKILL.md) | Onboarding an existing repository into the fleet and the skills sync |
 | [frostyard-plan-project](../../.agents/skills/frostyard-plan-project/SKILL.md) | Planning a multi-step project into an approved task graph |
+| [frostyard-readme](../../.agents/skills/frostyard-readme/SKILL.md) | Writing or fixing a root `README.md` to the README spec, with its checker |
 | [frostyard-suite-app-release](../../.agents/skills/frostyard-suite-app-release/SKILL.md) | Releasing a suite app's Flatpak and its daemon's sysext |
 | [frostyard-write-adr](../../.agents/skills/frostyard-write-adr/SKILL.md) | Writing, accepting, amending or superseding an ADR |
 | `golang-*` (20 skills, [list](#vendored-go-skills)) | General Go practice in Go repositories, vendored from samber/cc-skills-golang |
@@ -247,7 +248,11 @@ another one.
   [ADR-0070](../adr/0070-build-tool-docs-sites-with-materialx-on-github-pages.md)
   (the `frostyard-docs-site` skill);
   [ADR-0071](../adr/0071-hold-every-code-repository-to-one-baseline.md)
-  (the Fleet toolchain table in `frostyard-go-repo`, carried by `@go`)
+  (the Fleet toolchain table in `frostyard-go-repo`, carried by `@go`);
+  [ADR-0072](../adr/0072-write-every-readme-to-one-standard.md)
+  (the `frostyard-readme` skill, a default skill)
+- Contracts: [README spec](../specs/readme.md) (the
+  `frostyard-readme` checker and templates)
 - Operations: [Skills sync operations](skills-sync-operations.md)
 - Built in:
   [Plan 0001, Phases 1-2](../plans/0001-docs-shape-rollout.md)
