@@ -19,12 +19,23 @@ const rate = (pass, total) => (total === 0 ? 1 : pass / total);
 // ---- 1. Index coverage: every doc in the four categories is indexed. ----
 const indexPath = join(root, "docs/README.md");
 // Strip fenced code blocks and HTML comments so example/commented-out links
-// aren't mistaken for real links.
-const indexText = readFileSync(indexPath, "utf8")
-  .replace(/```[\s\S]*?```/g, "")
-  .replace(/<!--[\s\S]*?-->/g, "");
+// aren't mistaken for real links. Matches map back to the original text, where
+// codeSpanRanges decides whether a match is inside inline code.
+const originalIndexText = readFileSync(indexPath, "utf8");
+const fenceStrippedIndex = stripWithMap(originalIndexText, /```[\s\S]*?```/g);
+const commentStrippedIndex = stripWithMap(fenceStrippedIndex.text, /<!--[\s\S]*?-->/g);
+const indexText = commentStrippedIndex.text;
+const indexCodeSpanRanges = codeSpanRanges(originalIndexText);
 const indexedTargets = new Set();
 for (const m of indexText.matchAll(/\[[^\]]*\]\(([^)\s]+)\)/g)) {
+  const fenceStrippedStart = commentStrippedIndex.toOriginal(m.index);
+  const fenceStrippedEnd = commentStrippedIndex.toOriginal(m.index + m[0].length);
+  const originalStart = fenceStrippedIndex.toOriginal(fenceStrippedStart);
+  const originalEnd = fenceStrippedIndex.toOriginal(fenceStrippedEnd);
+  if (
+    originalEnd - originalStart === m[0].length &&
+    isInCodeSpan(indexCodeSpanRanges, originalStart, originalEnd)
+  ) continue;
   const target = m[1];
   if (/^[a-z][a-z+.-]*:/i.test(target) || target.startsWith("#")) continue;
   indexedTargets.add(resolve(dirname(indexPath), target.split("#")[0]));
@@ -82,6 +93,150 @@ function stripFences(text) {
     })
     .join("\n");
 }
+
+// Inline code spans, as [start, end) ranges of the ORIGINAL text (never of a
+// fence-stripped text: a removed chunk can join two backticks into a false
+// span). Spans count only in a safe run of non-blank lines, so a link-shaped
+// match is skipped only when CommonMark would render it as code. A run is
+// unsafe, and all its links stay checked, when it has:
+// - a `|` (a GFM table cell boundary splits inline contexts);
+// - a backslash before a backtick (an escaped backtick is not a delimiter);
+// - a `<` with a later `>` (raw HTML and autolinks bind before code spans);
+// - a line with an unpaired backtick run (a span may wrap lines, or a heading
+//   or other block may end it). Each line of a safe run pairs runs of equal
+//   length left to right, which is CommonMark's own pairing.
+function codeSpanRanges(text) {
+  const lines = [];
+  let lineStart = 0;
+  for (const lineText of text.split("\n")) {
+    lines.push({ text: lineText, start: lineStart });
+    lineStart += lineText.length + 1;
+  }
+
+  const ranges = [];
+  let lineIndex = 0;
+  while (lineIndex < lines.length) {
+    if (/^\s*$/.test(lines[lineIndex].text)) {
+      lineIndex++;
+      continue;
+    }
+
+    const runStartIndex = lineIndex;
+    while (lineIndex < lines.length && !/^\s*$/.test(lines[lineIndex].text)) lineIndex++;
+    const runLines = lines.slice(runStartIndex, lineIndex);
+    const runStart = runLines[0].start;
+    const lastLine = runLines[runLines.length - 1];
+    const runEnd = lastLine.start + lastLine.text.length;
+    const runText = text.slice(runStart, runEnd);
+
+    let unsafe = false;
+    if (runLines.some((line) => line.text.includes("|"))) unsafe = true;
+    if (!unsafe && runText.includes("\\`")) unsafe = true;
+
+    if (!unsafe) {
+      for (let i = runText.indexOf("<"); i !== -1; i = runText.indexOf("<", i + 1)) {
+        if (runText.indexOf(">", i + 1) !== -1) {
+          unsafe = true;
+          break;
+        }
+      }
+    }
+
+    const runRanges = [];
+    if (!unsafe) {
+      for (const line of runLines) {
+        let pos = 0;
+        let lineUnpaired = false;
+        while (pos < line.text.length) {
+          if (line.text[pos] !== "`") {
+            pos++;
+            continue;
+          }
+
+          const opener = pos;
+          while (pos < line.text.length && line.text[pos] === "`") pos++;
+          const length = pos - opener;
+
+          let search = pos;
+          let closerStart = -1;
+          let closerEnd = -1;
+          while (search < line.text.length) {
+            if (line.text[search] !== "`") {
+              search++;
+              continue;
+            }
+            const candidate = search;
+            while (search < line.text.length && line.text[search] === "`") search++;
+            if (search - candidate === length) {
+              closerStart = candidate;
+              closerEnd = search;
+              break;
+            }
+          }
+
+          if (closerStart === -1) {
+            lineUnpaired = true;
+            break;
+          }
+
+          runRanges.push([line.start + opener, line.start + closerEnd]);
+          pos = closerEnd;
+        }
+
+        if (lineUnpaired) {
+          unsafe = true;
+          break;
+        }
+      }
+    }
+
+    if (!unsafe) ranges.push(...runRanges);
+  }
+
+  return ranges;
+}
+
+function isInCodeSpan(ranges, start, end) {
+  return ranges.some(([rangeStart, rangeEnd]) => rangeStart <= start && end <= rangeEnd);
+}
+
+function stripWithMap(text, regex) {
+  const removedIntervals = [];
+  let nextOriginal = 0;
+  for (const match of text.matchAll(regex)) {
+    const start = match.index;
+    const end = start + match[0].length;
+    if (start < nextOriginal) continue;
+    removedIntervals.push([start, end]);
+    nextOriginal = end;
+  }
+
+  const boundaries = [];
+  let stripped = "";
+  let originalCursor = 0;
+  for (const [start, end] of removedIntervals) {
+    const kept = text.slice(originalCursor, start);
+    boundaries[stripped.length] = originalCursor;
+    for (let i = 0; i < kept.length; i++) {
+      stripped += kept[i];
+      boundaries[stripped.length] = originalCursor + i + 1;
+    }
+    originalCursor = end;
+  }
+  const kept = text.slice(originalCursor);
+  boundaries[stripped.length] = originalCursor;
+  for (let i = 0; i < kept.length; i++) {
+    stripped += kept[i];
+    boundaries[stripped.length] = originalCursor + i + 1;
+  }
+
+  return {
+    text: stripped,
+    toOriginal(index) {
+      return boundaries[index] ?? text.length;
+    },
+  };
+}
 const anchorCache = new Map();
 function anchorsOf(path) {
   const cached = anchorCache.get(path);
@@ -131,10 +286,20 @@ const skillsRoot = join(root, ".agents", "skills");
 let linksTotal = 0;
 let linksOk = 0;
 for (const file of mdFiles) {
-  // Strip fenced code blocks so example links aren't checked.
-  const text = readFileSync(file, "utf8").replace(/```[\s\S]*?```/g, "");
+  // Strip fenced code blocks so example links aren't checked; a match is
+  // skipped as inline code only when its original range is inside 1 span.
+  const originalText = readFileSync(file, "utf8");
+  const fenceStripped = stripWithMap(originalText, /```[\s\S]*?```/g);
+  const text = fenceStripped.text;
+  const codeSpanRangesInText = codeSpanRanges(originalText);
   const isSkillDoc = file.startsWith(skillsRoot + sep);
   for (const m of text.matchAll(/\[[^\]]*\]\(([^)\s]+)\)/g)) {
+    const originalStart = fenceStripped.toOriginal(m.index);
+    const originalEnd = fenceStripped.toOriginal(m.index + m[0].length);
+    if (
+      originalEnd - originalStart === m[0].length &&
+      isInCodeSpan(codeSpanRangesInText, originalStart, originalEnd)
+    ) continue;
     const target = m[1];
     if (
       /^[a-z][a-z+.-]*:/i.test(target) ||
