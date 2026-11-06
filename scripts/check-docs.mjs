@@ -82,97 +82,6 @@ function stripFences(text) {
     })
     .join("\n");
 }
-// Code spans, conservatively. The text is cut into runs of non-blank lines;
-// every Markdown block lies inside 1 run, and no block crosses a line inside
-// it. In each line, a run of N backticks opens a span that closes at the next
-// run of exactly N backticks (CommonMark); a backtick after an odd number of
-// backslashes is literal. When every backtick run of every line in the run is
-// paired, and no line holds a table cell boundary or a possible HTML tag or
-// autolink, those pairs are CommonMark's pairs for any split of the run into
-// blocks, so the spans are dropped and a link-shaped example in them is not
-// read as a link. Otherwise (a span that wraps, a literal backtick, a table
-// row, inline HTML) the whole run stays as it is: its links are all checked.
-// A line with another inline context in it (a GFM table cell boundary `|`,
-// or a `<` that may open raw HTML or an autolink, whose attribute or URL can
-// hold a literal backtick) counts as ambiguous, like an unpaired run.
-const AMBIGUOUS_LINE = /(^|[^\\])(\\\\)*(\||<[A-Za-z\/!?])/;
-function lineCodeSpans(line) {
-  const spans = [];
-  let unpaired = AMBIGUOUS_LINE.test(line) && line.includes("`");
-  let i = 0;
-  while (i < line.length) {
-    if (line[i] !== "`") {
-      i++;
-      continue;
-    }
-    let backslashes = 0;
-    while (i - backslashes - 1 >= 0 && line[i - backslashes - 1] === "\\") backslashes++;
-    let opener = 0;
-    while (line[i + opener] === "`") opener++;
-    if (backslashes % 2 === 1) {
-      // The first backtick is escaped; the rest of the run opens a span.
-      i++;
-      continue;
-    }
-    let j = i + opener;
-    let closeAt = -1;
-    while (j < line.length) {
-      if (line[j] !== "`") {
-        j++;
-        continue;
-      }
-      let run = 0;
-      while (line[j + run] === "`") run++;
-      if (run === opener) {
-        closeAt = j;
-        break;
-      }
-      j += run;
-    }
-    if (closeAt === -1) {
-      unpaired = true;
-      i += opener;
-      continue;
-    }
-    spans.push([i, closeAt + opener]);
-    i = closeAt + opener;
-  }
-  return { spans, unpaired };
-}
-
-function stripCodeSpans(text) {
-  const lines = text.split("\n");
-  const out = [];
-  let block = [];
-  const flush = () => {
-    const parsed = block.map(lineCodeSpans);
-    if (parsed.some((p) => p.unpaired)) {
-      out.push(...block);
-    } else {
-      block.forEach((line, k) => {
-        let kept = "";
-        let at = 0;
-        for (const [from, to] of parsed[k].spans) {
-          kept += line.slice(at, from);
-          at = to;
-        }
-        out.push(kept + line.slice(at));
-      });
-    }
-    block = [];
-  };
-  for (const line of lines) {
-    if (line.trim() === "") {
-      flush();
-      out.push(line);
-    } else {
-      block.push(line);
-    }
-  }
-  flush();
-  return out.join("\n");
-}
-
 const anchorCache = new Map();
 function anchorsOf(path) {
   const cached = anchorCache.get(path);
@@ -217,11 +126,8 @@ const skillsRoot = join(root, ".agents", "skills");
 let linksTotal = 0;
 let linksOk = 0;
 for (const file of mdFiles) {
-  // Strip fenced code blocks and inline code spans so example links, and
-  // code such as `errors.AsType[*T](err)`, aren't checked as links.
-  const text = stripCodeSpans(
-    readFileSync(file, "utf8").replace(/```[\s\S]*?```/g, ""),
-  );
+  // Strip fenced code blocks so example links aren't checked.
+  const text = readFileSync(file, "utf8").replace(/```[\s\S]*?```/g, "");
   const isSkillDoc = file.startsWith(skillsRoot + sep);
   for (const m of text.matchAll(/\[[^\]]*\]\(([^)\s]+)\)/g)) {
     const target = m[1];

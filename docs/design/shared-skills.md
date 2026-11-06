@@ -153,6 +153,12 @@ vendored skill. Each `SKILL.md` opens with an attribution and a
   `golang-documentation` links `#readmemd` and `#distribution`, and
   `golang-troubleshooting/references/methodology.md` links `../SKILL.md`
   (upstream's anchors and path do not resolve).
+- Code spans: core's docs gate reads a generic call such as
+  `errors.AsType[T]` with its argument list in 1 code span as a link.
+  `golang-error-handling`, `golang-safety` and
+  `golang-modernize/references/versions.md` write those 3 generic calls as
+  the code span `X[T]` followed by `(v)`, each with a marked HTML comment.
+  A refresh keeps these edits until the gate learns code spans.
 
 ### Description budget
 
