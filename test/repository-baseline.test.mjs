@@ -47,6 +47,43 @@ export function missingEcosystems(files, dependabotText) {
   return [...required].filter((name) => !named.has(name)).sort();
 }
 
+// B5: the 1-based line of each actions/checkout step that does not set
+// persist-credentials: false in its own step. Comments do not count.
+export function checkoutsKeepingCredentials(text) {
+  const lines = text.split("\n").map((line) => (/^\s*#/.test(line) ? "" : line.replace(/\s+#.*$/, "")));
+  const offenders = [];
+  for (let i = 0; i < lines.length; i++) {
+    const start = /^(\s*)-\s+(.*)$/.exec(lines[i]);
+    if (!start) continue;
+    const indent = start[1].length;
+    const step = [start[2]];
+    for (let j = i + 1; j < lines.length; j++) {
+      if (lines[j].trim() === "") continue;
+      if (lines[j].length - lines[j].trimStart().length <= indent) break;
+      step.push(lines[j].trim());
+    }
+    if (!step.some((line) => /^uses:\s*actions\/checkout@/.test(line))) continue;
+    if (!step.some((line) => /^persist-credentials:\s*(false|"false"|'false')$/.test(line))) offenders.push(i + 1);
+  }
+  return offenders;
+}
+
+test("B5: checkoutsKeepingCredentials flags a missing, a commented and a misplaced setting", () => {
+  const checkout = "      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2";
+  const good = [checkout, "        with:", "          persist-credentials: false"].join("\n");
+  assert.deepEqual(checkoutsKeepingCredentials(`    steps:\n${good}\n      - run: true\n`), []);
+  const missing = `    steps:\n${checkout}\n      - run: true\n`;
+  assert.deepEqual(checkoutsKeepingCredentials(missing), [2]);
+  const commented = `    steps:\n${checkout}\n        with:\n          # persist-credentials: false\n          fetch-depth: 0\n`;
+  assert.deepEqual(checkoutsKeepingCredentials(commented), [2]);
+  const trailing = `    steps:\n${checkout}\n        with:\n          fetch-depth: 0 # persist-credentials: false\n`;
+  assert.deepEqual(checkoutsKeepingCredentials(trailing), [2]);
+  const elsewhere = `    steps:\n${checkout}\n      - uses: actions/setup-node@x\n        with:\n          persist-credentials: false\n`;
+  assert.deepEqual(checkoutsKeepingCredentials(elsewhere), [2]);
+  const truthy = `    steps:\n${checkout}\n        with:\n          persist-credentials: true\n`;
+  assert.deepEqual(checkoutsKeepingCredentials(truthy), [2]);
+});
+
 test("B1: AGENTS.md is a regular file and every alias is a symlink to it", () => {
   const modes = lsFilesStaged();
   assert.equal(modes.get("AGENTS.md"), "100644");
@@ -87,6 +124,7 @@ test("B5: every workflow pins its actions by SHA, starts from no permissions and
   const dir = path.join(root, ".github/workflows");
   const workflows = readdirSync(dir).filter((name) => /\.ya?ml$/.test(name));
   assert.ok(workflows.length > 0);
+  let checkouts = 0;
   for (const name of workflows) {
     const text = read(path.join(".github/workflows", name));
     for (const line of text.split("\n").filter((l) => /^\s*-?\s*uses:/.test(l))) {
@@ -94,10 +132,10 @@ test("B5: every workflow pins its actions by SHA, starts from no permissions and
       assert.match(line, /uses:\s*[\w.-]+\/[\w./-]+@[0-9a-f]{40} # v\S+/, `${name}: unpinned action: ${line.trim()}`);
     }
     assert.match(text, /^permissions:\s*\{\}\s*$/m, `${name}: no top-level permissions: {}`);
-    const checkouts = (text.match(/uses:\s*actions\/checkout@/g) ?? []).length;
-    const noCredentials = (text.match(/persist-credentials:\s*false/g) ?? []).length;
-    assert.equal(noCredentials, checkouts, `${name}: a checkout keeps credentials`);
+    assert.deepEqual(checkoutsKeepingCredentials(text), [], `${name}: a checkout keeps credentials`);
+    checkouts += (text.match(/^\s*-\s+uses:\s*actions\/checkout@/gm) ?? []).length;
   }
+  assert.ok(checkouts > 0, "no actions/checkout step found: the credentials check checked nothing");
 });
 
 test("B7: the PR template has a risk tier section", () => {

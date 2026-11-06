@@ -6,9 +6,10 @@ the reusable workflows that other frostyard repositories call.
 ## Supported versions
 
 Core makes no releases and has no tags. Only the `main` branch gets fixes.
-Consuming repositories copy skills, templates and the risk-paths workflow from
-`main`. A fix reaches them through the skills sync, or through their next pin
-update.
+Consuming repositories copy skills and templates from `main`; a fix reaches
+them through the skills sync or their next copy. Their risk-paths caller pins
+core's reusable workflow by commit SHA (ADR-0068); a workflow fix reaches them
+when they update that pin.
 
 ## Reporting a vulnerability
 
