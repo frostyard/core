@@ -50,23 +50,60 @@ export function missingEcosystems(files, dependabotText) {
 // B12 (ADR-0073): the parts of `make ci` that a CI workflow does not run. A
 // `make ci` step covers all of them. Otherwise each prerequisite of the `ci`
 // target needs a `make <target>` step (extra variables allowed), and each
-// command of the `ci` recipe needs the same command in the workflow.
+// command of the `ci` recipe needs a step that runs exactly that command.
+// Only the commands of `run:` steps count: comments, step names and other
+// keys do not.
+export function workflowCommands(workflowText) {
+  const lines = workflowText.split("\n");
+  const commands = [];
+  for (let i = 0; i < lines.length; i++) {
+    const step = /^(\s*)(?:-\s+)?run:\s*(.*)$/.exec(lines[i]);
+    if (!step) continue;
+    const value = step[2].replace(/\s+#.*$/, "").trim();
+    if (value !== "" && !/^[|>][-+]?$/.test(value)) {
+      commands.push(value.replace(/^(["'])(.*)\1$/, "$2"));
+      continue;
+    }
+    // A block scalar: the lines indented deeper than the key.
+    const keyIndent = lines[i].indexOf("run:");
+    for (i += 1; i < lines.length; i++) {
+      const line = lines[i];
+      if (line.trim() === "") continue;
+      if (line.length - line.trimStart().length <= keyIndent) {
+        i -= 1;
+        break;
+      }
+      const command = line.trim();
+      if (!command.startsWith("#")) commands.push(command);
+    }
+  }
+  return commands;
+}
+
 export function ciCoverageGaps(makefileText, workflowText) {
   const lines = makefileText.split("\n");
   const start = lines.findIndex((line) => /^ci\s*:(?!=)/.test(line));
   if (start === -1) return ["a ci target in the Makefile"];
-  const runsMake = (target) => new RegExp(`(^|[\\s;&|])make ${target.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(\\s|$)`, "m").test(workflowText);
+  const commands = workflowCommands(workflowText);
+  const escape = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const runsMake = (target) => {
+    const pattern = new RegExp(`(^|[;&|]\\s*)make ${escape(target)}(\\s|$)`);
+    return commands.some((command) => pattern.test(command));
+  };
   if (runsMake("ci")) return [];
   const prerequisites = lines[start].replace(/^ci\s*:/, "").replace(/#.*$/, "").trim().split(/\s+/).filter(Boolean);
   const recipe = [];
-  for (let i = start + 1; i < lines.length && lines[i].startsWith("\t"); i++) {
-    const command = lines[i].trim().replace(/^[@-]+/, "").replace(/\$\(MAKE\)/g, "make");
-    if (command) recipe.push(command);
+  for (let i = start + 1; i < lines.length; i++) {
+    const line = lines[i];
+    if (line.trim() === "" || line.startsWith("#")) continue; // blank lines and comments do not end a recipe
+    if (!line.startsWith("\t")) break;
+    const command = line.trim().replace(/^[@-]+/, "").replace(/\$\(MAKE\)/g, "make");
+    if (command && !command.startsWith("#")) recipe.push(command);
   }
   const gaps = prerequisites.filter((target) => !runsMake(target)).map((target) => `make ${target}`);
   for (const command of recipe) {
     const target = /^make (\S+)$/.exec(command);
-    if (target ? !runsMake(target[1]) : !workflowText.includes(command)) gaps.push(command);
+    if (target ? !runsMake(target[1]) : !commands.includes(command)) gaps.push(command);
   }
   return gaps;
 }
@@ -218,6 +255,24 @@ test("B12: ciCoverageGaps accepts separate jobs that run every part of make ci (
   const noRace = ci.replace("go test -race ./...", "go test ./...");
   assert.deepEqual(ciCoverageGaps(makefile, noRace), ["go test -race ./..."]);
   assert.deepEqual(ciCoverageGaps("verify:\n\ttrue\n", ci), ["a ci target in the Makefile"]);
+});
+
+test("B12: ciCoverageGaps counts only the commands of run steps, whole", () => {
+  const makefile = "ci: verify\n\tgo test -race ./...\n\n# the second command\n\tgo vet ./...\n\nother:\n\ttrue\n";
+  const steps = "on: [pull_request]\njobs:\n  a:\n    steps:\n      - run: make verify\n      - run: go test -race ./...\n      - run: go vet ./...\n";
+  assert.deepEqual(ciCoverageGaps(makefile, steps), []);
+  // A comment or a step name is not a command.
+  const commented = "on: [pull_request]\n# make ci\njobs:\n  a:\n    steps:\n      - name: make verify\n        run: echo # make verify\n      - run: go test -race ./...\n      - run: go vet ./...\n";
+  assert.deepEqual(ciCoverageGaps(makefile, commented), ["make verify"]);
+  // A command with an added filter runs fewer tests: it is not the recipe command.
+  const filtered = steps.replace("go test -race ./...", "go test -race ./... -run TestOne");
+  assert.deepEqual(ciCoverageGaps(makefile, filtered), ["go test -race ./..."]);
+  // A blank line and a comment inside the recipe do not end it.
+  const noVet = steps.replace("      - run: go vet ./...\n", "");
+  assert.deepEqual(ciCoverageGaps(makefile, noVet), ["go vet ./..."]);
+  // Block scalars count line by line, without their comments.
+  const block = "on: [pull_request]\njobs:\n  a:\n    steps:\n      - run: |\n          # make ci\n          make verify\n          go test -race ./...\n          go vet ./...\n";
+  assert.deepEqual(ciCoverageGaps(makefile, block), []);
 });
 
 test("B12: core's ci.yml runs make ci on pull requests", () => {
