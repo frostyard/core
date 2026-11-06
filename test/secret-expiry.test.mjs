@@ -22,7 +22,7 @@ const guard = path.join(repoRoot, "scripts/check-secret-expiry.mjs");
 const DAY_MS = 86_400_000;
 
 const record = loadRecord(repoRoot);
-const orgPat = record.secrets.find((secret) => secret.name === "ORG_PAT");
+const syncToken = record.secrets.find((secret) => secret.name === "SKILLS_SYNC_TOKEN");
 
 /** Shift a `YYYY-MM-DD` day by whole days, staying in UTC. */
 function shiftDay(day, days) {
@@ -37,29 +37,29 @@ function runGuard(today, env = {}) {
   });
 }
 
-test("the committed record pins the documented ORG_PAT expiry and a lead time of at least 30 days", () => {
-  assert.ok(orgPat, "the record must carry an ORG_PAT entry");
-  assert.equal(orgPat.expires_on, "2027-08-11");
+test("the committed record pins the documented SKILLS_SYNC_TOKEN expiry and a lead time of at least 30 days", () => {
+  assert.ok(syncToken, "the record must carry an SKILLS_SYNC_TOKEN entry");
+  assert.equal(syncToken.expires_on, "2027-11-01");
   assert.ok(
-    orgPat.warn_days_before >= MINIMUM_WARN_DAYS,
-    `warn_days_before must be >= ${MINIMUM_WARN_DAYS}, got ${orgPat.warn_days_before}`,
+    syncToken.warn_days_before >= MINIMUM_WARN_DAYS,
+    `warn_days_before must be >= ${MINIMUM_WARN_DAYS}, got ${syncToken.warn_days_before}`,
   );
   assert.equal(record.never_relax, true);
-  assert.ok(orgPat.used_by.includes(".github/workflows/sync-skills.yml"));
+  assert.ok(syncToken.used_by.includes(".github/workflows/sync-skills.yml"));
 });
 
 test("the guard passes on the day before the rotation window opens", async () => {
-  const dayBeforeWindow = shiftDay(orgPat.expires_on, -(orgPat.warn_days_before + 1));
+  const dayBeforeWindow = shiftDay(syncToken.expires_on, -(syncToken.warn_days_before + 1));
   const { stdout } = await runGuard(dayBeforeWindow);
-  assert.match(stdout, /ok {3}ORG_PAT expires on 2027-08-11/);
+  assert.match(stdout, /ok {3}SKILLS_SYNC_TOKEN expires on 2027-11-01/);
   assert.match(stdout, /ok {3}secret_expiry: 1\/1 outside their rotation window/);
 });
 
 test("the guard fails on the first day inside the rotation window", async () => {
-  const windowOpens = shiftDay(orgPat.expires_on, -orgPat.warn_days_before);
+  const windowOpens = shiftDay(syncToken.expires_on, -syncToken.warn_days_before);
   await assert.rejects(runGuard(windowOpens), (error) => {
     assert.equal(error.code, 1);
-    assert.match(error.stderr, /FAIL ORG_PAT expires on 2027-08-11/);
+    assert.match(error.stderr, /FAIL SKILLS_SYNC_TOKEN expires on 2027-11-01/);
     assert.match(error.stderr, /inside its \d+-day rotation window/);
     assert.match(error.stderr, /docs\/design\/skills-sync-operations\.md/);
     return true;
@@ -67,10 +67,10 @@ test("the guard fails on the first day inside the rotation window", async () => 
 });
 
 test("the guard fails the day after expiry", async () => {
-  const afterExpiry = shiftDay(orgPat.expires_on, 1);
+  const afterExpiry = shiftDay(syncToken.expires_on, 1);
   await assert.rejects(runGuard(afterExpiry), (error) => {
     assert.equal(error.code, 1);
-    assert.match(error.stderr, /FAIL ORG_PAT expired on 2027-08-11 \(1 day\(s\) ago\)/);
+    assert.match(error.stderr, /FAIL SKILLS_SYNC_TOKEN expired on 2027-11-01 \(1 day\(s\) ago\)/);
     return true;
   });
 });
@@ -82,12 +82,12 @@ test("the guard passes well before the rotation window", async () => {
 
 test("the guard never echoes secret material present in the environment", async () => {
   const canary = "totally-not-a-real-token-3f9c2a";
-  const afterExpiry = shiftDay(orgPat.expires_on, 1);
-  await assert.rejects(runGuard(afterExpiry, { ORG_PAT: canary, GH_TOKEN: canary }), (error) => {
+  const afterExpiry = shiftDay(syncToken.expires_on, 1);
+  await assert.rejects(runGuard(afterExpiry, { SKILLS_SYNC_TOKEN: canary, GH_TOKEN: canary }), (error) => {
     assert.ok(!`${error.stdout}${error.stderr}`.includes(canary));
     return true;
   });
-  const { stdout, stderr } = await runGuard("2026-01-01", { ORG_PAT: canary, GH_TOKEN: canary });
+  const { stdout, stderr } = await runGuard("2026-01-01", { SKILLS_SYNC_TOKEN: canary, GH_TOKEN: canary });
   assert.ok(!`${stdout}${stderr}`.includes(canary));
 });
 
@@ -101,7 +101,7 @@ test("evaluate classifies the window boundaries exactly", () => {
         name: "FIXTURE_PAT",
         kind: "github-fine-grained-pat",
         purpose: "fixture",
-        expires_on: "2027-08-11",
+        expires_on: "2027-11-01",
         warn_days_before: 30,
         owner: "fixture",
         used_by: [".github/workflows/sync-skills.yml"],
@@ -110,12 +110,12 @@ test("evaluate classifies the window boundaries exactly", () => {
     ],
   };
   const stateOn = (day) => evaluate(fixture, day).findings[0].state;
-  assert.equal(stateOn("2027-07-11"), "ok"); // 31 days out
-  assert.equal(stateOn("2027-07-12"), "expiring"); // exactly 30 days out
-  assert.equal(stateOn("2027-08-11"), "expiring"); // expiry day itself
-  assert.equal(stateOn("2027-08-12"), "expired");
-  assert.equal(evaluate(fixture, "2027-07-11").ok, true);
-  assert.equal(evaluate(fixture, "2027-07-12").ok, false);
+  assert.equal(stateOn("2027-10-01"), "ok"); // 31 days out
+  assert.equal(stateOn("2027-10-02"), "expiring"); // exactly 30 days out
+  assert.equal(stateOn("2027-11-01"), "expiring"); // expiry day itself
+  assert.equal(stateOn("2027-11-02"), "expired");
+  assert.equal(evaluate(fixture, "2027-10-01").ok, true);
+  assert.equal(evaluate(fixture, "2027-10-02").ok, false);
 });
 
 test("the schema rejects a lead time shorter than the floor", () => {

@@ -77,8 +77,9 @@ assigning the repository to an agent's roster (Brian's decision: an ask).
      group is needed.
    Run `npm ci && npm run check` and `npm run check:fleet` (it fetches the
    new repository's `mise.toml`, `mise.lock` and verify gate) before opening.
-   Ask Brian, in the report's asks, to give the `ORG_PAT` secret access to
-   the repository before this PR merges: the skills sync clones and pushes
+   Ask Brian, in the report's asks, to add the repository to the repository
+   access of the `SKILLS_SYNC_TOKEN` fine-grained PAT (owned by
+   `frostyard-machines`) before this PR merges: the skills sync clones and pushes
    with it ([design/skills-sync-operations.md](https://github.com/frostyard/core/blob/main/docs/design/skills-sync-operations.md)).
 
 5. **Print the settings commands for Brian.** From a core checkout, dry run
@@ -115,7 +116,7 @@ assigning the repository to an agent's roster (Brian's decision: an ask).
   never run; fix CI before the merge queue.
 - **Required checks that no PR produces.** Merges block until the check
   times out; copy the names from `gh pr checks`.
-- **`ORG_PAT` without access** to the new repository: the sync fails for it
+- **`SKILLS_SYNC_TOKEN` without access** to the new repository: the sync fails for it
   (since core#177, the run is red, naming the repository).
 - **Deleting a declaration.** Never. A repository that leaves the fleet is
   set `fleet_state: "disabled"` and kept.

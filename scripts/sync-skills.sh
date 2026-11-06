@@ -12,7 +12,8 @@
 # of "groups"; an unknown group stops the run before any clone. A group holds
 # skill names only — it does not nest another "@" name.
 #
-# Requires: GH_TOKEN with repo scope across the org (the ORG_PAT secret).
+# Requires: GH_TOKEN with Contents and Pull requests write access to the
+# configured consumers only (the SKILLS_SYNC_TOKEN secret).
 set -euo pipefail
 
 CONFIG=.github/skills-sync.json
@@ -21,7 +22,7 @@ BRANCH=chore/sync-core-skills
 GIT_NAME="frostyard-core[bot]"
 GIT_EMAIL="core@frostyard.invalid"
 
-: "${GH_TOKEN:?GH_TOKEN (ORG_PAT) is not configured}"
+: "${GH_TOKEN:?GH_TOKEN (SKILLS_SYNC_TOKEN) is not configured}"
 export GH_TOKEN
 
 SELF_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)

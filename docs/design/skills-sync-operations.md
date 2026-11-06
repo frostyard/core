@@ -107,7 +107,7 @@ config, the workflow, or the script. It also runs at 05:23 UTC every Monday
 to catch drift and accepts manual dispatches. A single concurrency group lets
 one run finish before another begins; in-progress runs are not cancelled.
 
-The workflow maps the core Actions secret `ORG_PAT` to the script's required
+The workflow maps the core Actions secret `SKILLS_SYNC_TOKEN` to the script's required
 `GH_TOKEN` environment variable. The fine-grained PAT must have:
 
 - repository access to every configured Frostyard consumer;
@@ -118,19 +118,22 @@ The workflow maps the core Actions secret `ORG_PAT` to the script's required
 The workflow grants no permissions to its `GITHUB_TOKEN` and checkout does not
 persist credentials.
 
-The token's owner is the author GitHub shows on every sync PR (the commit
-author stays `frostyard-core[bot]`). A consumer ruleset that requires an
-approving review therefore needs a reviewer other than that owner, or an
-administrator's bypass, before the PR can merge.
+The token is a fine-grained PAT owned by the machine account
+`frostyard-machines`, with resource owner `frostyard` and repository access
+limited to the consumers listed in [`.github/skills-sync.json`](../../.github/skills-sync.json).
+GitHub shows `frostyard-machines` as the author of every sync PR (the commit
+author stays `frostyard-core[bot]`). A maintainer other than
+`frostyard-machines` approves the PR under the default-branch ruleset;
+`frostyard-machines` cannot approve its own PR.
 
 ### Expiry and rotation
 
-`ORG_PAT`'s expiry is declared in
+`SKILLS_SYNC_TOKEN`'s expiry is declared in
 [`.github/secrets-expiry.json`](../../.github/secrets-expiry.json), the
 canonical record ([ADR-0045](../adr/0045-guard-actions-secret-expiry-in-the-repository.md)).
 That file — not this document, and not the closed
 [core#15](https://github.com/frostyard/core/issues/15) — is the one place the
-date lives: it currently declares `2027-08-11` with a 60-day
+date lives: it currently declares `2027-11-01` with a 60-day
 `warn_days_before` lead time. The record is metadata only; its schema is
 closed and holds no token value.
 
@@ -142,8 +145,9 @@ guard reads no secret, and it is deliberately not part of `make verify` /
 `make ci`, so an approaching rotation never blocks unrelated pull requests.
 Run it locally with `npm run check:secret-expiry`.
 
-To rotate: create the replacement token with the permissions listed above,
-replace the `ORG_PAT` repository secret, and update `expires_on` in the record
+To rotate: create the replacement token while signed in as
+`frostyard-machines`, with the permissions listed above,
+replace the `SKILLS_SYNC_TOKEN` repository secret, and update `expires_on` in the record
 in the same pull request — the guard keeps failing until the record matches
 the live token. After replacing the secret, manually dispatch the sync
 workflow. An unchanged run proves clone access; the next changed sync also
@@ -153,8 +157,11 @@ exercises push and pull-request access.
 
 - **Change a managed skill:** edit it in core and merge to `main`. Review and
   merge the generated consumer PRs; do not copy the edit into consumers.
-- **Onboard a repository:** confirm `ORG_PAT` can access it, add its slug and
-  extras to `repos`, then merge and review the generated PR. Tool-specific
+- **Onboard a repository:** add it to the repository access of the
+  `SKILLS_SYNC_TOKEN` PAT (the token's settings, signed in as
+  `frostyard-machines`), add its slug and extras to `repos`, then merge and
+  review the generated PR. Give the token access before the config change
+  merges, or the next run fails for that repository. Tool-specific
   discovery wiring remains the consumer repository's responsibility.
 - **Change assignments:** edit `defaults` or a repository's extras. Additions
   are mirrored on the next run. Removing an assignment stops future updates
@@ -175,8 +182,8 @@ error that exits immediately.
 
 | Signal | Recovery |
 | --- | --- |
-| `GH_TOKEN (ORG_PAT) is not configured` | Restore or rotate the core `ORG_PAT` Actions secret, then dispatch the workflow. |
-| `Secrets expiry` workflow fails for `ORG_PAT` | The declared expiry is inside its lead window or past. Rotate the token and update `expires_on` in [`.github/secrets-expiry.json`](../../.github/secrets-expiry.json) ([ADR-0045](../adr/0045-guard-actions-secret-expiry-in-the-repository.md)). |
+| `GH_TOKEN (SKILLS_SYNC_TOKEN) is not configured` | Restore or rotate the core `SKILLS_SYNC_TOKEN` Actions secret, then dispatch the workflow. |
+| `Secrets expiry` workflow fails for `SKILLS_SYNC_TOKEN` | The declared expiry is inside its lead window or past. Rotate the token and update `expires_on` in [`.github/secrets-expiry.json`](../../.github/secrets-expiry.json) ([ADR-0045](../adr/0045-guard-actions-secret-expiry-in-the-repository.md)). |
 | `Resource not accessible by personal access token` | Check token expiry, consumer repository access, and Contents/Pull requests permissions; update the secret and dispatch. |
 | `clone failed for frostyard/<repo>` | Confirm the slug still exists and the token can read it; correct config or access, then dispatch. |
 | `skills-sync.json names unknown skill` | Correct the skill name or restore its core directory, then dispatch. Repositories after the failure were not attempted. |
