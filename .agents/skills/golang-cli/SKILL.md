@@ -23,7 +23,7 @@ paths:
 > **Frostyard override.** When this skill disagrees with the repository's `AGENTS.md`, the `frostyard-go-repo` skill or a frostyard/core ADR, they win. A pointer to `samber/cc-skills-golang@golang-<name>` means the local `golang-<name>` skill when it exists; frostyard does not vendor the others. Do not add a third-party module that this skill suggests (for example `samber/*`) without the owner's approval. Pin tools in the repository's `mise.toml` and `mise.lock` ([ADR-0043](https://github.com/frostyard/core/blob/main/docs/adr/0043-pin-repository-tools-in-mise-and-name-the-verify-gate.md)), not with `go install …@latest`, `go get -tool`, a `tools.go` file or `brew`, and run the gate through `make verify`, `make check` and `make ci` ([ADR-0044](https://github.com/frostyard/core/blob/main/docs/adr/0044-expose-the-make-gate-triad-in-every-repository.md)). The orchestration and thinking hints (sub-agents, `ultracode`, `ultrathink`) are Claude Code hints: the session's own rules for subagents win.
 >
 > - Frostyard CLIs use `github.com/frostyard/clix` (a fang and cobra wrapper) in the layout of `frostyard-go-repo`: `cmd/<name>-cli/main.go` runs `clix.App{...}.Run(NewRootCmd())`, the Cobra handlers live in `cmd/<name>/`, and the logic lives in the SDK package. clix supplies the version strings, the common flags, `--json` output, completions and man pages: do not add Viper configuration layering or a hand-made version or completion command.
-> - `assets/examples/` shows plain cobra and Viper patterns for reference only. Releases use GoReleaser Pro and svu tags; an agent never tags or releases.
+> - `references/examples.md` holds the plain cobra and Viper examples as fenced Go blocks, not as `.go` files, so that a consumer's Go tooling and repository guards never see them; they are for reference only. Releases use GoReleaser Pro and svu tags; an agent never tags or releases.
 
 **Persona:** You are a Go CLI engineer. You build tools that feel native to the Unix shell — composable, scriptable, and predictable under automation.
 
@@ -71,11 +71,11 @@ myapp/
 └── go.sum
 ```
 
-`main.go` should be minimal — see [assets/examples/main.go](assets/examples/main.go).
+`main.go` should be minimal — see [main.go example](references/examples.md#maingo).
 
 ## Root Command Setup
 
-The root command initializes Viper configuration and sets up global behavior via `PersistentPreRunE`. See [assets/examples/root.go](assets/examples/root.go).
+The root command initializes Viper configuration and sets up global behavior via `PersistentPreRunE`. See [root.go example](references/examples.md#rootgo).
 
 Key points:
 
@@ -86,11 +86,11 @@ Key points:
 
 ## Subcommands
 
-Add subcommands by creating separate files in `cmd/myapp/` and registering them in `init()`. See [assets/examples/serve.go](assets/examples/serve.go) for a complete subcommand example including command groups.
+Add subcommands by creating separate files in `cmd/myapp/` and registering them in `init()`. See [serve.go example](references/examples.md#servego) for a complete subcommand example including command groups.
 
 ## Flags
 
-See [assets/examples/flags.go](assets/examples/flags.go) for all flag patterns:
+See [flags.go example](references/examples.md#flagsgo) for all flag patterns:
 
 ### Persistent vs Local
 
@@ -111,7 +111,7 @@ This ensures `viper.GetInt("port")` returns the flag value, env var `MYAPP_PORT`
 
 ## Argument Validation
 
-Cobra provides built-in validators for positional arguments. See [assets/examples/args.go](assets/examples/args.go) for both built-in and custom validation examples.
+Cobra provides built-in validators for positional arguments. See [args.go example](references/examples.md#argsgo) for both built-in and custom validation examples.
 
 | Validator                   | Description                          |
 | --------------------------- | ------------------------------------ |
@@ -131,7 +131,7 @@ Viper resolves configuration values in this order (highest to lowest precedence)
 3. **Config file** (persistent settings)
 4. **Defaults** (set in code)
 
-See [assets/examples/config.go](assets/examples/config.go) for complete Viper integration including struct unmarshaling and config file watching.
+See [config.go example](references/examples.md#configgo) for complete Viper integration including struct unmarshaling and config file watching.
 
 ### Example Config File (.myapp.yaml)
 
@@ -152,7 +152,7 @@ With the setup above, these are all equivalent:
 
 ## Version and Build Info
 
-Version SHOULD be embedded at compile time using `ldflags`. See [assets/examples/version.go](assets/examples/version.go) for the version command and build instructions.
+Version SHOULD be embedded at compile time using `ldflags`. See [version.go example](references/examples.md#versiongo) for the version command and build instructions.
 
 ## Exit Codes
 
@@ -168,11 +168,11 @@ Exit codes MUST follow Unix conventions:
 | 127   | Command not found | Missing dependency                        |
 | 128+N | Signal N          | Terminated by signal (e.g., 130 = SIGINT) |
 
-See [assets/examples/exit_codes.go](assets/examples/exit_codes.go) for a pattern mapping errors to exit codes.
+See [exit codes example](references/examples.md#exit-codes) for a pattern mapping errors to exit codes.
 
 ## I/O Patterns
 
-See [assets/examples/output.go](assets/examples/output.go) for all I/O patterns:
+See [output.go example](references/examples.md#outputgo) for all I/O patterns:
 
 - **stdout vs stderr**: NEVER write diagnostic output to stdout — stdout is for program output (pipeable), stderr for logs/errors/diagnostics
 - **Detecting pipe vs terminal**: check `os.ModeCharDevice` on stdout
@@ -181,15 +181,15 @@ See [assets/examples/output.go](assets/examples/output.go) for all I/O patterns:
 
 ## Signal Handling
 
-Signal handling MUST use `signal.NotifyContext` to propagate cancellation through context. See [assets/examples/signal.go](assets/examples/signal.go) for graceful HTTP server shutdown.
+Signal handling MUST use `signal.NotifyContext` to propagate cancellation through context. See [signal.go example](references/examples.md#signalgo) for graceful HTTP server shutdown.
 
 ## Shell Completions
 
-Cobra generates completions for bash, zsh, fish, and PowerShell automatically. See [assets/examples/completion.go](assets/examples/completion.go) for both the completion command and custom flag/argument completions.
+Cobra generates completions for bash, zsh, fish, and PowerShell automatically. See [completion.go example](references/examples.md#completiongo) for both the completion command and custom flag/argument completions.
 
 ## Testing CLI Commands
 
-Test commands by executing them programmatically and capturing output. See [assets/examples/cli_test.go](assets/examples/cli_test.go).
+Test commands by executing them programmatically and capturing output. See [CLI tests example](references/examples.md#cli-tests).
 
 Use `cmd.OutOrStdout()` and `cmd.ErrOrStderr()` in commands (instead of `os.Stdout` / `os.Stderr`) so output can be captured in tests.
 
