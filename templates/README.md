@@ -7,7 +7,7 @@ in place, so downstream repos stay self-contained.
 Design-system page templates (docs page, site page, Pilothouse module) live
 with their skill in
 [../.agents/skills/frostyard-design/templates/](../.agents/skills/frostyard-design/templates/),
-and the full Astro docs-site scaffold in
+and the ProperDocs + MaterialX docs-site scaffold in
 [../.agents/skills/frostyard-docs-site/scaffold/](../.agents/skills/frostyard-docs-site/scaffold/).
 
 *(no standalone templates yet — add one when a starting point repeats across

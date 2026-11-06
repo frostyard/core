@@ -113,3 +113,4 @@ checksum-verified downloads with an update check per pin.
   [ADR-0026](0026-distribute-core-skills-via-sync-prs.md),
   [ADR-0040](0040-publish-the-repository-settings-contract.md); Snowcat
   [ADR-0076](https://github.com/frostyard/snowcat/blob/main/docs/adr/0076-pin-repository-tools-in-the-repository-and-qualify-lanes-by-running-them.md)
+- Amended in part by: [ADR-0071](0071-hold-every-code-repository-to-one-baseline.md)

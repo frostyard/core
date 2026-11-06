@@ -85,6 +85,8 @@ no ADR, spec, or plan covers yet.
 - [0067 — Publish omarchy-apps packages on change, and keep the newest two](adr/0067-publish-omarchy-apps-on-change-and-keep-the-newest-two.md)
 - [0068 — Label pull requests that touch high-risk paths](adr/0068-label-pull-requests-that-touch-high-risk-paths.md)
 - [0069 — Report problems local first, opt-in, with one sender per host](adr/0069-report-problems-local-first-opt-in-with-one-sender-per-host.md)
+- [0070 — Build tool docs sites with ProperDocs and MaterialX on GitHub Pages](adr/0070-build-tool-docs-sites-with-materialx-on-github-pages.md)
+- [0071 — Hold every code repository to one baseline](adr/0071-hold-every-code-repository-to-one-baseline.md)
 
 ### Design
 
@@ -107,6 +109,7 @@ no ADR, spec, or plan covers yet.
 - [Risk paths](specs/risk-paths.md)
 - [Flaky-test scan](specs/flaky-test-scan.md)
 - [Problem report `frostyard.problem/1`](specs/problem-report.md)
+- [Repository baseline](specs/repository-baseline.md)
 
 ### Plans
 

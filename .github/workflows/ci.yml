@@ -1,5 +1,6 @@
 # Core CI (ADR-0021: SHA-pinned, least-privilege): organization authority and
-# docs integrity at the repository root, plus the docs-site scaffold e2e suite.
+# docs integrity at the repository root, plus the docs-site scaffold build in
+# ProperDocs + MaterialX.
 name: CI
 
 on:
@@ -47,17 +48,15 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    defaults:
-      run:
-        working-directory: .agents/skills/frostyard-docs-site/scaffold
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      - uses: jdx/mise-action@3c2e0cf82a5b2e5249f0d3635a4d83d0ae861518 # v4.2.5
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
-          node-version: "22"
-          cache: npm
-          cache-dependency-path: .agents/skills/frostyard-docs-site/scaffold/package-lock.json
-      - run: npm ci
-      - run: npm test # astro build + pagefind + node --test tests/*.test.mjs
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: .agents/skills/frostyard-docs-site/scaffold/requirements.txt
+      - name: Build the scaffold site and assert on its output
+        run: node --test .agents/skills/frostyard-docs-site/tests/*.test.mjs

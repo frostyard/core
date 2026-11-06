@@ -1,17 +1,20 @@
----
-title: CLI reference
-description: Commands and flags.
-group: Reference
-order: 20
----
+# Commands
 
-## Commands
+PROJECT has one command. Replace this page with the real commands, and keep it
+in step with the CLI in the same pull request.
 
-| Command | Purpose |
+## `PROJECT`
+
+Replace this section with what the command does when it runs with no
+arguments.
+
+| Option | Meaning |
 | --- | --- |
-| `example build` | Build the artifact |
-| `example status` | Report state without changing it |
+| `--help` | Print the usage and exit. |
+| `--version` | Print the version and exit. |
 
-## JSON output
+## Exit status
 
-Every command accepts `--json` for machine-readable output.
+Replace this section with the exit codes a script may check.
+
+See the [example guide](../guides/example.md) for a task that uses them.
