@@ -111,6 +111,10 @@ Start from .agents/skills/TEMPLATE/SKILL.md. -->
   no leftover agent-framework trees), with its named exemptions
   ([ADR-0071](docs/adr/0071-hold-every-code-repository-to-one-baseline.md)).
   The weekly conformance sweep files the gaps; a new row needs a new ADR.
+  A row that restates an existing ADR keeps that ADR's full scope and every
+  file it requires (B4 names `mise.toml` and `mise.lock` because ADR-0043
+  does); narrowing a row needs an ADR that amends the cited one.
+  `test/no-leftover-agent-trees.test.mjs` holds core itself to row B16.
 - ADRs record the decision, not how it was reached. State context, decision,
   and consequences as facts. No narration of who asked, who was consulted, or
   the author's process; that belongs in the PR description
