@@ -48,14 +48,15 @@ against.
      schema (ADR-0018).
   3. Docs shape: `docs/README.md`, `docs/adr/`, `docs/design/`,
      `docs/specs/`, `docs/plans/` and `docs/org-adrs.md` (ADR-0025).
-  4. Make gate: `make verify`, `make check` and `make ci` (ADR-0043,
-     ADR-0044; `make ci` per ADR-0038).
+  4. Make gate and tool pins: `make verify`, `make check` and `make ci`,
+     with `mise.toml` and `mise.lock` at the root (ADR-0043, ADR-0044;
+     `make ci` per ADR-0038).
   5. Actions pinned by full commit SHA, with least-privilege permissions
      (ADR-0021).
-  6. Risk paths: a repository that releases or deploys has
-     `.github/risk-paths.json` and its caller workflow (ADR-0068). The list
-     covers at least its release workflows, signing, install scripts and
-     privileged helpers.
+  6. Risk paths: the repository has `.github/risk-paths.json` and its
+     caller workflow (ADR-0068). In a repository that releases or deploys,
+     the list covers at least its release and deploy workflows, signing,
+     install scripts and privileged helpers.
   7. PR template: `.github/pull_request_template.md` with a risk tier
      section (ADR-0019).
   8. Versions: a released Go repository versions with svu and
