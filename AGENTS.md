@@ -47,6 +47,13 @@ Start from .agents/skills/TEMPLATE/SKILL.md. -->
   [.agents/skills/frostyard-go-repo/SKILL.md](.agents/skills/frostyard-go-repo/SKILL.md)
   — SDK-first layout, clix CLI, Makefile check gate, GoReleaser Pro + svu
   releases (extracted from updex).
+- **General Go practice in a Go repository (style, naming, errors,
+  concurrency, tests, lint, security, CLI, layout, dependencies)** → the
+  20 vendored `.agents/skills/golang-*/SKILL.md` skills from
+  samber/cc-skills-golang; their Frostyard override blocks and
+  `frostyard-go-repo` win. Change them only per
+  [docs/design/shared-skills.md](docs/design/shared-skills.md#vendored-go-skills),
+  which also says how to refresh them from upstream.
 - **Onboarding an existing repository into the fleet (core declaration,
   canonical surfaces, mise and Makefile gate, settings + merge queue,
   skills-sync enrollment)** →
