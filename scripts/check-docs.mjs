@@ -96,33 +96,41 @@ function stripFences(text) {
 
 // Inline code spans, as [start, end) ranges of the ORIGINAL text (never of a
 // fence-stripped text: a removed chunk can join two backticks into a false
-// span). Spans count only in a safe run of non-blank lines, so a link-shaped
-// match is skipped only when CommonMark would render it as code. A run is
-// unsafe, and all its links stay checked, when it has:
+// span). CR, LF and CRLF end a line; only spaces and tabs make a blank line.
+// Spans count only in a safe run of non-blank lines, so a link-shaped match is
+// skipped only when CommonMark would render it as code. A run is unsafe, and
+// all its links stay checked, when it has:
 // - a `|` (a GFM table cell boundary splits inline contexts);
 // - a backslash before a backtick (an escaped backtick is not a delimiter);
 // - a `<` with a later `>` (raw HTML and autolinks bind before code spans);
 // - a line with an unpaired backtick run (a span may wrap lines, or a heading
 //   or other block may end it). Each line of a safe run pairs runs of equal
-//   length left to right, which is CommonMark's own pairing.
+//   length left to right, which is CommonMark's own pairing;
+// - a `](` or `][` outside a computed span, when a backtick comes later in the
+//   run. The link consumes that backtick in a destination, title or reference
+//   label, so it is not a span delimiter. A `](` inside a real span does not
+//   trigger this rule, because it belongs to code such as `AsType[T](err)`.
 function codeSpanRanges(text) {
   const lines = [];
-  let lineStart = 0;
-  for (const lineText of text.split("\n")) {
-    lines.push({ text: lineText, start: lineStart });
-    lineStart += lineText.length + 1;
+  const lineEnding = /\r\n|\r|\n/g;
+  let previousEnd = 0;
+  let ending;
+  while ((ending = lineEnding.exec(text)) !== null) {
+    lines.push({ text: text.slice(previousEnd, ending.index), start: previousEnd });
+    previousEnd = ending.index + ending[0].length;
   }
+  lines.push({ text: text.slice(previousEnd), start: previousEnd });
 
   const ranges = [];
   let lineIndex = 0;
   while (lineIndex < lines.length) {
-    if (/^\s*$/.test(lines[lineIndex].text)) {
+    if (/^[ \t]*$/.test(lines[lineIndex].text)) {
       lineIndex++;
       continue;
     }
 
     const runStartIndex = lineIndex;
-    while (lineIndex < lines.length && !/^\s*$/.test(lines[lineIndex].text)) lineIndex++;
+    while (lineIndex < lines.length && !/^[ \t]*$/.test(lines[lineIndex].text)) lineIndex++;
     const runLines = lines.slice(runStartIndex, lineIndex);
     const runStart = runLines[0].start;
     const lastLine = runLines[runLines.length - 1];
@@ -184,6 +192,19 @@ function codeSpanRanges(text) {
         }
 
         if (lineUnpaired) {
+          unsafe = true;
+          break;
+        }
+      }
+    }
+
+    if (!unsafe) {
+      for (let i = 0; i < runText.length - 1; i++) {
+        if (runText[i] !== "]") continue;
+        if (runText[i + 1] !== "(" && runText[i + 1] !== "[") continue;
+        const position = runStart + i;
+        if (isInCodeSpan(runRanges, position, position + 1)) continue;
+        if (runText.indexOf("`", i + 2) !== -1) {
           unsafe = true;
           break;
         }

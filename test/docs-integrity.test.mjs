@@ -403,6 +403,72 @@ test("a list item fence does not hide a later real link", async () => {
     error.stderr.includes("-> missing.md does not resolve"));
 });
 
+test("a backtick in a link destination is not a span delimiter", async () => {
+  const root = await createFixture();
+  await writeFile(
+    path.join(root, ".agents/skills/example/SKILL.md"),
+    "[a](https://example.com/a`b) [x](missing.md) `tail\n",
+  );
+
+  await assert.rejects(runDocsGate(root), (error) =>
+    error.stderr.includes("-> missing.md does not resolve"));
+});
+
+test("a backtick in a link title is not a span delimiter", async () => {
+  const root = await createFixture();
+  await writeFile(
+    path.join(root, ".agents/skills/example/SKILL.md"),
+    "[a](u \"t`\") [x](missing.md) `tail\n",
+  );
+
+  await assert.rejects(runDocsGate(root), (error) =>
+    error.stderr.includes("-> missing.md does not resolve"));
+});
+
+test("a backtick in a full reference label is not a span delimiter", async () => {
+  const root = await createFixture();
+  await writeFile(
+    path.join(root, ".agents/skills/example/SKILL.md"),
+    "[a][b`c] [x](missing.md) `tail\n\n[b`c]: https://example.com\n",
+  );
+
+  await assert.rejects(runDocsGate(root), (error) =>
+    error.stderr.includes("-> missing.md does not resolve"));
+});
+
+test("a Unicode blank line does not hide a real link", async () => {
+  const root = await createFixture();
+  await writeFile(
+    path.join(root, ".agents/skills/example/SKILL.md"),
+    "`head\n\u00a0\nend` [x](missing.md) `tail\n",
+  );
+
+  await assert.rejects(runDocsGate(root), (error) =>
+    error.stderr.includes("-> missing.md does not resolve"));
+});
+
+test("a lone CR line ending does not hide a real link", async () => {
+  const root = await createFixture();
+  await writeFile(
+    path.join(root, ".agents/skills/example/SKILL.md"),
+    "`head\r\r[x](missing.md) `tail\r",
+  );
+
+  await assert.rejects(runDocsGate(root), (error) =>
+    error.stderr.includes("-> missing.md does not resolve"));
+});
+
+test("CRLF line endings still permit a paired code span", async () => {
+  const root = await createFixture();
+  await writeFile(
+    path.join(root, ".agents/skills/example/SKILL.md"),
+    "Use `errors.AsType[T](err)` here.\r\n",
+  );
+
+  const { stdout } = await runDocsGate(root);
+  assert.match(stdout, /ok   link_integrity: 1\.000/);
+});
+
 async function createFixture() {
   const root = await mkdtemp(path.join(os.tmpdir(), "core-docs-gate-"));
   for (const dir of [
