@@ -38,7 +38,7 @@ The alias table (edit the targets, never the aliases):
 | `docs/review-rubric.md` | `specs/pr-review-rubric.md` | PR review rubric (#34) |
 | `docs/metrics.md` | `specs/pr-acceptance-metric.md` | PR acceptance metric (#33) |
 | `docs/quality.md` | `design/quality-loop.md` | quality dashboard (#35) |
-| `tests/e2e/scaffold-tests` | `../../.agents/skills/frostyard-docs-site/scaffold/tests` | E2E suite (#23) |
+| `tests/e2e/scaffold-tests` | `../../.agents/skills/frostyard-docs-site/tests` | E2E suite (#23) |
 
 Rules:
 

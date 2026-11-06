@@ -40,9 +40,11 @@ Start from .agents/skills/TEMPLATE/SKILL.md. -->
 - **Designing any Frostyard-branded interface, page, mock, or asset** →
   [.agents/skills/frostyard-design/SKILL.md](.agents/skills/frostyard-design/SKILL.md)
   — brand law, tokens, guidelines, components, UI kits, hero art.
-- **Adding a Frostyard-branded Astro docs site to a project repo** →
+- **Adding a Frostyard-branded ProperDocs + MaterialX docs site to a tool
+  repository** →
   [.agents/skills/frostyard-docs-site/SKILL.md](.agents/skills/frostyard-docs-site/SKILL.md)
-  — applies the `scaffold/` payload as `site/`.
+  — applies the `scaffold/` payload as `site/` and the GitHub Pages workflow
+  ([ADR-0070](docs/adr/0070-build-tool-docs-sites-with-materialx-on-github-pages.md)).
 - **Creating or conforming a frostyard Go repository** →
   [.agents/skills/frostyard-go-repo/SKILL.md](.agents/skills/frostyard-go-repo/SKILL.md)
   — SDK-first layout, clix CLI, Makefile check gate, GoReleaser Pro + svu
@@ -101,6 +103,14 @@ Start from .agents/skills/TEMPLATE/SKILL.md. -->
   PR template's Risk tier section; reviews apply
   [docs/specs/pr-review-rubric.md](docs/specs/pr-review-rubric.md)
   ([ADR-0019](docs/adr/0019-governance-as-code-and-risk-tiers.md)).
+- Every frostyard code repository carries the
+  [repository baseline](docs/specs/repository-baseline.md) (rows `B1` to
+  `B16`: instruction surface, corrections inbox, docs shape, make gate,
+  pinned actions, risk paths, PR template, svu, tool docs site, license,
+  fleet Go toolchain, `ci.yml`, Dependabot, `SECURITY.md`, no `CODEOWNERS`,
+  no leftover agent-framework trees), with its named exemptions
+  ([ADR-0071](docs/adr/0071-hold-every-code-repository-to-one-baseline.md)).
+  The weekly conformance sweep files the gaps; a new row needs a new ADR.
 - ADRs record the decision, not how it was reached. State context, decision,
   and consequences as facts. No narration of who asked, who was consulted, or
   the author's process; that belongs in the PR description
@@ -135,9 +145,9 @@ removed. -->
   `scripts/check-organization.mjs`; every doc indexed, every relative link
   resolving, every symlink intact via `scripts/check-docs.mjs`; thresholds in
   `.coverage-thresholds.json`, `never_relax`) and the docs-site scaffold
-  e2e suite (`npm ci && npm test` in
-  `.agents/skills/frostyard-docs-site/scaffold/`). Run both locally before
-  pushing.
+  build (`node --test
+  .agents/skills/frostyard-docs-site/tests/*.test.mjs` builds the MaterialX
+  scaffold with `properdocs --strict`). Run both locally before pushing.
 - Author repository declarations and canonical surface contracts only under
   [`organization/`](organization/README.md); validate live records and their
   conformance fixtures with `npm run check:organization`

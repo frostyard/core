@@ -26,7 +26,7 @@ linked canonical skill rather than a copied version:
 | [frostyard-acmm-conformance](../../.agents/skills/frostyard-acmm-conformance/SKILL.md) | Bringing a repository to Hive ACMM conformance |
 | [frostyard-apt-producer](../../.agents/skills/frostyard-apt-producer/SKILL.md) | Publishing a repository's `.deb` packages through apt-publisher |
 | [frostyard-design](../../.agents/skills/frostyard-design/SKILL.md) | Frostyard-branded interfaces and assets |
-| [frostyard-docs-site](../../.agents/skills/frostyard-docs-site/SKILL.md) | Adding an Astro documentation site |
+| [frostyard-docs-site](../../.agents/skills/frostyard-docs-site/SKILL.md) | Adding a ProperDocs + MaterialX documentation site (GitHub Pages) |
 | [frostyard-go-repo](../../.agents/skills/frostyard-go-repo/SKILL.md) | Creating or conforming a Frostyard Go repository |
 | [frostyard-onboard-repo](../../.agents/skills/frostyard-onboard-repo/SKILL.md) | Onboarding an existing repository into the fleet and the skills sync |
 | [frostyard-plan-project](../../.agents/skills/frostyard-plan-project/SKILL.md) | Planning a multi-step project into an approved task graph |
@@ -243,7 +243,11 @@ another one.
 ## References
 
 - Rationale:
-  [ADR-0026](../adr/0026-distribute-core-skills-via-sync-prs.md)
+  [ADR-0026](../adr/0026-distribute-core-skills-via-sync-prs.md);
+  [ADR-0070](../adr/0070-build-tool-docs-sites-with-materialx-on-github-pages.md)
+  (the `frostyard-docs-site` skill);
+  [ADR-0071](../adr/0071-hold-every-code-repository-to-one-baseline.md)
+  (the Fleet toolchain table in `frostyard-go-repo`, carried by `@go`)
 - Operations: [Skills sync operations](skills-sync-operations.md)
 - Built in:
   [Plan 0001, Phases 1-2](../plans/0001-docs-shape-rollout.md)

@@ -35,7 +35,7 @@ Risk tier: 1 — <!-- justification -->
 <!-- Paste evidence the gates ran locally. -->
 
 - [ ] `node scripts/check-docs.mjs` green
-- [ ] Scaffold changed? `npm ci && npm test` in
-      `.agents/skills/frostyard-docs-site/scaffold/` green
+- [ ] Docs-site skill changed? `node --test
+      .agents/skills/frostyard-docs-site/tests/*.test.mjs` green
 - [ ] Workflows changed? Every action SHA-pinned (40 chars + `# vX.Y.Z`),
       `permissions: {}`, `persist-credentials: false` (ADR-0021)

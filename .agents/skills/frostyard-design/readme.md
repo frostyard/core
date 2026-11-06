@@ -64,7 +64,7 @@ Inter is referenced by the source as a system/stack font; no font binaries ship 
 - `ui_kits/frostyard-org/` — click-through recreation of frostyard.org (home + tools + why-atomic)
 - `ui_kits/docs/` — shared documentation shell, per-project content packs (snosi / updex / ChairLift)
 - `ui_kits/pilothouse/` — Pilothouse admin console restyled to the Frostyard language (login, overview, sysexts, services, podman)
-- `../frostyard-docs-site/` — sibling skill that applies a production docs site (Astro, this docs shell) to any project repo as `site/`
+- `../frostyard-docs-site/` — sibling skill that applies a ProperDocs + MaterialX docs site to a tool repository as `site/`
 - `SKILL.md` — agent skill entry point
 
 ### Intentional additions

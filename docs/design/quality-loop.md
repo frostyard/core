@@ -44,9 +44,10 @@ PR template ──► review rubric ──► CI gates ──► corrections ─
     `never_relax: true` (the ADR-0019 guardrail: the loop may tighten, never
     loosen). This is the coverage gate for a repo whose product is docs.
   - *scaffold-e2e*: the docs-site scaffold suite
-    (`.agents/skills/frostyard-docs-site/scaffold/tests/`, aliased at
-    `tests/e2e/scaffold-tests`) — `npm ci`, then `npm test` builds the real
-    site (Astro + Pagefind) and asserts on the final `dist/` HTML.
+    (`.agents/skills/frostyard-docs-site/tests/`, aliased at
+    `tests/e2e/scaffold-tests`) — installs the hash-locked requirements and
+    builds the real site with `properdocs build --strict` (ProperDocs +
+    MaterialX), then asserts on the final `dist/` output.
 - **Gate (fleet repositories)** — every enabled repository pins its
   tools in `mise.toml`/`mise.lock`, requires them
   (no "skipping"), and exposes `make verify` (non-mutating; what a
@@ -59,6 +60,16 @@ PR template ──► review rubric ──► CI gates ──► corrections ─
   the organization gate checks presence, never versions, via
   `scripts/check-fleet-conventions.mjs` (`npm run check:fleet`) and CI's
   `fleet-conventions` job.
+- **Sweep (every code repository)** — the
+  [repository baseline](../specs/repository-baseline.md) lists, as rows
+  `B1` to `B16`, what every frostyard code repository carries
+  ([ADR-0071](../adr/0071-hold-every-code-repository-to-one-baseline.md)),
+  including the tool docs site
+  ([ADR-0070](../adr/0070-build-tool-docs-sites-with-materialx-on-github-pages.md))
+  and the fleet Go and golangci-lint versions. The weekly conformance sweep
+  reads it at core's `origin/main` and files one `sweep` issue for each
+  failed row; owners fix the gaps in normal work. The organization gate
+  stays the presence check above.
 - **Learn** — corrections land in
   [.memory/corrections.jsonl](../../.memory/README.md) (append-only,
   five-field schema, ADR-0018) and are promoted into `AGENTS.md`, docs, or
@@ -111,7 +122,7 @@ Re-run every gate locally before pushing:
 
 ```
 node scripts/check-docs.mjs
-cd .agents/skills/frostyard-docs-site/scaffold && npm ci && npm test
+node --test .agents/skills/frostyard-docs-site/tests/*.test.mjs
 ```
 
 Failure modes: a broken alias or missing index line fails docs-gate (fix the
@@ -127,10 +138,13 @@ copy it as-is.
   [ADR-0029](../adr/0029-acmm-conformance-via-canonical-aliases.md),
   [ADR-0068](../adr/0068-label-pull-requests-that-touch-high-risk-paths.md),
   [ADR-0043](../adr/0043-pin-repository-tools-in-mise-and-name-the-verify-gate.md),
-  [ADR-0044](../adr/0044-expose-the-make-gate-triad-in-every-repository.md)
+  [ADR-0044](../adr/0044-expose-the-make-gate-triad-in-every-repository.md),
+  [ADR-0070](../adr/0070-build-tool-docs-sites-with-materialx-on-github-pages.md),
+  [ADR-0071](../adr/0071-hold-every-code-repository-to-one-baseline.md)
 - Contracts: [specs/pr-review-rubric.md](../specs/pr-review-rubric.md),
   [specs/pr-acceptance-metric.md](../specs/pr-acceptance-metric.md),
   [specs/risk-paths.md](../specs/risk-paths.md),
-  [specs/flaky-test-scan.md](../specs/flaky-test-scan.md)
+  [specs/flaky-test-scan.md](../specs/flaky-test-scan.md),
+  [specs/repository-baseline.md](../specs/repository-baseline.md)
 - Built in: the 2026-08-12 ACMM conformance PR
   (closes [core#22–#41](https://github.com/frostyard/core/issues/22))

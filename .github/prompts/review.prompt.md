@@ -12,8 +12,8 @@ authored ([ADR-0019](../../docs/adr/0019-governance-as-code-and-risk-tiers.md)).
    independently; cite file and line for every failure.
 3. Run the gates the rubric names:
    - `node scripts/check-docs.mjs`
-   - if `.agents/skills/frostyard-docs-site/scaffold/**` changed:
-     `cd .agents/skills/frostyard-docs-site/scaffold && npm ci && npm test`
+   - if `.agents/skills/frostyard-docs-site/**` changed:
+     `node --test .agents/skills/frostyard-docs-site/tests/*.test.mjs`
 4. If the diff touches `.github/workflows/`, verify every `uses:` is a
    full 40-char SHA with a `# vX.Y.Z` comment, `permissions: {}` at top
    level, and `persist-credentials: false` on checkouts
