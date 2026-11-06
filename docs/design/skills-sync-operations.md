@@ -91,10 +91,11 @@ core commits.
 If the staged skill tree changed, the script recreates
 `chore/sync-core-skills` from the freshly cloned default branch, commits as
 `frostyard-core[bot] <core@frostyard.invalid>`, and force-pushes that reserved
-branch. Each run rebuilds the branch from the current default branch, so a
-dispatch or the weekly run brings a stale sync PR up to date. An existing open
-PR from the branch is thereby updated; otherwise the
-script opens one. The automation never pushes to a consumer's default branch,
+branch. A run that finds a change rebuilds the branch from the current
+default branch, so a dispatch or the weekly run brings a stale sync PR up to
+date. A run that finds no change (`== REPO: up to date`) leaves the branch
+and any open sync PR as they are; that PR is then obsolete. An existing open
+PR from the branch is thereby updated; otherwise the script opens one. The automation never pushes to a consumer's default branch,
 and the PR must pass that repository's normal review and merge gate. Human
 commits must not be placed on the reserved sync branch because the next run
 replaces it.

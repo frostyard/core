@@ -238,9 +238,14 @@ check instead.
    default branch at run time. A later commit on the default branch, for
    example a layout move, is not in the head, and green CI at the head does
    not test it. When `behind_by` is not `0`, do not add the label: run the
-   sync again (`gh workflow run sync-skills.yml --repo frostyard/core`). It
+   sync again (`gh workflow run sync-skills.yml --repo frostyard/core`). When
+   the default branch still differs from core in a managed skill, the run
    recreates the branch from the current default branch; then check the new
-   head. The weekly run also does this.
+   head. The weekly run also does this. When the run log says
+   `== REPO: up to date`, the default branch already holds core's managed
+   skills: the run leaves the branch as it was, and the stale pull request
+   is obsolete. Close it after a check that the default branch's managed
+   trees equal core's (step 3).
 5. The repository's CI is green at that head.
 
 When all 5 hold, the owner adds `ready-for-human`. A new push to the sync

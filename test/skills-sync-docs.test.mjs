@@ -37,7 +37,17 @@ test("the sync pull request procedure requires a head current with the default b
     }
   }
   assert.ok(end > start + 1, "the section is empty");
-  const section = lines.slice(start, end).join("\n");
-  assert.match(section, /behind_by/);
-  assert.match(section, /gh workflow run sync-skills\.yml/);
+  // Prose wraps: compare with every run of whitespace as 1 space.
+  const section = lines.slice(start, end).join("\n").replace(/\s+/g, " ");
+  // The head is compared against the default branch (BRANCH...HEAD_SHA, not
+  // the reverse), and only behind_by 0 passes.
+  assert.ok(
+    section.includes("compare/BRANCH...HEAD_SHA --jq .behind_by` prints `0`"),
+    "the procedure must require behind_by 0 for compare/BRANCH...HEAD_SHA",
+  );
+  assert.ok(
+    section.includes("When `behind_by` is not `0`, do not add the label"),
+    "the procedure must withhold the label when the head is behind",
+  );
+  assert.ok(section.includes("gh workflow run sync-skills.yml --repo frostyard/core"));
 });
