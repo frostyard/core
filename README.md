@@ -39,12 +39,19 @@ four-question docs taxonomy, and skills as first-class files.
 AGENTS.md                     canonical agent instructions (the law)
 CLAUDE.md → AGENTS.md         symlink for Claude Code
 GEMINI.md → AGENTS.md         symlink for Gemini CLI
+.cursorrules → AGENTS.md      symlink for Cursor
+CONTRIBUTING.md → AGENTS.md   symlink for contributors
 .github/copilot-instructions.md → AGENTS.md
+.github/dependabot.yml        Dependabot (actions, npm)
+SECURITY.md                   private vulnerability reporting
+LICENSE                       MIT
 .agents/skills/               canonical skills; TEMPLATE/SKILL.md to copy
 .claude/skills → .agents/skills
+.memory/corrections.jsonl     corrections inbox (append-only)
 templates/                    doc & repo templates for new frostyard work
 assets/                       shared logos, badges, diagrams, media
 organization/                 machine-readable organization authority
+scripts/, test/               validators and their tests (npm run verify)
 docs/README.md                taxonomy + index (every doc gets a line)
 docs/adr/                     why — immutable decisions + TEMPLATE.md
 docs/design/                  how — living architecture docs + TEMPLATE.md

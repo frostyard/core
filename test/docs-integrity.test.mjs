@@ -261,6 +261,8 @@ async function createFixture() {
     path.join(root, "docs/specs/pr-acceptance-metric.md"),
     "# Metric\n\n## Definition\n\n## Rules\n",
   );
+  // The gate also checks links in docs/org-adrs.md (baseline row B3).
+  await writeFile(path.join(root, "docs/org-adrs.md"), "# Org ADRs\n");
   return root;
 }
 

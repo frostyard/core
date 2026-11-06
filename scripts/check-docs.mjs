@@ -108,7 +108,12 @@ function anchorsOf(path) {
   }
   return anchors;
 }
-const mdFiles = [join(root, "AGENTS.md"), join(root, "README.md"), join(root, "docs/README.md")];
+const mdFiles = [
+  join(root, "AGENTS.md"),
+  join(root, "README.md"),
+  join(root, "docs/README.md"),
+  join(root, "docs/org-adrs.md"),
+];
 for (const cat of categories) {
   for (const name of readdirSync(join(root, "docs", cat))) {
     if (name.endsWith(".md") && name !== "TEMPLATE.md") mdFiles.push(join(root, "docs", cat, name));

@@ -9,15 +9,20 @@ durable learnings go to [.memory/](../.memory/README.md), never here.
 
 ## Current state
 
-- Plan 0001 Phases 1–3 complete (2026-08-12): skills synced org-wide,
-  `yeti/` retired, 63 repo-local ADRs merged across six repos.
-- ACMM conformance PR in flight: closes core#22–#41 via ADR-0029's alias
-  lattice plus new CI, templates, and agent-surface artifacts.
+- The repository baseline ([ADR-0071](../docs/adr/0071-hold-every-code-repository-to-one-baseline.md),
+  [spec](../docs/specs/repository-baseline.md)) is the standard for every
+  frostyard code repository.
+- Core carries the baseline itself: `SECURITY.md`,
+  `.github/dependabot.yml`, `docs/org-adrs.md`, and
+  `test/repository-baseline.test.mjs`, which holds core to the rows.
 
 ## Last landed
 
-- Plan 0001 Phase 3 (six repo-local ADR PRs + pilothouse overview split).
+- core#204 — ADR-0071, ADR-0070 and the repository baseline spec.
+- core#203 — MIT `LICENSE`.
+- core#202 — managed skills guarded against Go files.
 
 ## Next
 
-- Plan 0001 Phase 4 — supply-chain cleanup (core#16, #17, #18).
+- The baseline rollout across the fleet, one PR per repository.
+- The B9 and B11 follow-ups stay per repository.

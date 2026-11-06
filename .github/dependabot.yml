@@ -1,0 +1,24 @@
+# Dependabot (ADR-0071 row B13): 1 entry for each ecosystem with a manifest in
+# this repository.
+#
+# The hash-locked .agents/skills/frostyard-docs-site/scaffold/requirements.txt
+# is refreshed by the repository-hygiene line with `uv pip compile`, not by
+# Dependabot. Skill payloads are not scanned.
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "build"
+      include: "scope"
