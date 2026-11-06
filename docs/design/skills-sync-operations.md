@@ -70,9 +70,10 @@ receives the `@go` group in addition to the default skills: that group is
 ([shared skills](shared-skills.md#vendored-go-skills)).
 `snowcat` and `snowcat-cockpit` left the list when Snowcat was retired and
 both repositories were archived
-([ADR-0064](../adr/0064-retire-snowcat.md)). A regular
-`.agents/` directory and a `.agents` symlink are both supported: the script
-resolves the physical target before writing or staging files.
+([ADR-0064](../adr/0064-retire-snowcat.md)). `.agents`, `.agents/skills` and
+each managed skill directory must be real directories: the script refuses a
+symlink at any of them before it writes or stages a file, and the run fails
+for that repository.
 
 ### Merge and ownership contract
 
@@ -90,8 +91,11 @@ core commits.
 If the staged skill tree changed, the script recreates
 `chore/sync-core-skills` from the freshly cloned default branch, commits as
 `frostyard-core[bot] <core@frostyard.invalid>`, and force-pushes that reserved
-branch. An existing open PR from the branch is thereby updated; otherwise the
-script opens one. The automation never pushes to a consumer's default branch,
+branch. A run that finds a change rebuilds the branch from the current
+default branch, so a dispatch or the weekly run brings a stale sync PR up to
+date. A run that finds no change (`== REPO: up to date`) leaves the branch
+and any open sync PR as they are; that PR is then obsolete. An existing open
+PR from the branch is thereby updated; otherwise the script opens one. The automation never pushes to a consumer's default branch,
 and the PR must pass that repository's normal review and merge gate. Human
 commits must not be placed on the reserved sync branch because the next run
 replaces it.

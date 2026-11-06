@@ -217,9 +217,9 @@ cross-reviewed in core. Brian made a standing exception to the cross-review
 rule for it on 2026-11-01: the repository's owner handles it with a tree
 check instead.
 
-1. Resolve the consumer's physical skills path first: `.agents/skills/`,
-   or the in-repository target of an `.agents` symlink (chairlift and
-   pilothouse use `docs/agents/skills/`).
+1. Managed skills live in real directories at `.agents/skills/<name>/`.
+   `.agents` and `.agents/skills` are real directories too, and the sync
+   refuses a symlink at any of them before it writes a file.
 2. Every file the pull request changes lies under one of that consumer's
    managed skill directories (`defaults` plus its extras in
    [skills-sync.json](../../.github/skills-sync.json)).
@@ -232,14 +232,30 @@ check instead.
    and `sha` for both sides. The `.synced-from-core` marker exists only on
    the consumer side; check it separately: its content is the 2 lines
    `scripts/lib/skills-sync-containment.sh` writes for that skill.
-4. The repository's CI is green at that head.
+4. The head is current with the consumer's default branch: `gh api
+   repos/OWNER/REPO/compare/BRANCH...HEAD_SHA --jq .behind_by` prints `0`,
+   where `BRANCH` is the default branch. The sync cuts its branch from the
+   default branch at run time. A later commit on the default branch, for
+   example a layout move, is not in the head, and green CI at the head does
+   not test it. When `behind_by` is not `0`, do not add the label: run the
+   sync again (`gh workflow run sync-skills.yml --repo frostyard/core`). When
+   the default branch still differs from core in a managed skill, the run
+   recreates the branch from the current default branch; then check the new
+   head. The weekly run also does this. When the run log says
+   `== REPO: up to date`, the default branch already holds core's managed
+   skills: the run leaves the branch as it was, and the stale pull request
+   is obsolete. Close it after a check that the default branch's managed
+   trees equal core's (step 3).
+5. The repository's CI is green at that head.
 
-When all 4 hold, the owner adds `ready-for-human`. A new push to the sync
+When all 5 hold, the owner adds `ready-for-human`. A new push to the sync
 branch (each core skill change force-updates it) means the label comes off
-until the check passes again at the new head. A pull request that fails the
-check is not edited on the reserved branch: fix core, or dispatch the sync
-again. Do not close a needed sync pull request: the next run creates
-another one.
+until the check passes again at the new head. In a consumer without a merge
+queue, a new commit on the default branch before the merge also makes step 4
+fail; the label comes off until a new sync run passes the check. A pull
+request that fails the check is not edited on the reserved branch: fix core,
+or dispatch the sync again. Do not close a needed sync pull request: the next
+run creates another one.
 
 ## References
 

@@ -94,19 +94,66 @@ test("syncs a skill into a normal .agents directory", async () => {
   assert.equal(synced, "# Example\n");
 });
 
-test("syncs a skill through an in-repository .agents -> docs/agents symlink", async () => {
+test("rejects an in-repository .agents -> docs/agents symlink", async () => {
   const { dir, coreRoot } = await createFixture();
   await mkdir(path.join(dir, "docs/agents"), { recursive: true });
   await symlink("docs/agents", path.join(dir, ".agents"), "dir");
 
-  await runSyncRepo(dir, coreRoot, ["example"]);
-
-  const marker = await readFile(
-    path.join(dir, "docs/agents/skills/example/.synced-from-core"),
-    "utf8",
+  await assert.rejects(
+    runSyncRepo(dir, coreRoot, ["example"]),
+    (error) => assertSymlinkRefusal(error, ".agents"),
   );
-  assert.match(marker, /Managed by frostyard\/core/);
+  assert.deepEqual(await readdir(path.join(dir, "docs/agents")), []);
 });
+
+test("rejects an in-repository .agents/skills -> ../docs/skills symlink", async () => {
+  const { dir, coreRoot } = await createFixture();
+  await mkdir(path.join(dir, ".agents"), { recursive: true });
+  await mkdir(path.join(dir, "docs/skills"), { recursive: true });
+  await symlink("../docs/skills", path.join(dir, ".agents/skills"), "dir");
+
+  await assert.rejects(
+    runSyncRepo(dir, coreRoot, ["example"]),
+    (error) => assertSymlinkRefusal(error, ".agents/skills"),
+  );
+  assert.deepEqual(await readdir(path.join(dir, "docs/skills")), []);
+});
+
+test("rejects an in-repository managed-skill symlink", async () => {
+  const { dir, coreRoot } = await createFixture();
+  await mkdir(path.join(dir, ".agents/skills"), { recursive: true });
+  await mkdir(path.join(dir, "docs/example"), { recursive: true });
+  await symlink("../../docs/example", path.join(dir, ".agents/skills/example"), "dir");
+
+  await assert.rejects(
+    runSyncRepo(dir, coreRoot, ["example"]),
+    (error) => assertSymlinkRefusal(error, ".agents/skills/example"),
+  );
+  assert.deepEqual(await readdir(path.join(dir, "docs/example")), []);
+});
+
+test("rejects a later symlinked destination without creating an earlier valid one", async () => {
+  const { dir, coreRoot } = await createFixture();
+  await mkdir(path.join(coreRoot, ".agents/skills/second"), { recursive: true });
+  await writeFile(path.join(coreRoot, ".agents/skills/second/SKILL.md"), "# Second\n");
+  await mkdir(path.join(dir, ".agents/skills"), { recursive: true });
+  await mkdir(path.join(dir, "docs/second"), { recursive: true });
+  await symlink("../../docs/second", path.join(dir, ".agents/skills/second"), "dir");
+
+  await assert.rejects(
+    runSyncRepo(dir, coreRoot, ["example", "second"]),
+    (error) => assertSymlinkRefusal(error, ".agents/skills/second"),
+  );
+  assert.deepEqual(await readdir(path.join(dir, "docs/second")), []);
+  await assert.rejects(readdir(path.join(dir, ".agents/skills/example")));
+});
+
+function assertSymlinkRefusal(error, relPath) {
+  assert.equal(error.code, 1);
+  assert.match(error.stderr, /is a symlink: managed skills must be real directories/);
+  assert.ok(error.stderr.includes(`${relPath} is a symlink`), error.stderr);
+  return true;
+}
 
 async function createFixture() {
   const base = await mkdtemp(path.join(os.tmpdir(), "sync-skills-containment-"));
