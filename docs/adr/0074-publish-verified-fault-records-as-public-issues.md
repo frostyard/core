@@ -53,13 +53,17 @@ a fault issue is not a report and holds no value that only a report proves.
 - **1 issue for each problem key.** The problem-intake triage job opens at most
   1 GitHub issue for each problem key, in the repository that owns the faulty
   code (routing by kind and `app_id`), with the label `problem-report`. The
-  problem key is derived only from the GlitchTip fingerprint above, whose
-  values are all public fields of the table below; frostyard/problem-intake
+  job runs at most once a day, so an issue's creation time tells no more
+  than the day of a report. The
+  problem key is the first 16 hex characters of the SHA-256 of the GlitchTip
+  fingerprint above; the key itself is published, the fingerprint values
+  only as the table below allows. frostyard/problem-intake
   `docs/specs/triage.md` defines it.
 - **Closed list of public fields.** Every issue holds the kind, the class, and
-  the newest verified version: the app version for `app_problem`, else the
-  image id and its newest verified image version. A version list is never
-  published. Then, for each kind, only:
+  the newest verified version: the app version for `app_problem`, else each
+  image id with its newest verified image version (1 problem key can cover
+  several images, because the fingerprint holds no image id). A list of
+  versions for 1 image or app is never published. Then, for each kind, only:
 
   | Kind | Public fields |
   | --- | --- |
@@ -88,9 +92,12 @@ a fault issue is not a report and holds no value that only a report proves.
   `count` bucket, `retries` or a number of reports), any day, a
   `bootc_version`, `shipped`, `secure` outside the 2 kinds above, a host
   name, a user name, a path or free text. Besides the public fields, an
-  issue holds only the problem key, the GlitchTip issue number (an internal
-  row number, not an event ID), a fixed footer that links the privacy page,
-  and the job's fixed comments of the fix loop with verified versions only.
+  issue body holds only the line `Problem key: <key>`, the line
+  `GlitchTip issue: <ids>` (internal GlitchTip issue row numbers, never an
+  event ID or a GlitchTip URL), and a fixed footer that links
+  <https://frostyard.org/privacy/problem-reports/#public-bug-reports>. The
+  job's later comments on the issue hold only fixed text, its marker, and
+  fix boundaries and versions that it verified.
 - **Cutoff.** The job files only problems that GlitchTip first saw on or after
   a cutoff: 00:00 UTC of the date that the frostyard.org privacy page states
   in its section `public-bug-reports`. Until that section is live, the job
