@@ -11,7 +11,7 @@ B4 (ADR-0043 and ADR-0044), and only for enabled repositories.
 
 ## Interface
 
-Each row has an ID (`B1` to `B16`), the rule, its source, and a read-only
+Each row has an ID (`B1` to `B17`), the rule, its source, and a read-only
 check. Run each check in a clone of the repository at the commit you read
 (`git ls-tree`, `git show <commit>:<path>`, or `gh api`); nothing writes.
 
@@ -33,6 +33,7 @@ check. Run each check in a clone of the repository at the commit you read
 | B14 | Security policy | `SECURITY.md` (at the root or in `.github/`) names GitHub private vulnerability reporting for the repository and says which versions get fixes. | ADR-0071, [ADR-0040](../adr/0040-publish-the-repository-settings-contract.md) | The file is in the tree and links `https://github.com/frostyard/<repo>/security`. |
 | B15 | No CODEOWNERS | No `CODEOWNERS` file at the root, in `.github/` or in `docs/`. | ADR-0071 | `git ls-tree <commit> CODEOWNERS .github/CODEOWNERS docs/CODEOWNERS` prints nothing. |
 | B16 | No leftover agent-framework trees | None of `docs/superpowers/`, `.planning/`, `.cursor/rules/`, `.gaai/`, `yeti/` or `cairn/` at the root. `.claude/` holds only `settings.json`, `skills` and `session-summary.md`. | ADR-0071, [ADR-0025](../adr/0025-consolidate-repository-docs-into-docs.md), [ADR-0029](../adr/0029-acmm-conformance-via-canonical-aliases.md) | `git ls-tree --name-only <commit> docs/superpowers .planning .cursor/rules .gaai yeti cairn` prints nothing, and `git ls-tree --name-only <commit> .claude/` prints no other name. Skill payloads under `.agents/skills/` are not the root. |
+| B17 | README | The root `README.md` follows the [README spec](readme.md) for the kind that its marker declares: rules R1 to R12 (kind marker, title and lead, status line, documentation line, badges, the kind's sections, `Develop` and `Where to go next`, at most 1000 words, nothing that belongs in `docs/`). | [ADR-0072](../adr/0072-write-every-readme-to-one-standard.md) | From a core checkout at `origin/main`: `node .agents/skills/frostyard-readme/scripts/check-readme.mjs --ref <commit> <clone>` prints `ok`. Each `FAIL R<n>` line is 1 part of the finding. |
 
 ## Rules
 
@@ -66,5 +67,7 @@ check. Run each check in a clone of the repository at the commit you read
 
 - Rationale: [ADR-0071](../adr/0071-hold-every-code-repository-to-one-baseline.md),
   [ADR-0070](../adr/0070-build-tool-docs-sites-with-materialx-on-github-pages.md),
+  [ADR-0072](../adr/0072-write-every-readme-to-one-standard.md),
   [ADR-0073](../adr/0073-let-ci-run-the-make-ci-targets-as-separate-jobs.md) (row B12)
+- Row B17's contract: [spec: README](readme.md)
 - Context: [design: quality loop](../design/quality-loop.md)

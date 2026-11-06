@@ -1,84 +1,53 @@
+<!-- readme-kind: org -->
 # core
 
-The org-wide hub for the [frostyard](https://github.com/frostyard)
-organization. This repo hosts the shared material every frostyard project
-draws on — agent skills, templates, assets, org-level docs and machine-readable
-organization authority — and is the home
-for org-wide [issues](https://github.com/frostyard/core/issues) and
-[discussions](https://github.com/frostyard/core/discussions). It contains no
-product application code.
+core is the org-wide hub of the [frostyard](https://github.com/frostyard)
+organization. It holds the decisions, specs and plans that bind every
+frostyard repository, the agent skills and templates they share, and the
+machine-readable organization authority. It holds no product code.
 
-Built from [agentic-template](https://github.com/bketelsen/agentic-template):
-one canonical `AGENTS.md` instruction surface for every coding agent, a
-four-question docs taxonomy, and skills as first-class files.
+**Status:** in production.
 
-## What lives here
+**Documentation:** [docs/README.md](docs/README.md)
 
-- **`.agents/skills/`** — org-wide agent skills, shared across frostyard
-  repos (`.claude/skills` is a symlink). Includes the
-  [Frostyard design system](.agents/skills/frostyard-design/) (migrated from
-  the archived `frostyard/design-system` repo, history preserved) and the
-   [docs-site skill](.agents/skills/frostyard-docs-site/). See the
-   [shared-skills guide](docs/design/shared-skills.md) for discovery and
-   ownership.
-- **`templates/`** — document and repository templates for starting new
-  frostyard work.
-- **`assets/`** — shared assets: logos, badges, diagrams, and other common
-  media.
-- **`docs/`** — org-level documentation, split by the question it answers
-  (see [docs/README.md](docs/README.md)).
-- **`organization/`** — strict, versioned repository enrollment declarations,
-  canonical surface contracts, schemas, and conformance fixtures (see
-  [organization/README.md](organization/README.md)).
-- **Issues & Discussions** — org-wide planning, proposals, and conversation
-  that spans more than one repo.
+## What is here
 
-## Layout
+| Path | What it is |
+| --- | --- |
+| `docs/` | The org's ADRs, designs, specs and plans, by the question each answers ([index](docs/README.md)); [tenets](docs/tenets.md) come first |
+| `.agents/skills/` | The shared agent skills; the skills sync copies them to enrolled repositories ([shared skills](docs/design/shared-skills.md)) |
+| `organization/` | Repository declarations, contracts, schemas and fixtures ([organization authority](organization/README.md)) |
+| `templates/`, `assets/` | Document and repository templates; logos, badges and other shared media |
+| `scripts/`, `test/` | The validators of this repository and their tests |
 
-```
-AGENTS.md                     canonical agent instructions (the law)
-CLAUDE.md → AGENTS.md         symlink for Claude Code
-GEMINI.md → AGENTS.md         symlink for Gemini CLI
-.cursorrules → AGENTS.md      symlink for Cursor
-CONTRIBUTING.md → AGENTS.md   symlink for contributors
-.github/copilot-instructions.md → AGENTS.md
-.github/dependabot.yml        Dependabot (actions, npm)
-SECURITY.md                   private vulnerability reporting
-LICENSE                       MIT
-.agents/skills/               canonical skills; TEMPLATE/SKILL.md to copy
-.claude/skills → .agents/skills
-.memory/corrections.jsonl     corrections inbox (append-only)
-templates/                    doc & repo templates for new frostyard work
-assets/                       shared logos, badges, diagrams, media
-organization/                 machine-readable organization authority
-scripts/, test/               validators and their tests (npm run verify)
-docs/README.md                taxonomy + index (every doc gets a line)
-docs/adr/                     why — immutable decisions + TEMPLATE.md
-docs/design/                  how — living architecture docs + TEMPLATE.md
-docs/specs/                   what — testable contracts + TEMPLATE.md
-docs/plans/                   when — phased plans + TEMPLATE.md
+## Use
+
+- A frostyard repository carries the
+  [repository baseline](docs/specs/repository-baseline.md) and follows the
+  [ADRs](docs/README.md#decisions-adrs) that apply to it.
+- An agent in any frostyard repository follows the skill that
+  [AGENTS.md](AGENTS.md) names for its task.
+- An org-wide proposal starts as an
+  [issue](https://github.com/frostyard/core/issues) or a
+  [discussion](https://github.com/frostyard/core/discussions); a decision
+  becomes an ADR (frostyard-write-adr skill).
+
+## Develop
+
+```sh
+mise install   # the pinned Node and jq
+npm ci
+make ci        # what CI runs
 ```
 
-Symlinks require Linux/macOS (or `core.symlinks=true` on Windows); GitHub's
-web renderer shows symlinks as their target path, which is cosmetic only.
+Edit canonical paths only, start each branch from `main`, and declare the
+risk tier in the pull request; [AGENTS.md](AGENTS.md) has the rules.
+The aliases are symlinks: on Windows, clone with `core.symlinks=true`.
 
-## Contributing
+## Where to go next
 
-Make shared-material changes in this repository, not in a consuming project's
-copy. Start from a fresh branch off `main`; do not stack a branch on another
-PR branch.
-
-1. Edit canonical paths only. `AGENTS.md` is the source for the instruction
-   aliases (including `CONTRIBUTING.md`), and `.agents/skills/` is the source
-   for the `.claude/skills` alias.
-2. Put docs in the appropriate `docs/` category, start new docs from that
-   category's `TEMPLATE.md`, add them to `docs/README.md`, and maintain the
-   required cross-links. Update skills, templates, and assets at their
-   canonical paths.
-3. Run `mise install && npm ci && npm run check` at the root. When changing
-   the docs-site skill, also run
-   `node --test .agents/skills/frostyard-docs-site/tests/*.test.mjs` at the
-   root.
-4. Open a PR from the branch, declare its risk tier, and complete the
-   applicable housekeeping items in the PR template. Core squash-merges PRs;
-   do not merge your own change.
+- [AGENTS.md](AGENTS.md): the rules for agents and contributors.
+- [docs/README.md](docs/README.md): the index of decisions, designs, specs
+  and plans.
+- [SECURITY.md](SECURITY.md): report a vulnerability privately.
+- [LICENSE](LICENSE): MIT.

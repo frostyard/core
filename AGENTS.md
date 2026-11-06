@@ -70,6 +70,13 @@ Start from .agents/skills/TEMPLATE/SKILL.md. -->
   a task graph of one-PR tasks with evidence-shaped acceptance and release
   tasks at version boundaries, Brian's approval of one revision, then
   delivery and a whole-plan verification.
+- **Writing, fixing or reviewing a repository's root `README.md` (a sweep
+  issue for baseline row B17, a new repository)** →
+  [.agents/skills/frostyard-readme/SKILL.md](.agents/skills/frostyard-readme/SKILL.md)
+  — 1 template for each of 10 kinds, content moved to the docs site or
+  `docs/`, and a read-only checker for rules R1 to R12
+  ([ADR-0072](docs/adr/0072-write-every-readme-to-one-standard.md),
+  [README spec](docs/specs/readme.md)).
 - **Releasing a suite app (frostnotes, frostmail, frostread, lodge,
   porter): Flatpak candidate, clean-desktop gate, promotion and listing;
   the daemon's attested `.deb` and its snosi sysext** →
@@ -105,16 +112,18 @@ Start from .agents/skills/TEMPLATE/SKILL.md. -->
   ([ADR-0019](docs/adr/0019-governance-as-code-and-risk-tiers.md)).
 - Every frostyard code repository carries the
   [repository baseline](docs/specs/repository-baseline.md) (rows `B1` to
-  `B16`: instruction surface, corrections inbox, docs shape, make gate,
+  `B17`: instruction surface, corrections inbox, docs shape, make gate,
   pinned actions, risk paths, PR template, svu, tool docs site, license,
   fleet Go toolchain, `ci.yml`, Dependabot, `SECURITY.md`, no `CODEOWNERS`,
-  no leftover agent-framework trees), with its named exemptions
-  ([ADR-0071](docs/adr/0071-hold-every-code-repository-to-one-baseline.md)).
+  no leftover agent-framework trees, README), with its named exemptions
+  ([ADR-0071](docs/adr/0071-hold-every-code-repository-to-one-baseline.md),
+  [ADR-0072](docs/adr/0072-write-every-readme-to-one-standard.md)).
   The weekly conformance sweep files the gaps; a new row needs a new ADR.
   A row that restates an existing ADR keeps that ADR's full scope and every
   file it requires (B4 names `mise.toml` and `mise.lock` because ADR-0043
   does); narrowing a row needs an ADR that amends the cited one.
-  `test/no-leftover-agent-trees.test.mjs` holds core itself to row B16.
+  `test/no-leftover-agent-trees.test.mjs` holds core itself to row B16, and
+  `test/readme-check.test.mjs` holds core's `README.md` to row B17.
 - ADRs record the decision, not how it was reached. State context, decision,
   and consequences as facts. No narration of who asked, who was consulted, or
   the author's process; that belongs in the PR description

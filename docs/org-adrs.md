@@ -52,6 +52,10 @@ names what the decision binds in core and where it lives here.
   agent-framework tree. [test/repository-baseline.test.mjs](../test/repository-baseline.test.mjs)
   and [test/no-leftover-agent-trees.test.mjs](../test/no-leftover-agent-trees.test.mjs)
   hold core to the rows.
+- [ADR-0072 — Write every README to one standard](adr/0072-write-every-readme-to-one-standard.md)
+  — core's [README](../README.md) is of the `org` kind (row B17);
+  [test/readme-check.test.mjs](../test/readme-check.test.mjs) holds it to
+  the [README spec](specs/readme.md).
 - [ADR-0073 — Let CI run the `make ci` targets as separate jobs](adr/0073-let-ci-run-the-make-ci-targets-as-separate-jobs.md)
   — core uses the first form: 1 `make ci` step in
   [ci.yml](../.github/workflows/ci.yml); `ciCoverageGaps` in

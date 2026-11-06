@@ -62,11 +62,13 @@ PR template ──► review rubric ──► CI gates ──► corrections ─
   `fleet-conventions` job.
 - **Sweep (every code repository)** — the
   [repository baseline](../specs/repository-baseline.md) lists, as rows
-  `B1` to `B16`, what every frostyard code repository carries
+  `B1` to `B17`, what every frostyard code repository carries
   ([ADR-0071](../adr/0071-hold-every-code-repository-to-one-baseline.md)),
   including the tool docs site
-  ([ADR-0070](../adr/0070-build-tool-docs-sites-with-materialx-on-github-pages.md))
-  and the fleet Go and golangci-lint versions. The weekly conformance sweep
+  ([ADR-0070](../adr/0070-build-tool-docs-sites-with-materialx-on-github-pages.md)),
+  the fleet Go and golangci-lint versions, and the README
+  ([ADR-0072](../adr/0072-write-every-readme-to-one-standard.md),
+  [README spec](../specs/readme.md)). The weekly conformance sweep
   reads it at core's `origin/main` and files one `sweep` issue for each
   failed row; owners fix the gaps in normal work. The organization gate
   stays the presence check above.
@@ -140,11 +142,13 @@ copy it as-is.
   [ADR-0043](../adr/0043-pin-repository-tools-in-mise-and-name-the-verify-gate.md),
   [ADR-0044](../adr/0044-expose-the-make-gate-triad-in-every-repository.md),
   [ADR-0070](../adr/0070-build-tool-docs-sites-with-materialx-on-github-pages.md),
-  [ADR-0071](../adr/0071-hold-every-code-repository-to-one-baseline.md)
+  [ADR-0071](../adr/0071-hold-every-code-repository-to-one-baseline.md),
+  [ADR-0072](../adr/0072-write-every-readme-to-one-standard.md)
 - Contracts: [specs/pr-review-rubric.md](../specs/pr-review-rubric.md),
   [specs/pr-acceptance-metric.md](../specs/pr-acceptance-metric.md),
   [specs/risk-paths.md](../specs/risk-paths.md),
   [specs/flaky-test-scan.md](../specs/flaky-test-scan.md),
-  [specs/repository-baseline.md](../specs/repository-baseline.md)
+  [specs/repository-baseline.md](../specs/repository-baseline.md),
+  [specs/readme.md](../specs/readme.md)
 - Built in: the 2026-08-12 ACMM conformance PR
   (closes [core#22–#41](https://github.com/frostyard/core/issues/22))
