@@ -92,6 +92,7 @@ which baseline rows do not apply here.
 - [0071 — Hold every code repository to one baseline](adr/0071-hold-every-code-repository-to-one-baseline.md)
 - [0072 — Write every README to one standard](adr/0072-write-every-readme-to-one-standard.md)
 - [0073 — Let CI run the `make ci` targets as separate jobs](adr/0073-let-ci-run-the-make-ci-targets-as-separate-jobs.md)
+- [0074 — Publish verified fault records as public issues in the owner repository](adr/0074-publish-verified-fault-records-as-public-issues.md)
 
 ### Design
 

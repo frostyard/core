@@ -1,6 +1,7 @@
 # Problem reports
 
-Living document. Rationale: [ADR-0069](../adr/0069-report-problems-local-first-opt-in-with-one-sender-per-host.md).
+Living document. Rationale: [ADR-0069](../adr/0069-report-problems-local-first-opt-in-with-one-sender-per-host.md),
+[ADR-0074](../adr/0074-publish-verified-fault-records-as-public-issues.md).
 Contracts: [specs/problem-report.md](../specs/problem-report.md).
 
 ## Overview
@@ -52,6 +53,15 @@ system sources ──► snosi-health ──► /var/lib/snosi-health/problems.j
 - **Validation in depth.** Writers map unknown values to `other`; readers
   drop records that fail the spec; the Worker rejects a document that fails
   the schema.
+- **Public fault issues.** A triage job in frostyard/problem-intake may open
+  1 public GitHub issue (label `problem-report`) for each problem key in the
+  repository that owns the faulty code. It publishes only the closed list of
+  public fields of
+  [ADR-0074](../adr/0074-publish-verified-fault-records-as-public-issues.md),
+  each verified against a public source, and only for problems first seen on
+  or after the cutoff that the frostyard.org privacy page states. The job is
+  not built yet; frostyard/problem-intake `docs/specs/triage.md` will hold its
+  contract.
 
 ## Operational notes
 
@@ -63,7 +73,8 @@ system sources ──► snosi-health ──► /var/lib/snosi-health/problems.j
 
 ## References
 
-- Rationale: [ADR-0069](../adr/0069-report-problems-local-first-opt-in-with-one-sender-per-host.md)
+- Rationale: [ADR-0069](../adr/0069-report-problems-local-first-opt-in-with-one-sender-per-host.md),
+  [ADR-0074](../adr/0074-publish-verified-fault-records-as-public-issues.md)
 - Contracts: [specs/problem-report.md](../specs/problem-report.md)
 - Built in: the problem-reporting plan of the Desk, which tracks the work in
   each repository listed above

@@ -10,7 +10,10 @@ the registry of the local journal records that frostyard apps write: the fixed
 readers), `snosi-health` (collector and Floe sender), chairlift (reader and
 desktop sender), the intake Worker in `frostyard/problem-intake` (validator),
 and frostyard.org (the published copy and the privacy page). The decision
-behind it is [ADR-0069](../adr/0069-report-problems-local-first-opt-in-with-one-sender-per-host.md);
+behind it is [ADR-0069](../adr/0069-report-problems-local-first-opt-in-with-one-sender-per-host.md),
+amended in part by
+[ADR-0074](../adr/0074-publish-verified-fault-records-as-public-issues.md)
+(public fault issues, rule 12);
 [the problem reports design](../design/problem-reports.md) shows where each
 piece fits.
 
@@ -224,6 +227,17 @@ never go into a report.
 11. **The test.** `test/problem-report-schema.test.mjs` validates every example
     and rejects the negative cases. It pins the sha256 of `v1.json`, so a
     change to the file also changes the test.
+12. **Publication.** A raw report is never published. Besides the weekly
+    aggregates of ADR-0069 (cells from 1 to 4 and their complementary cells
+    suppressed), report values reach the public only in a public fault issue
+    by
+    [ADR-0074](../adr/0074-publish-verified-fault-records-as-public-issues.md):
+    only the public fields of its kind in that ADR's closed list, each value
+    verified against a public source first, and only for a problem first seen
+    on or after the cutoff. A fault issue, its comments and the triage job's
+    public status never hold a `report_id`, an event ID, a `week`, a `client`,
+    a count (also the S6 `count` and `retries`), a day, a `bootc_version` or
+    `shipped`. `crash` and `count` reports are never filed as issues.
 
 ## Derived artifacts
 
@@ -235,10 +249,12 @@ never go into a report.
 | std `problems` test vectors (Go and Rust) | Journal fields and S8 payload fields from the registry above |
 | `snosi-health` `problems.json` | Holds only report fields of S1–S8, by this spec |
 | chairlift report envelope and hints | The envelope and the enums above |
+| Public fault issue (label `problem-report`, owner repository), by the frostyard/problem-intake triage job | Only the public fields of [ADR-0074](../adr/0074-publish-verified-fault-records-as-public-issues.md), each verified against a public source (rule 12) |
 
 ## References
 
-- Rationale: [ADR-0069](../adr/0069-report-problems-local-first-opt-in-with-one-sender-per-host.md)
+- Rationale: [ADR-0069](../adr/0069-report-problems-local-first-opt-in-with-one-sender-per-host.md),
+  [ADR-0074](../adr/0074-publish-verified-fault-records-as-public-issues.md)
 - Context: [design/problem-reports.md](../design/problem-reports.md)
 - Builds on: [ADR-0006](../adr/0006-os-artifact-versions-are-utc-timestamps.md),
   [ADR-0015](../adr/0015-os-release-image-identity.md),

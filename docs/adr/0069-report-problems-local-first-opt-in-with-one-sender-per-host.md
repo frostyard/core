@@ -120,3 +120,4 @@ the schema copy and the aggregates). They need 1 contract.
   [ADR-0015](0015-os-release-image-identity.md),
   [ADR-0016](0016-reverse-dns-org-frostyard-identifiers.md),
   [ADR-0046](0046-rename-cayo-server-image-to-floe.md)
+- Amended in part by: [ADR-0074](0074-publish-verified-fault-records-as-public-issues.md)
