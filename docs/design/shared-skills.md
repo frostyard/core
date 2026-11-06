@@ -161,16 +161,6 @@ vendored skill. Each `SKILL.md` opens with an attribution and a
   `golang-documentation` links `#readmemd` and `#distribution`, and
   `golang-troubleshooting/references/methodology.md` links `../SKILL.md`
   (upstream's anchors and path do not resolve).
-- Code spans: a docs gate that does not read code spans takes a generic
-  call such as `errors.AsType[T]` with its argument list in 1 code span for
-  a link. `golang-error-handling`, `golang-safety` and
-  `golang-modernize/references/versions.md` write those 3 generic calls as
-  the code span `X[T]` followed by `(v)`, each with a marked HTML comment.
-  Core's gate (`scripts/check-docs.mjs`) ignores link-shaped text inside a
-  code span, but the docs gates of updex and std check every Markdown file,
-  the synced skills too, and do not read code spans yet. A refresh keeps
-  these edits until every consumer gate that checks `.agents/skills` reads
-  code spans; then 1 pull request removes them.
 
 ### Description budget
 
