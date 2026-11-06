@@ -54,28 +54,69 @@ export function missingEcosystems(files, dependabotText) {
 // Only the commands of `run:` steps count: comments, step names and other
 // keys do not.
 export function workflowCommands(workflowText) {
+  const indentOf = (line) => line.length - line.trimStart().length;
+  // Shell comments: from an unquoted # at the start or after a blank.
+  const stripShellComment = (line) => {
+    let quote = null;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (quote) {
+        if (c === quote) quote = null;
+      } else if (c === "'" || c === '"') {
+        quote = c;
+      } else if (c === "#" && (i === 0 || /\s/.test(line[i - 1]))) {
+        return line.slice(0, i).trim();
+      }
+    }
+    return line.trim();
+  };
   const lines = workflowText.split("\n");
   const commands = [];
+  let stepsIndent = -1; // indent of the current `steps:` key
+  let itemIndent = -1; // indent of the `-` of the steps' list items
   for (let i = 0; i < lines.length; i++) {
-    const step = /^(\s*)(?:-\s+)?run:\s*(.*)$/.exec(lines[i]);
-    if (!step) continue;
-    const value = step[2].replace(/\s+#.*$/, "").trim();
-    if (value !== "" && !/^[|>][-+]?$/.test(value)) {
-      commands.push(value.replace(/^(["'])(.*)\1$/, "$2"));
+    const line = lines[i];
+    if (line.trim() === "" || line.trim().startsWith("#")) continue;
+    const indent = indentOf(line);
+    if (stepsIndent >= 0 && indent <= stepsIndent) stepsIndent = itemIndent = -1;
+    if (/^\s*steps:\s*$/.test(line)) {
+      stepsIndent = indent;
       continue;
     }
-    // A block scalar: the lines indented deeper than the key.
-    const keyIndent = lines[i].indexOf("run:");
+    if (stepsIndent < 0) continue;
+    const item = /^(\s*)-\s+(.*)$/.exec(line);
+    if (item && (itemIndent < 0 || item[1].length === itemIndent)) itemIndent = item[1].length;
+    // A step's own `run` key: on the `-` line, or at the item's key indent.
+    let value = null;
+    let keyIndent = -1;
+    if (item && item[1].length === itemIndent && /^run:/.test(item[2])) {
+      value = item[2].slice(4);
+      keyIndent = itemIndent + 2;
+    } else if (itemIndent >= 0 && indent === itemIndent + 2 && /^\s*run:/.test(line)) {
+      value = line.trim().slice(4);
+      keyIndent = indent;
+    }
+    if (value === null) continue;
+    value = value.replace(/\s+#.*$/, "").trim();
+    const block = /^([|>])[-+]?$/.exec(value);
+    if (!block) {
+      const command = stripShellComment(value.replace(/^(["'])(.*)\1$/, "$2"));
+      if (command) commands.push(command);
+      continue;
+    }
+    // A block scalar: the lines indented deeper than the key. A literal (|)
+    // block runs each line; a folded (>) block joins its lines into 1 command.
+    const body = [];
     for (i += 1; i < lines.length; i++) {
-      const line = lines[i];
-      if (line.trim() === "") continue;
-      if (line.length - line.trimStart().length <= keyIndent) {
+      if (lines[i].trim() === "") continue;
+      if (indentOf(lines[i]) <= keyIndent) {
         i -= 1;
         break;
       }
-      const command = line.trim();
-      if (!command.startsWith("#")) commands.push(command);
+      body.push(lines[i].trim());
     }
+    const blockCommands = block[1] === ">" ? [body.join(" ")] : body;
+    for (const command of blockCommands.map(stripShellComment)) if (command) commands.push(command);
   }
   return commands;
 }
@@ -273,6 +314,23 @@ test("B12: ciCoverageGaps counts only the commands of run steps, whole", () => {
   // Block scalars count line by line, without their comments.
   const block = "on: [pull_request]\njobs:\n  a:\n    steps:\n      - run: |\n          # make ci\n          make verify\n          go test -race ./...\n          go vet ./...\n";
   assert.deepEqual(ciCoverageGaps(makefile, block), []);
+});
+
+test("B12: ciCoverageGaps ignores run keys outside steps, folded text and shell comments", () => {
+  const makefile = "ci: verify\n";
+  const covered = "on: [pull_request]\njobs:\n  a:\n    steps:\n      - name: gate\n        run: make verify\n";
+  assert.deepEqual(ciCoverageGaps(makefile, covered), []);
+  // A `run` key under env is not a step command.
+  const envRun = "on: [pull_request]\nenv:\n  run: make ci\njobs:\n  a:\n    env:\n      run: make verify\n    steps:\n      - name: other\n        env:\n          run: make verify\n        run: echo\n";
+  assert.deepEqual(ciCoverageGaps(makefile, envRun), ["make verify"]);
+  // A folded block is 1 command: here it only prints text.
+  const folded = "on: [pull_request]\njobs:\n  a:\n    steps:\n      - run: >\n          echo\n          make verify\n";
+  assert.deepEqual(ciCoverageGaps(makefile, folded), ["make verify"]);
+  // A shell comment in a block line hides nothing, and a quoted # is kept.
+  const comment = "on: [pull_request]\njobs:\n  a:\n    steps:\n      - run: |\n          echo skipped # ; make ci\n          echo '#' ; make verify\n";
+  assert.deepEqual(ciCoverageGaps(makefile, comment), []);
+  const commentOnly = comment.replace("echo '#' ; make verify", "echo done");
+  assert.deepEqual(ciCoverageGaps(makefile, commentOnly), ["make verify"]);
 });
 
 test("B12: core's ci.yml runs make ci on pull requests", () => {
