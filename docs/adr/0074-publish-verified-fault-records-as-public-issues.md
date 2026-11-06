@@ -53,12 +53,14 @@ a fault issue is not a report and holds no value that only a report proves.
 - **1 issue for each problem key.** The problem-intake triage job opens at most
   1 GitHub issue for each problem key, in the repository that owns the faulty
   code (routing by kind and `app_id`), with the label `problem-report`. The
-  job runs at most once a day, so an issue's creation time tells no more
-  than the day of a report. The
-  problem key is the first 16 hex characters of the SHA-256 of the GlitchTip
-  fingerprint above; the key itself is published, the fingerprint values
-  only as the table below allows. frostyard/problem-intake
-  `docs/specs/triage.md` defines it.
+  job runs at most once a day. The problem key is computed only from
+  published values: the first 16 hex characters of the SHA-256 of the
+  fingerprint `[kind, class, ...groupKey]` with each value in its published
+  form (a frame of another module as its top package name). So the key holds
+  nothing that the issue does not show, and a guess cannot be tested against
+  a raw value. The GlitchTip fingerprint of the raw values stays internal;
+  several GlitchTip issues can map to 1 problem key. frostyard/problem-intake
+  `docs/specs/triage.md` defines the exact form.
 - **Closed list of public fields.** Every issue holds the kind, the class, and
   the newest verified version: the app version for `app_problem`, else each
   image id with its newest verified image version (1 problem key can cover
