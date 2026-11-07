@@ -180,3 +180,5 @@ against.
   [ADR-0070](0070-build-tool-docs-sites-with-materialx-on-github-pages.md)
 - Amended in part by: [ADR-0073](0073-let-ci-run-the-make-ci-targets-as-separate-jobs.md)
   (item 12, CI entry: separate jobs can run the parts of `make ci`)
+- Amended in part by: [ADR-0075](0075-batch-routine-pull-requests.md)
+  (item 13, Dependabot: each entry groups its version updates)

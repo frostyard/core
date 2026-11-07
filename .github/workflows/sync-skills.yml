@@ -1,17 +1,12 @@
 # Pushes core-managed agent skills to consuming repos as PRs (ADR-0026).
-# Runs on skill changes, weekly (drift catch), and manual dispatch.
+# Runs once a day at 05:23 UTC (before 07:00 America/New_York all year) and
+# on manual dispatch for an urgent sync; no push trigger, so several skill
+# changes on 1 day make 1 sync push in each consumer (ADR-0075).
 name: Sync agent skills
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - ".agents/skills/**"
-      - ".github/skills-sync.json"
-      - ".github/workflows/sync-skills.yml"
-      - "scripts/sync-skills.sh"
   schedule:
-    - cron: "23 5 * * 1"
+    - cron: "23 5 * * *"
   workflow_dispatch: {}
 
 permissions: {}

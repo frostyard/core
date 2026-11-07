@@ -100,8 +100,9 @@ assigning the repository to an agent's roster (Brian's decision: an ask).
    - `npm run check:fleet` in core reports `ok OWNER/NAME`.
    - The dry run of `apply-repo-settings.sh` with the same checks prints no
      `WOULD` line.
-   - The next skills-sync run (a dispatch, the Monday cron, or the merge of
-     the core PR) opens `chore: sync agent skills from frostyard/core` in the
+   - The next skills-sync run (a dispatch, or the daily run at 05:23 UTC;
+     [ADR-0075](https://github.com/frostyard/core/blob/main/docs/adr/0075-batch-routine-pull-requests.md))
+     opens `chore: sync agent skills from frostyard/core` in the
      repository, and its CI is green.
    Report the run URLs and PR links.
 

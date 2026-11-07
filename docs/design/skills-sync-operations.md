@@ -1,7 +1,8 @@
 # Skills sync operations
 
 Living document. Rationale:
-[ADR-0026](../adr/0026-distribute-core-skills-via-sync-prs.md).
+[ADR-0026](../adr/0026-distribute-core-skills-via-sync-prs.md) and
+[ADR-0075](../adr/0075-batch-routine-pull-requests.md) (the daily trigger).
 Executable contracts:
 [skills-sync.json](../../.github/skills-sync.json),
 [sync-skills.yml](../../.github/workflows/sync-skills.yml), and
@@ -89,11 +90,16 @@ and PR body rather than the marker, avoiding marker-only diffs after unrelated
 core commits.
 
 If the staged skill tree changed, the script recreates
-`chore/sync-core-skills` from the freshly cloned default branch, commits as
-`frostyard-core[bot] <core@frostyard.invalid>`, and force-pushes that reserved
-branch. A run that finds a change rebuilds the branch from the current
-default branch, so a dispatch or the weekly run brings a stale sync PR up to
-date. A run that finds no change (`== REPO: up to date`) leaves the branch
+`chore/sync-core-skills` from the freshly cloned default branch and commits as
+`frostyard-core[bot] <core@frostyard.invalid>`. It then reads the remote
+reserved branch. When that branch already holds the same tree on the same
+parent (the current default-branch tip), the script does not push it
+(`== REPO: sync branch already current`), so the daily run does not restart
+CI on an unchanged open sync PR
+([ADR-0075](../adr/0075-batch-routine-pull-requests.md)). Otherwise it
+force-pushes the reserved branch. A run that finds a change rebuilds the
+branch from the current default branch, so a dispatch or the daily run
+brings a stale sync PR up to date. A run that finds no change (`== REPO: up to date`) leaves the branch
 and any open sync PR as they are; that PR is then obsolete. An existing open
 PR from the branch is thereby updated; otherwise the script opens one. The automation never pushes to a consumer's default branch,
 and the PR must pass that repository's normal review and merge gate. Human
@@ -102,9 +108,12 @@ replaces it.
 
 ### Trigger and authentication contract
 
-The workflow runs after a push to core's `main` that changes a skill, the
-config, the workflow, or the script. It also runs at 05:23 UTC every Monday
-to catch drift and accepts manual dispatches. A single concurrency group lets
+The workflow runs once a day at 05:23 UTC (before 07:00 America/New_York all
+year) and on a manual dispatch for an urgent sync
+(`gh workflow run sync-skills.yml --repo frostyard/core`). It has no push
+trigger: all core skill changes of 1 day reach each consumer in 1 push
+([ADR-0075](../adr/0075-batch-routine-pull-requests.md), which amends
+ADR-0026's trigger). A single concurrency group lets
 one run finish before another begins; in-progress runs are not cancelled.
 
 The workflow maps the core Actions secret `SKILLS_SYNC_TOKEN` to the script's required
@@ -198,6 +207,7 @@ error that exits immediately.
 
 - Rationale:
   [ADR-0026](../adr/0026-distribute-core-skills-via-sync-prs.md),
+  [ADR-0075](../adr/0075-batch-routine-pull-requests.md) (the daily trigger),
   [ADR-0019](../adr/0019-governance-as-code-and-risk-tiers.md),
   [ADR-0021](../adr/0021-sha-pinned-actions-and-least-privilege-ci.md),
   [ADR-0045](../adr/0045-guard-actions-secret-expiry-in-the-repository.md),

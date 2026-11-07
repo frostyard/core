@@ -1,7 +1,8 @@
 # Shared skills
 
 Living document. Rationale:
-[ADR-0026](../adr/0026-distribute-core-skills-via-sync-prs.md).
+[ADR-0026](../adr/0026-distribute-core-skills-via-sync-prs.md) and
+[ADR-0075](../adr/0075-batch-routine-pull-requests.md) (the daily trigger).
 Executable contracts:
 [AGENTS.md](../../AGENTS.md) and
 [skills-sync.json](../../.github/skills-sync.json).
@@ -235,7 +236,7 @@ check instead.
    sync again (`gh workflow run sync-skills.yml --repo frostyard/core`). When
    the default branch still differs from core in a managed skill, the run
    recreates the branch from the current default branch; then check the new
-   head. The weekly run also does this. When the run log says
+   head. The daily run at 05:23 UTC also does this. When the run log says
    `== REPO: up to date`, the default branch already holds core's managed
    skills: the run leaves the branch as it was, and the stale pull request
    is obsolete. Close it after a check that the default branch's managed
@@ -243,7 +244,9 @@ check instead.
 5. The repository's CI is green at that head.
 
 When all 5 hold, the owner adds `ready-for-human`. A new push to the sync
-branch (each core skill change force-updates it) means the label comes off
+branch (the daily run force-updates it when core's skills or the default
+branch changed; it does not push a branch that is already current) means the
+label comes off
 until the check passes again at the new head. In a consumer without a merge
 queue, a new commit on the default branch before the merge also makes step 4
 fail; the label comes off until a new sync run passes the check. A pull
@@ -255,6 +258,7 @@ run creates another one.
 
 - Rationale:
   [ADR-0026](../adr/0026-distribute-core-skills-via-sync-prs.md);
+  [ADR-0075](../adr/0075-batch-routine-pull-requests.md) (the daily trigger);
   [ADR-0070](../adr/0070-build-tool-docs-sites-with-materialx-on-github-pages.md)
   (the `frostyard-docs-site` skill);
   [ADR-0071](../adr/0071-hold-every-code-repository-to-one-baseline.md)

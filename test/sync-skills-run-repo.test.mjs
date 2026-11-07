@@ -21,8 +21,8 @@ const repoLibPath = path.join(repoRoot, "scripts/lib/skills-sync-repo.sh");
 const FAKE_TOKEN = "fake-test-token-do-not-use-1234567890";
 
 // Stub `git` and `gh` so these tests never touch the network or GitHub:
-// every subcommand that would otherwise reach github.com (clone, push, pr
-// list/create) is faked and logged; every other subcommand (init, add,
+// every subcommand that would otherwise reach github.com (clone, ls-remote,
+// push, pr list/create) is faked and logged; every other subcommand (init, add,
 // diff, checkout, commit) runs the real git binary against the local
 // scratch clone so the function's real control flow is exercised.
 const GIT_STUB = `#!/usr/bin/env bash
@@ -54,6 +54,11 @@ case "$subcmd" in
     if [ -n "\${SYNC_TEST_ESCAPE_TARGET:-}" ]; then
       ln -s "$SYNC_TEST_ESCAPE_TARGET" "$dest/.agents"
     fi
+    ;;
+  ls-remote)
+    # The stub clone has no origin and so no sync branch: answer as
+    # \`ls-remote --exit-code\` does for a missing ref.
+    exit 2
     ;;
   push)
     if [ -n "\${SYNC_TEST_PUSH_FAIL:-}" ]; then
