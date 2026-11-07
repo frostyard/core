@@ -36,9 +36,10 @@ a day. The cost is the number of pull requests, not the merge time of each.
 ## Decision
 
 - **Dependabot groups version updates.** Each `updates` entry in
-  `.github/dependabot.yml` has a `groups` entry with 1 group whose
+  `.github/dependabot.yml` has a `groups` entry with exactly 1 group, whose
   `patterns` is `["*"]`, so each entry makes at most 1 version-update pull
-  request for each run. The group has no `applies-to: security-updates`;
+  request for each run. A second group (for example a specific group beside
+  the catch-all) makes a second pull request and is not allowed. The group has no `applies-to: security-updates`;
   security updates stay ungrouped. The rest of ADR-0071 item 13 stays (1
   entry for `github-actions` and 1 for each other ecosystem with a
   manifest; `site/requirements.txt` is refreshed by the hygiene line).
