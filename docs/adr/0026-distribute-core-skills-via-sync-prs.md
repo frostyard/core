@@ -76,3 +76,5 @@ recurse them.
   [ADR-0018](0018-org-wide-agent-instruction-and-knowledge-surfaces.md),
   [ADR-0021](0021-sha-pinned-actions-and-least-privilege-ci.md) (the
   workflow follows its pinning/permissions rules)
+- Amended in part by: [ADR-0075](0075-batch-routine-pull-requests.md)
+  (the sync trigger: once a day and on dispatch, no push trigger)

@@ -81,6 +81,96 @@ test("a changed managed skill follows the sync branch and pull-request path", as
   assert.equal(marker, syncedMarker("demo"));
 });
 
+// The sync runs once a day (ADR-0075). It updates an open sync PR when the
+// content or the base changes, never opens a second PR, and does not push a
+// sync branch that already holds the same tree on the same parent: an
+// unchanged push restarts the PR's CI and removes its readiness label.
+test("an open sync PR and a changed skill: the run pushes the branch and opens no second PR", async () => {
+  const fixture = await createFixture();
+  await seedConsumerRemote(fixture.remotesDir, "consumer", { "README.md": "seed\n" });
+  await runSync(fixture);
+  await commitCoreSkill(fixture, "demo", "# Demo v2\n");
+  await writeFile(fixture.log, "");
+
+  const { stdout } = await runSync(fixture, { SYNC_SKILLS_TEST_GH_PR_LIST_OUTPUT: "7" });
+
+  assert.match(stdout, /consumer: PR #7 already open — branch force-updated/);
+  const invocations = await readLog(fixture.log);
+  assert.ok(
+    invocations.some((line) => isGitSubcommand(line, "push")),
+    `expected a push, got: ${invocations.join("\n")}`,
+  );
+  assert.equal(invocations.some((line) => line.startsWith("gh pr create ")), false);
+  const pushed = await cloneSyncBranch(fixture);
+  assert.equal(
+    await readFile(path.join(pushed, ".agents/skills/demo/SKILL.md"), "utf8"),
+    "# Demo v2\n",
+  );
+});
+
+test("an open sync PR with no change in core or in the consumer: the run pushes nothing", async () => {
+  const fixture = await createFixture();
+  await seedConsumerRemote(fixture.remotesDir, "consumer", { "README.md": "seed\n" });
+  await runSync(fixture);
+  const before = await remoteRef(fixture, "chore/sync-core-skills");
+  await writeFile(fixture.log, "");
+
+  const { stdout } = await runSync(fixture, { SYNC_SKILLS_TEST_GH_PR_LIST_OUTPUT: "7" });
+
+  assert.match(stdout, /consumer: sync branch already current/);
+  assert.match(stdout, /consumer: PR #7 already open — branch unchanged/);
+  const invocations = await readLog(fixture.log);
+  assert.equal(
+    invocations.some((line) => isGitSubcommand(line, "push")),
+    false,
+    `expected no push, got: ${invocations.join("\n")}`,
+  );
+  assert.equal(invocations.some((line) => line.startsWith("gh pr create ")), false);
+  assert.equal(await remoteRef(fixture, "chore/sync-core-skills"), before);
+});
+
+test("a current sync branch with no open PR gets a new PR and no push", async () => {
+  const fixture = await createFixture();
+  await seedConsumerRemote(fixture.remotesDir, "consumer", { "README.md": "seed\n" });
+  await runSync(fixture);
+  await writeFile(fixture.log, "");
+
+  await runSync(fixture);
+
+  const invocations = await readLog(fixture.log);
+  assert.equal(invocations.some((line) => isGitSubcommand(line, "push")), false);
+  assert.ok(
+    invocations.some((line) => line.startsWith("gh pr create ")),
+    `expected a pr create, got: ${invocations.join("\n")}`,
+  );
+});
+
+test("an open sync PR and a moved consumer default branch: the run rebuilds the branch on the new tip", async () => {
+  const fixture = await createFixture();
+  await seedConsumerRemote(fixture.remotesDir, "consumer", { "README.md": "seed\n" });
+  await runSync(fixture);
+  await commitConsumerMain(fixture, "consumer", { "NEWS.md": "news\n" });
+  const tip = await remoteRef(fixture, "main");
+  await writeFile(fixture.log, "");
+
+  const { stdout } = await runSync(fixture, { SYNC_SKILLS_TEST_GH_PR_LIST_OUTPUT: "7" });
+
+  assert.match(stdout, /consumer: PR #7 already open — branch force-updated/);
+  const invocations = await readLog(fixture.log);
+  assert.ok(
+    invocations.some((line) => isGitSubcommand(line, "push")),
+    `expected a push, got: ${invocations.join("\n")}`,
+  );
+  assert.equal(invocations.some((line) => line.startsWith("gh pr create ")), false);
+  const { stdout: parent } = await execFileAsync("git", [
+    "--git-dir",
+    path.join(fixture.remotesDir, "consumer.git"),
+    "rev-parse",
+    "chore/sync-core-skills^",
+  ]);
+  assert.equal(parent.trim(), tip);
+});
+
 // A repository entry (or `defaults`) may name a group as "@<name>"; the script
 // replaces it with that group's skills before it syncs anything.
 test("a repository entry naming a group syncs every skill in the group", async () => {
@@ -345,6 +435,37 @@ async function readLog(log) {
 
 function coreSkillContent(skill) {
   return skill === "demo" ? "# Demo\n" : `# ${skill}\n`;
+}
+
+// commits a new version of a core skill, as a push to core `main` does.
+async function commitCoreSkill({ coreRepo }, skill, content) {
+  await writeFile(path.join(coreRepo, ".agents/skills", skill, "SKILL.md"), content);
+  await execFileAsync("git", ["commit", "--quiet", "-am", `change ${skill}`], { cwd: coreRepo });
+}
+
+// adds a commit to a consumer's default branch in its bare fixture remote.
+async function commitConsumerMain({ remotesDir }, name, files) {
+  const working = await mkdtemp(path.join(os.tmpdir(), `sync-skills-move-${name}-`));
+  await execFileAsync("git", ["clone", "--quiet", path.join(remotesDir, `${name}.git`), working]);
+  await execFileAsync("git", ["config", "user.email", "test@example.com"], { cwd: working });
+  await execFileAsync("git", ["config", "user.name", "Sync Skills Test"], { cwd: working });
+  for (const [relPath, content] of Object.entries(files)) {
+    await writeFile(path.join(working, relPath), content);
+  }
+  await execFileAsync("git", ["add", "-A"], { cwd: working });
+  await execFileAsync("git", ["commit", "--quiet", "-m", "move main"], { cwd: working });
+  await execFileAsync("git", ["push", "--quiet", "origin", "main"], { cwd: working });
+}
+
+// reads a branch tip of the consumer's bare fixture remote.
+async function remoteRef({ remotesDir }, ref) {
+  const { stdout } = await execFileAsync("git", [
+    "--git-dir",
+    path.join(remotesDir, "consumer.git"),
+    "rev-parse",
+    ref,
+  ]);
+  return stdout.trim();
 }
 
 // clones the pushed sync branch so a test can read the mirrored skills.

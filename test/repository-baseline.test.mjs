@@ -47,6 +47,122 @@ export function missingEcosystems(files, dependabotText) {
   return [...required].filter((name) => !named.has(name)).sort();
 }
 
+// B13 (ADR-0075): the `updates` entries that are not grouped. Each entry needs
+// exactly 1 group: its `patterns` is exactly ["*"] (flow or block list), and it
+// has no `applies-to: security-updates`. A second group (for example a
+// specific group beside the catch-all) makes a second version-update PR.
+// Returns "<ecosystem> <directory>" for each entry that fails. Line-based,
+// like missingEcosystems: it reads the block shape that Dependabot files use,
+// with no YAML library. It fails closed: a file whose entries it cannot read
+// (no `updates:` entry, or a `package-ecosystem:` line outside a parsed
+// entry) returns "(unparsed) updates".
+export function ungroupedEntries(dependabotText) {
+  const indentOf = (line) => line.length - line.trimStart().length;
+  const isDash = (line) => /^\s*-(\s|$)/.test(line);
+  const unquote = (value) => value.trim().replace(/^(["'])(.*)\1$/, "$2");
+  // YAML comments: from an unquoted # at the start or after a blank.
+  const stripComment = (line) => {
+    let quote = null;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (quote) {
+        if (c === quote) quote = null;
+      } else if (c === "'" || c === '"') {
+        quote = c;
+      } else if (c === "#" && (i === 0 || /\s/.test(line[i - 1]))) {
+        return line.slice(0, i).trimEnd();
+      }
+    }
+    return line.trimEnd();
+  };
+  // The lines under the key at lines[i]: deeper lines, and list items at the
+  // same indent (an indentless block sequence).
+  const block = (lines, i) => {
+    const k = indentOf(lines[i]);
+    const out = [];
+    for (let j = i + 1; j < lines.length; j++) {
+      const ind = indentOf(lines[j]);
+      if (ind > k || (ind === k && isDash(lines[j]))) out.push(lines[j]);
+      else break;
+    }
+    return out;
+  };
+  // The keys of a mapping block: [name, value, index] at the block's indent.
+  const keys = (lines) => {
+    if (lines.length === 0) return [];
+    const ind = indentOf(lines[0]);
+    const out = [];
+    lines.forEach((line, i) => {
+      const m = indentOf(line) === ind && !isDash(line) && line.match(/^\s*([^\s:][^:]*):(?:\s+(.*))?$/);
+      if (m) out.push([unquote(m[1]), m[2] ?? "", i]);
+    });
+    return out;
+  };
+  const isStarOnly = (values) => values.length === 1 && values[0] === "*";
+
+  const lines = dependabotText.split("\n").map(stripComment).filter((line) => line.trim() !== "");
+  const unparsed = ["(unparsed) updates"];
+  const start = lines.findIndex((line) => /^updates:$/.test(line));
+  if (start < 0) return unparsed;
+  // Each list item of `updates`, with its "- " turned into blanks so the item
+  // reads as a mapping block. A standalone "-" starts an item whose keys are
+  // on the next, deeper lines.
+  const items = [];
+  let itemIndent = -1;
+  for (const line of block(lines, start)) {
+    const m = line.match(/^(\s*)-(?:(\s+)(.*))?$/);
+    if (m && (itemIndent < 0 || m[1].length === itemIndent)) {
+      itemIndent = m[1].length;
+      items.push(m[3] ? [" ".repeat(m[1].length + 1 + m[2].length) + m[3]] : []);
+    } else if (items.length > 0) {
+      items.at(-1).push(line);
+    }
+  }
+  // Every `package-ecosystem` key in the file, also one in a shape this
+  // function does not read (a flow mapping): each must be a parsed entry.
+  const ecosystemLines = lines.filter((line) => /package-ecosystem["']?\s*:/.test(line)).length;
+
+  const failing = [];
+  let parsed = 0;
+  for (const item of items) {
+    const fields = new Map(keys(item).map(([name, value, i]) => [name, { value, i }]));
+    const ecosystem = unquote(fields.get("package-ecosystem")?.value ?? "");
+    if (!ecosystem) continue;
+    parsed += 1;
+    const directory = fields.has("directory")
+      ? unquote(fields.get("directory").value)
+      : fields.has("directories")
+        ? "(directories)"
+        : "(no directory)";
+    let groupCount = 0;
+    let starGroup = false;
+    let securityGroup = false;
+    if (fields.has("groups")) {
+      const groups = block(item, fields.get("groups").i);
+      for (const [, , i] of keys(groups)) {
+        groupCount += 1;
+        const body = block(groups, i);
+        for (const [name, value, j] of keys(body)) {
+          if (name === "patterns") {
+            const flow = value.match(/^\[(.*)\]$/);
+            const values = flow
+              ? flow[1].split(",").map(unquote).filter((v) => v !== "")
+              : value === ""
+                ? block(body, j).map((line) => unquote(line.replace(/^\s*-\s*/, "")))
+                : [unquote(value)];
+            if (isStarOnly(values)) starGroup = true;
+          } else if (name === "applies-to" && unquote(value) === "security-updates") {
+            securityGroup = true;
+          }
+        }
+      }
+    }
+    if (groupCount !== 1 || !starGroup || securityGroup) failing.push(`${ecosystem} ${directory}`);
+  }
+  if (parsed === 0 || parsed !== ecosystemLines) return [...unparsed, ...failing];
+  return failing;
+}
+
 // B12 (ADR-0073): the parts of `make ci` that a CI workflow does not run. A
 // `make ci` step covers all of them. Otherwise each prerequisite of the `ci`
 // target needs a `make <target>` step (extra variables allowed), and each
@@ -371,6 +487,89 @@ test("B13: missingEcosystems names each manifest ecosystem that Dependabot skips
 
 test("B13: core's Dependabot configuration covers every manifest in the tree", () => {
   assert.deepEqual(missingEcosystems(lsFiles(), read(".github/dependabot.yml")), []);
+});
+
+test("B13: ungroupedEntries names each entry without a [\"*\"] group or with a security-updates group (ADR-0075)", () => {
+  const text = [
+    "# Dependabot",
+    "version: 2",
+    "updates:",
+    "  - package-ecosystem: \"github-actions\" # grouped, flow list",
+    "    directory: \"/\"",
+    "    groups:",
+    "      actions:",
+    "        patterns: [\"*\"]",
+    "  - package-ecosystem: \"gomod\" # not grouped",
+    "    directory: \"/\"",
+    "    schedule:",
+    "      interval: \"weekly\"",
+    "  - package-ecosystem: npm # grouped, block list",
+    "    directory: /web",
+    "    groups:",
+    "      npm:",
+    "        patterns:",
+    "          - \"*\"",
+    "  - package-ecosystem: \"npm\" # grouped for security updates",
+    "    directory: \"/app\"",
+    "    groups:",
+    "      npm:",
+    "        applies-to: security-updates",
+    "        patterns: [\"*\"]",
+    "  - package-ecosystem: \"cargo\" # a group that does not match every dependency",
+    "    directory: \"/\"",
+    "    groups:",
+    "      serde:",
+    "        patterns: [\"serde*\"]",
+    "  - package-ecosystem: \"docker\" # indentless block list, single quotes",
+    "    directory: \"/\"",
+    "    groups:",
+    "      docker:",
+    "        patterns:",
+    "        - '*'",
+    "        applies-to: version-updates",
+    "  - package-ecosystem: \"pip\" # a specific group beside the catch-all: 2 PRs",
+    "    directory: \"/\"",
+    "    groups:",
+    "      react:",
+    "        patterns: [\"react*\"]",
+    "      all:",
+    "        patterns: [\"*\"]",
+    "  -",
+    "    package-ecosystem: \"bundler\" # standalone dash, not grouped",
+    "    directory: \"/\"",
+    "  -",
+    "    package-ecosystem: \"composer\" # standalone dash, grouped",
+    "    directory: \"/\"",
+    "    groups:",
+    "      composer:",
+    "        patterns: [\"*\"]",
+    "",
+  ].join("\n");
+  assert.deepEqual(ungroupedEntries(text), ["gomod /", "npm /app", "cargo /", "pip /", "bundler /"]);
+});
+
+test("B13: ungroupedEntries fails closed on a file it cannot read", () => {
+  // No `updates:` key, or an `updates:` with no entry: never a pass.
+  assert.deepEqual(ungroupedEntries("version: 2\n"), ["(unparsed) updates"]);
+  assert.deepEqual(ungroupedEntries("version: 2\nupdates: []\n"), ["(unparsed) updates"]);
+  // A `package-ecosystem:` line outside a parsed entry (a flow mapping here).
+  const flow = [
+    "version: 2",
+    "updates:",
+    "  - package-ecosystem: \"npm\"",
+    "    directory: \"/\"",
+    "    groups:",
+    "      npm:",
+    "        patterns: [\"*\"]",
+    "  - { package-ecosystem: \"gomod\",",
+    "      directory: \"/\" }",
+    "",
+  ].join("\n");
+  assert.ok(ungroupedEntries(flow).includes("(unparsed) updates"));
+});
+
+test("B13: core's Dependabot configuration groups every entry (ADR-0075)", () => {
+  assert.deepEqual(ungroupedEntries(read(".github/dependabot.yml")), []);
 });
 
 test("B14: SECURITY.md names GitHub private vulnerability reporting", () => {

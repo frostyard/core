@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Per-repo sync orchestration for scripts/sync-skills.sh (ADR-0026).
+# Per-repo sync orchestration for scripts/sync-skills.sh (ADR-0026, ADR-0075).
 set -euo pipefail
 
 SKILLS_SYNC_REPO_LIB_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -15,6 +15,14 @@ source "${SKILLS_SYNC_REPO_LIB_DIR}/skills-sync-containment.sh"
 # authenticates without ever appearing in a URL or a raw command
 # argument), mirrors the named skills into it via skills_sync_sync_repo,
 # and opens or updates its sync PR when the mirrored tree changed.
+#
+# The sync commit is new on each run (a new timestamp, so a new SHA). The
+# function pushes the sync branch only when the remote branch is missing
+# or differs from that commit in its tree or its parent (the default-branch
+# tip). A branch that already holds the same tree on the same parent is
+# not pushed, so a daily run does not restart CI on an unchanged open sync
+# PR (ADR-0075). The PR check-then-create step runs in both cases: an open
+# PR is never duplicated, and a current branch with no open PR gets one.
 #
 # The mktemp clone is removed before this function returns on every exit
 # path — clone failure, an unknown skill, containment failure, no change,
@@ -81,13 +89,46 @@ skills_sync_run_repo() {
     git checkout -q -B "$branch" || exit 1
     git -c user.name="$git_name" -c user.email="$git_email" \
       commit -q -m "chore: sync agent skills from frostyard/core@${src_sha}" || exit 1
-    git -c credential.helper="$cred_helper" push -qf origin "$branch" || exit 1
+    # Find the remote sync branch. `ls-remote --exit-code` exits 2 when
+    # the ref does not exist; any other non-zero status is an error.
+    remote_rc=0
+    git -c credential.helper="$cred_helper" ls-remote --exit-code --quiet \
+      origin "refs/heads/${branch}" >/dev/null || remote_rc=$?
+    branch_current=0
+    if [ "$remote_rc" -eq 0 ]; then
+      git -c credential.helper="$cred_helper" fetch -q --depth 1 origin \
+        "+refs/heads/${branch}:refs/remotes/origin/${branch}" || exit 1
+      # The fetch is shallow, and it can mark the new commit shallow too
+      # when the 2 commits have the same ID, so `<ref>^` may not resolve:
+      # read the tree and parent lines of each commit header instead.
+      new_commit=$(git cat-file -p HEAD) || exit 1
+      old_commit=$(git cat-file -p "refs/remotes/origin/${branch}") || exit 1
+      new_tree=$(printf '%s\n' "$new_commit" | sed -n '/^$/q; s/^tree //p') || exit 1
+      new_parent=$(printf '%s\n' "$new_commit" | sed -n '/^$/q; s/^parent //p') || exit 1
+      old_tree=$(printf '%s\n' "$old_commit" | sed -n '/^$/q; s/^tree //p') || exit 1
+      old_parent=$(printf '%s\n' "$old_commit" | sed -n '/^$/q; s/^parent //p') || exit 1
+      if [ "$new_tree" = "$old_tree" ] && [ "$new_parent" = "$old_parent" ]; then
+        branch_current=1
+      fi
+    elif [ "$remote_rc" -ne 2 ]; then
+      echo "::error::cannot read the sync branch of frostyard/${repo}" >&2
+      exit 1
+    fi
+    if [ "$branch_current" -eq 1 ]; then
+      echo "== ${repo}: sync branch already current"
+    else
+      git -c credential.helper="$cred_helper" push -qf origin "$branch" || exit 1
+    fi
     # Check-then-create, with no fallback masking: a create failure (e.g.
     # token missing pull-requests:write) must fail the run loudly.
     existing=$(gh pr list --repo "frostyard/${repo}" --head "$branch" --state open \
       --json number --jq '.[].number') || exit 1
     if [ -n "$existing" ]; then
-      echo "== ${repo}: PR #${existing} already open — branch force-updated"
+      if [ "$branch_current" -eq 1 ]; then
+        echo "== ${repo}: PR #${existing} already open — branch unchanged"
+      else
+        echo "== ${repo}: PR #${existing} already open — branch force-updated"
+      fi
     else
       gh pr create --repo "frostyard/${repo}" --head "$branch" \
         --title "chore: sync agent skills from frostyard/core" \

@@ -1,5 +1,7 @@
 # Dependabot (ADR-0071 row B13): 1 entry for each ecosystem with a manifest in
-# this repository.
+# this repository. Each entry has 1 group with `patterns: ["*"]`, so each entry
+# opens at most 1 version-update PR for each run (ADR-0075). The group has no
+# `applies-to`, so security updates stay 1 PR each.
 #
 # The hash-locked .agents/skills/frostyard-docs-site/scaffold/requirements.txt
 # is refreshed by the repository-hygiene line with `uv pip compile`, not by
@@ -14,6 +16,9 @@ updates:
     commit-message:
       prefix: "ci"
       include: "scope"
+    groups:
+      actions:
+        patterns: ["*"]
   - package-ecosystem: "npm"
     directory: "/"
     schedule:
@@ -22,3 +27,6 @@ updates:
     commit-message:
       prefix: "build"
       include: "scope"
+    groups:
+      npm:
+        patterns: ["*"]

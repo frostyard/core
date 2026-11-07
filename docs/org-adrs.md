@@ -61,6 +61,14 @@ names what the decision binds in core and where it lives here.
   [ci.yml](../.github/workflows/ci.yml); `ciCoverageGaps` in
   [test/repository-baseline.test.mjs](../test/repository-baseline.test.mjs)
   checks both forms.
+- [ADR-0075 — Group Dependabot updates and sync skills once a day](adr/0075-batch-routine-pull-requests.md)
+  — each entry of core's [dependabot.yml](../.github/dependabot.yml) has 1
+  group with `patterns: ["*"]`; `ungroupedEntries` in
+  [test/repository-baseline.test.mjs](../test/repository-baseline.test.mjs)
+  checks it. [sync-skills.yml](../.github/workflows/sync-skills.yml) runs
+  once a day and on dispatch, and
+  [skills-sync-repo.sh](../scripts/lib/skills-sync-repo.sh) does not push a
+  current sync branch.
 
 ## Rows that do not apply to core
 
