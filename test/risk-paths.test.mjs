@@ -15,7 +15,7 @@ import {
   validateGlob,
   validateRiskPaths,
 } from "../scripts/lib/risk-paths.mjs";
-import { renderBlock, syncWorkflow } from "../scripts/sync-risk-paths-workflow.mjs";
+import { RISK_PATHS_BLOCK, renderBlock, syncWorkflow } from "../scripts/sync-risk-paths-workflow.mjs";
 
 const execFileAsync = promisify(execFile);
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -491,47 +491,20 @@ test("addLabels posts to the issues labels API; other errors throw without the t
 
 // ---- Workflows ------------------------------------------------------------
 
-const workflowPath = path.join(repoRoot, ".github/workflows/risk-paths.yml");
-const callerPath = path.join(repoRoot, ".github/workflows/risk-paths-caller.yml");
+const workflowPath = path.join(repoRoot, ".github/workflows/pr-triage.yml");
 const libraryPath = path.join(repoRoot, "scripts/lib/risk-paths.mjs");
+const triageLibraryPath = path.join(repoRoot, "scripts/lib/pr-triage.mjs");
 
-function codeLines(text) {
-  return text.split("\n").filter((line) => !/^\s*#/.test(line));
-}
-
-// The YAML lines of a workflow outside the embedded heredoc.
-function yamlLines(text) {
-  const out = [];
-  let inBlock = false;
-  for (const line of codeLines(text)) {
-    if (line.trim() === "node --input-type=module <<'RISK_PATHS_EOF'") inBlock = true;
-    else if (line.trim() === "RISK_PATHS_EOF") inBlock = false;
-    else if (!inBlock) out.push(line);
-  }
-  return out;
-}
-
-function jobPermissions(lines) {
-  const start = lines.findIndex((line) => /^ {4}permissions:\s*$/.test(line));
-  assert.notEqual(start, -1, "the job has a permissions block");
-  const permissions = [];
-  for (const line of lines.slice(start + 1)) {
-    const match = /^ {6}([a-z-]+):\s*(\S+)\s*$/.exec(line);
-    if (!match) break;
-    permissions.push(`${match[1]}: ${match[2]}`);
-  }
-  return permissions.sort();
-}
-
-test("the reusable workflow embeds the library verbatim plus the trailer", async () => {
+test("the reusable workflow embeds the library verbatim, with no trailer", async () => {
   const [workflow, library] = await Promise.all([readFile(workflowPath, "utf8"), readFile(libraryPath, "utf8")]);
-  assert.equal(syncWorkflow(workflow, library), workflow);
+  assert.equal(syncWorkflow(workflow, library, RISK_PATHS_BLOCK), workflow);
   const lines = workflow.split("\n");
-  const start = lines.findIndex((line) => line.trim() === "node --input-type=module <<'RISK_PATHS_EOF'");
-  const end = lines.findIndex((line, index) => index > start && line.trim() === "RISK_PATHS_EOF");
+  const start = lines.indexOf(RISK_PATHS_BLOCK.startLine);
+  const end = lines.indexOf(RISK_PATHS_BLOCK.endLine, start + 1);
+  assert.ok(start !== -1 && end > start);
   const embedded = lines.slice(start + 1, end).map((line) => line.replace(/^ {10}/, "")).join("\n");
-  assert.equal(embedded, `${library.replace(/\n$/, "")}\nawait main(process.env);`);
-  assert.deepEqual(renderBlock(library), lines.slice(start + 1, end));
+  assert.equal(embedded, library.replace(/\n$/, ""));
+  assert.deepEqual(renderBlock(library, RISK_PATHS_BLOCK), lines.slice(start + 1, end));
 });
 
 test("the library has no static import and no expression or heredoc marker", async () => {
@@ -541,33 +514,9 @@ test("the library has no static import and no expression or heredoc marker", asy
   assert.ok(!library.split("\n").includes("RISK_PATHS_EOF"));
 });
 
-test("the reusable workflow checks out nothing and keeps least privilege", async () => {
-  const workflow = await readFile(workflowPath, "utf8");
-  const lines = yamlLines(workflow);
-  const text = lines.join("\n");
-  assert.ok(!workflow.includes("actions/checkout"));
-  assert.ok(!/head\.sha|head\.ref|head_ref|refs\/pull|merge_commit_sha|\/merge\b/.test(workflow));
-  assert.match(text, /^on:\n {2}workflow_call: \{\}$/m);
-  assert.match(text, /^permissions: \{\}$/m);
-  assert.deepEqual(jobPermissions(lines), ["contents: read", "pull-requests: write"]);
-  const uses = lines.filter((line) => /\buses:/.test(line));
-  assert.ok(uses.length > 0);
-  for (const line of uses) assert.match(line, /uses:\s*[\w.-]+\/[\w./-]+@[0-9a-f]{40}(\s|$)/);
-  assert.match(text, /timeout-minutes: 5/);
-  assert.match(text, /GITHUB_TOKEN: \$\{\{ github\.token \}\}/);
-});
-
-test("the caller runs only on pull_request_target with the 4 types", async () => {
-  const caller = await readFile(callerPath, "utf8");
-  const lines = codeLines(caller);
-  const text = lines.join("\n");
-  assert.match(text, /^on:\n {2}pull_request_target:\n {4}types: \[opened, synchronize, reopened, edited\]\n\npermissions: \{\}$/m);
-  assert.ok(!text.includes("merge_group"));
-  const triggers = text.split(/^on:\n/m)[1].split(/^\S/m)[0].split("\n").filter((line) => /^ {2}\S/.test(line));
-  assert.deepEqual(triggers, ["  pull_request_target:"]);
-  assert.deepEqual(jobPermissions(lines), ["contents: read", "pull-requests: write"]);
-  assert.match(text, /^ {4}uses: \.\/\.github\/workflows\/risk-paths\.yml$/m);
-  assert.ok(!/actions\/checkout|head\.sha|head\.ref/.test(caller));
+test("the risk-paths library never reads the head SHA, the head ref or the merge ref", async () => {
+  const library = await readFile(libraryPath, "utf8");
+  assert.ok(!/head\.sha|head\.ref|head_ref|refs\/pull|merge_commit_sha|\/merge\b/.test(library));
 });
 
 // ---- Gate -----------------------------------------------------------------
@@ -616,12 +565,37 @@ test("check-risk-paths fails on a list without the caller", async () => {
   );
 });
 
-test("check-risk-paths fails when the embedded copy drifts", async () => {
+async function driftFixture() {
   const root = await gateFixture(validList());
   await mkdir(path.join(root, "scripts/lib"), { recursive: true });
   await mkdir(path.join(root, ".github/workflows"), { recursive: true });
-  const library = await readFile(libraryPath, "utf8");
-  await writeFile(path.join(root, "scripts/lib/risk-paths.mjs"), `${library}// drift\n`);
-  await writeFile(path.join(root, ".github/workflows/risk-paths.yml"), await readFile(workflowPath, "utf8"));
-  await assert.rejects(runGate(root), (error) => error.stderr.includes("does not embed the current scripts/lib/risk-paths.mjs"));
+  await writeFile(path.join(root, "scripts/lib/risk-paths.mjs"), await readFile(libraryPath, "utf8"));
+  await writeFile(path.join(root, "scripts/lib/pr-triage.mjs"), await readFile(triageLibraryPath, "utf8"));
+  await writeFile(path.join(root, ".github/workflows/pr-triage.yml"), await readFile(workflowPath, "utf8"));
+  return root;
+}
+
+test("check-risk-paths passes on a fixture whose copies are in sync", async () => {
+  const { stdout } = await runGate(await driftFixture());
+  assert.match(stdout, /workflow in sync/);
+});
+
+test("check-risk-paths fails when the risk-paths copy drifts", async () => {
+  const root = await driftFixture();
+  await writeFile(path.join(root, "scripts/lib/risk-paths.mjs"), `${await readFile(libraryPath, "utf8")}// drift\n`);
+  await assert.rejects(runGate(root), (error) => {
+    assert.ok(error.stderr.includes("does not embed the current scripts/lib/risk-paths.mjs"));
+    assert.ok(!error.stderr.includes("current scripts/lib/pr-triage.mjs"));
+    return true;
+  });
+});
+
+test("check-risk-paths fails when the pr-triage copy drifts", async () => {
+  const root = await driftFixture();
+  await writeFile(path.join(root, "scripts/lib/pr-triage.mjs"), `${await readFile(triageLibraryPath, "utf8")}// drift\n`);
+  await assert.rejects(runGate(root), (error) => {
+    assert.ok(error.stderr.includes("does not embed the current scripts/lib/pr-triage.mjs"));
+    assert.ok(!error.stderr.includes("current scripts/lib/risk-paths.mjs"));
+    return true;
+  });
 });

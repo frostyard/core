@@ -2,9 +2,10 @@
 // glob matcher, a minimal GitHub API client and the labeling job.
 //
 // This module has no static imports. The reusable workflow
-// .github/workflows/risk-paths.yml embeds this file verbatim and runs it as
-// stdin to `node --input-type=module`, with no checkout. Edit this file, then
-// run `npm run sync:risk-paths-workflow`; `npm run check:risk-paths` fails when
+// .github/workflows/pr-triage.yml embeds this file verbatim, writes it to a
+// file in the runner temp directory, and scripts/lib/pr-triage.mjs imports it
+// there, with no checkout. Edit this file, then run
+// `npm run sync:risk-paths-workflow`; `npm run check:risk-paths` fails when
 // the embedded copy drifts. Never edit the embedded copy by hand.
 
 export const LIST_PATH = ".github/risk-paths.json";
@@ -422,6 +423,27 @@ export function createGitHubApi({ token, apiUrl = "https://api.github.com", fetc
     return null;
   };
 
+  // Reads every page of a list. The body is an array, or an object whose
+  // `field` is the array.
+  const paginate = async (first, { field, what }) => {
+    const items = [];
+    let next = first;
+    for (let page = 0; next; page++) {
+      if (page >= MAX_PAGES) throw new Error(`GitHub API ${what} has more than ${MAX_PAGES} pages`);
+      // The token goes only to the configured API host.
+      if (!next.startsWith("/") && !next.startsWith(`${base}/`)) {
+        throw new Error("GitHub API pagination link leaves the API host");
+      }
+      const response = await request("GET", next);
+      const body = await response.json();
+      const part = field === undefined ? body : body?.[field];
+      if (!Array.isArray(part)) throw new Error(`GitHub API ${what} is not an array`);
+      items.push(...part);
+      next = nextLink(response.headers.get("link"));
+    }
+    return items;
+  };
+
   return {
     async getFileAtRef(owner, repo, path, ref) {
       const encodedPath = path.split("/").map(enc).join("/");
@@ -434,21 +456,50 @@ export function createGitHubApi({ token, apiUrl = "https://api.github.com", fetc
     },
 
     async listPullFiles(owner, repo, number) {
-      const files = [];
-      let next = `/repos/${enc(owner)}/${enc(repo)}/pulls/${enc(String(number))}/files?per_page=100`;
-      for (let page = 0; next; page++) {
-        if (page >= MAX_PAGES) throw new Error(`GitHub API pull request file list has more than ${MAX_PAGES} pages`);
-        // The token goes only to the configured API host.
-        if (!next.startsWith("/") && !next.startsWith(`${base}/`)) {
-          throw new Error("GitHub API pagination link leaves the API host");
-        }
-        const response = await request("GET", next);
-        const items = await response.json();
-        if (!Array.isArray(items)) throw new Error("GitHub API pull request file list is not an array");
-        files.push(...items);
-        next = nextLink(response.headers.get("link"));
-      }
-      return files;
+      return paginate(`/repos/${enc(owner)}/${enc(repo)}/pulls/${enc(String(number))}/files?per_page=100`, {
+        what: "pull request file list",
+      });
+    },
+
+    async listIssueComments(owner, repo, number) {
+      return paginate(`/repos/${enc(owner)}/${enc(repo)}/issues/${enc(String(number))}/comments?per_page=100`, {
+        what: "issue comment list",
+      });
+    },
+
+    async createIssueComment(owner, repo, number, body) {
+      await request("POST", `/repos/${enc(owner)}/${enc(repo)}/issues/${enc(String(number))}/comments`, {
+        body: { body },
+      });
+    },
+
+    // Returns true when the label came off, false when the issue did not have it (HTTP 404).
+    async removeIssueLabel(owner, repo, number, name) {
+      const response = await request(
+        "DELETE",
+        `/repos/${enc(owner)}/${enc(repo)}/issues/${enc(String(number))}/labels/${enc(name)}`,
+        { allow404: true },
+      );
+      return response !== null;
+    },
+
+    // The latest run of each check name (filter=latest), as GitHub's checks
+    // rollup counts them: an older failed run that a re-run replaced does not
+    // count.
+    async listCheckRuns(owner, repo, sha) {
+      return paginate(`/repos/${enc(owner)}/${enc(repo)}/commits/${enc(sha)}/check-runs?filter=latest&per_page=100`, {
+        field: "check_runs",
+        what: "check run list",
+      });
+    },
+
+    // The statuses array, not the combined state: the combined state is
+    // "pending" when a commit has no statuses.
+    async listCommitStatuses(owner, repo, sha) {
+      return paginate(`/repos/${enc(owner)}/${enc(repo)}/commits/${enc(sha)}/status?per_page=100`, {
+        field: "statuses",
+        what: "commit status list",
+      });
     },
 
     async labelExists(owner, repo, name) {
@@ -466,7 +517,7 @@ export function createGitHubApi({ token, apiUrl = "https://api.github.com", fetc
 
 // ---- Job ------------------------------------------------------------------
 
-function escapeCell(value) {
+export function escapeCell(value) {
   return String(value)
     .replace(/[\\`*_[\]|]/g, "\\$&")
     .replace(/&/g, "&amp;")
@@ -475,7 +526,7 @@ function escapeCell(value) {
     .replace(/\r\n|\r|\n|\u2028|\u2029/g, " ");
 }
 
-const NAME_PATTERN = /^[A-Za-z0-9_.-]+$/;
+export const NAME_PATTERN = /^[A-Za-z0-9_.-]+$/;
 
 export async function runRiskPathsJob({ api, eventName, event, summary, log }) {
   const say = (message, value) => log(value === undefined ? `${LOG_PREFIX}${message}` : `${LOG_PREFIX}${message} ${JSON.stringify(value)}`);
@@ -563,7 +614,7 @@ export async function runRiskPathsJob({ api, eventName, event, summary, log }) {
 }
 
 // Escapes a workflow-command value (the runner reads %, CR and LF specially).
-function commandValue(text) {
+export function commandValue(text) {
   return String(text).replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A");
 }
 

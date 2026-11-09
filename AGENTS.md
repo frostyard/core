@@ -187,10 +187,11 @@ removed. -->
 - Risk paths follow
   [ADR-0068](docs/adr/0068-label-pull-requests-that-touch-high-risk-paths.md)
   and the [risk-paths spec](docs/specs/risk-paths.md): `.github/risk-paths.json`
-  lists the high-risk globs, and `.github/workflows/risk-paths.yml` embeds
-  `scripts/lib/risk-paths.mjs` verbatim. Edit `scripts/lib/risk-paths.mjs`,
-  then run `npm run sync:risk-paths-workflow`; never edit the embedded copy by
-  hand. `npm run check:risk-paths` (in `verify`) fails when the copy drifts.
+  lists the high-risk globs, and `.github/workflows/pr-triage.yml` embeds
+  `scripts/lib/risk-paths.mjs` and `scripts/lib/pr-triage.mjs` verbatim. Edit
+  those libraries, then run `npm run sync:risk-paths-workflow`; never edit an
+  embedded copy by hand. `npm run check:risk-paths` (in `verify`) fails when a
+  copy drifts.
 - Conformance alias symlinks are listed in
   [ADR-0029](docs/adr/0029-acmm-conformance-via-canonical-aliases.md) —
   edit their canonical targets, never the aliases.

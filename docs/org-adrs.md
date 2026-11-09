@@ -43,7 +43,8 @@ names what the decision binds in core and where it lives here.
 - [ADR-0068 — Label pull requests that touch high-risk paths](adr/0068-label-pull-requests-that-touch-high-risk-paths.md)
   — core lists its risk globs in [.github/risk-paths.json](../.github/risk-paths.json);
   its caller [risk-paths-caller.yml](../.github/workflows/risk-paths-caller.yml)
-  uses the local reusable workflow.
+  uses the local reusable workflow
+  [pr-triage.yml](../.github/workflows/pr-triage.yml).
 - [ADR-0071 — Hold every code repository to one baseline](adr/0071-hold-every-code-repository-to-one-baseline.md)
   — core carries the whole baseline: [LICENSE](../LICENSE) (MIT),
   [dependabot.yml](../.github/dependabot.yml), a
@@ -69,6 +70,10 @@ names what the decision binds in core and where it lives here.
   once a day and on dispatch, and
   [skills-sync-repo.sh](../scripts/lib/skills-sync-repo.sh) does not push a
   current sync branch.
+- [ADR-0077 — Bind `ready-for-human` to the head commit](adr/0077-bind-ready-for-human-to-the-head-commit.md)
+  — core's caller [risk-paths-caller.yml](../.github/workflows/risk-paths-caller.yml)
+  runs the local [pr-triage.yml](../.github/workflows/pr-triage.yml), which
+  also removes `ready-for-human` when the head moves or CI is not green.
 
 ## Rows that do not apply to core
 
