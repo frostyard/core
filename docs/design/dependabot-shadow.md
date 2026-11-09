@@ -125,12 +125,16 @@ makes only `gh api` GET calls. The rules live in
   `filter=all` and applies the rule above itself: a run of another app does
   not count when the marker records an `integration_id`, and a rerun replaces
   an earlier run of the same name.
-- **A commit's move.** A `committed` event that moved the head takes its
-  push time from the first check run at the new commit's SHA, never from the
-  commit's own date. When the read holds no check run at that SHA and every
-  recorded check had passed, the call is `unknown` and the report names the
-  missing push time. A failed recorded check needs no time then: the move
-  alone makes the call `superseded`.
+- **A commit's move.** No timestamp the report reads is the push time of a
+  commit that moved the head, so the report uses 2 bounds. The commit's
+  `committer.date` is the earliest push time, and the first `pr-triage` run at
+  that SHA is the latest: that workflow runs only on `pull_request_target`,
+  so its run came after the SHA became a pull request head. A run of another
+  name does not count, because it can come from another branch. A push at or
+  before the pass of the recorded checks makes the call `superseded`. Bounds
+  that cross the pass time make it `unknown`, and the report names both
+  bounds. A failed recorded check needs no time then: the move alone makes the
+  call `superseded`.
 - **A call from before the window.** The repository comment read filters by
   `updated_at`, so a call comment written before the window is not in it. A
   Dependabot pull request of the window with no call in that read gets all

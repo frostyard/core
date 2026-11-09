@@ -212,23 +212,33 @@ export function checkResultsFor(record, call) {
 
 // ---- Class of 1 call ------------------------------------------------------
 
-// The earliest check run start at 1 commit SHA: CI starts when a push lands,
-// so that is the push time. Infinity when the record holds no such run.
-function pushTimeOf(record, sha) {
-  let best = Number.POSITIVE_INFINITY;
+// The bounds of the push time of 1 commit SHA. No timestamp the record holds is
+// the push itself, so the record gives 2 bounds:
+// - the commit date is the earliest push time (a commit is pushed after it is
+//   made), NaN when the event holds no date;
+// - the first pr-triage run at that SHA is the latest push time, because that
+//   workflow runs only on pull_request_target events, so its run came after the
+//   SHA became a pull request head. A run of another name can come from another
+//   branch, so it does not count. Infinity when the record holds no such run.
+function pushBoundsOf(record, sha) {
+  let upper = Number.POSITIVE_INFINITY;
   for (const run of record?.checkRuns?.[String(sha ?? "")] ?? []) {
+    if (!String(run?.name ?? "").startsWith(PR_TRIAGE_JOB_PREFIX)) continue;
     const ms = timeOf(run?.started_at);
-    if (Number.isFinite(ms) && ms < best) best = ms;
+    if (Number.isFinite(ms) && ms < upper) upper = ms;
   }
-  return best;
+  return { upper };
 }
 
+// An instant as an ISO stamp, or null.
+const isoOf = (ms) => (Number.isFinite(ms) ? new Date(ms).toISOString().replace(/\.\d{3}Z$/, "Z") : null);
+
 // The times the head moved away from the call head: known move times, and the
-// commits that moved it whose push time the record does not hold.
+// commits that moved it with the bounds of their push time.
 function movesOf(record, call, allCalls) {
   const createdMs = timeOf(call.created_at);
   const moves = [];
-  const unproven = [];
+  const committed = [];
   for (const other of allCalls ?? []) {
     if (other === call) continue;
     // 1 comment is 1 call: a known id names it, and an unknown id cannot.
@@ -245,8 +255,7 @@ function movesOf(record, call, allCalls) {
     if (Number.isFinite(at) && at > createdMs) moves.push(at);
   }
   // A commit that another commit follows in timeline order moved the head; with
-  // no committed event for the call head, a later commit date did. The commit
-  // date is not the push time: the first check run at the new SHA is.
+  // no committed event for the call head, a later commit date did.
   const callIndex = timeline.findIndex((event) => event?.event === "committed" && event?.sha === call.head);
   timeline.forEach((event, index) => {
     if (event?.event !== "committed") return;
@@ -257,11 +266,10 @@ function movesOf(record, call, allCalls) {
     } else if (!(Number.isFinite(committedAt) && committedAt > createdMs)) {
       return;
     }
-    const pushedAt = pushTimeOf(record, event?.sha);
-    if (Number.isFinite(pushedAt)) moves.push(pushedAt);
-    else unproven.push({ sha: String(event?.sha ?? ""), committedAt });
+    const sha = String(event?.sha ?? "");
+    committed.push({ sha, lower: committedAt, ...pushBoundsOf(record, sha) });
   });
-  return { moves, unproven };
+  return { moves, committed };
 }
 
 // The class of 1 call and, when the class needs it, the reason why. allCalls is
@@ -281,28 +289,40 @@ export function classifyCallWithReason(record, call, allCalls = []) {
   } else {
     passedAt = Number.POSITIVE_INFINITY;
   }
-  const { moves, unproven } = movesOf(record, call, allCalls);
+  const { moves, committed } = movesOf(record, call, allCalls);
   const movedAt = moves.length === 0 ? Number.POSITIVE_INFINITY : Math.min(...moves);
+  // A known move time before the pass is proof.
   if (movedAt < passedAt) return { class: "superseded", reason: null };
-  if (unproven.length > 0) {
-    const first = unproven[0];
-    // The checks never all passed: the head moved after the call, so it moved
-    // before they passed, and no time is needed.
+
+  // A committed move: the bounds of its push time decide.
+  const proven = [];
+  const uncertain = [];
+  for (const move of committed) {
     if (passedAt === Number.POSITIVE_INFINITY) {
-      return {
-        class: "superseded",
-        reason: `superseded: the head moved to ${short(first.sha)} after the call, before every recorded check passed`,
-      };
+      // The checks never all passed, and the head moved after the call: no time
+      // is needed, the move proves superseded.
+      proven.push(move);
+    } else if (move.upper < passedAt) {
+      proven.push(move);
+    } else if (Number.isFinite(move.lower) && move.lower >= passedAt) {
+      // The commit was made after the pass, so the push came after it too.
+      continue;
+    } else {
+      uncertain.push(move);
     }
-    // Every recorded check passed. A commit dated at or after the pass came
-    // after it; with no push time, a commit dated earlier cannot be placed.
-    const earlier = unproven.find((move) => !(Number.isFinite(move.committedAt) && move.committedAt >= passedAt));
-    if (earlier !== undefined) {
-      return {
-        class: "unknown",
-        reason: `unknown: the head moved to ${short(earlier.sha)}, and its push time is not known`,
-      };
-    }
+  }
+  if (proven.length > 0) {
+    return {
+      class: "superseded",
+      reason: `superseded: the head moved to ${short(proven[0].sha)}, at or before ${isoOf(proven[0].upper) ?? "an unknown time"}, before the recorded checks passed`,
+    };
+  }
+  if (uncertain.length > 0) {
+    const move = uncertain[0];
+    return {
+      class: "unknown",
+      reason: `unknown: the head moved to ${short(move.sha)} between ${isoOf(move.lower) ?? "an unknown time"} and ${isoOf(move.upper) ?? "an unknown time"}, and the recorded checks passed at ${isoOf(passedAt) ?? "an unknown time"}`,
+    };
   }
   if (results.some((result) => result.result === "fail")) return { class: "waited", reason: null };
   if (results.length === 0 || results.some((result) => result.result === "unknown")) return { class: "unknown", reason: null };
