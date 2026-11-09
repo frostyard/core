@@ -1,0 +1,44 @@
+{
+  "repo": "bketelsen/pi-pocket-team",
+  "default_branch": "main",
+  "rules": [
+    {
+      "type": "deletion"
+    },
+    {
+      "type": "non_fast_forward"
+    },
+    {
+      "type": "pull_request"
+    },
+    {
+      "type": "required_status_checks",
+      "parameters": {
+        "strict_required_status_checks_policy": false,
+        "required_status_checks": [
+          {
+            "context": "Test",
+            "integration_id": 15368
+          }
+        ]
+      }
+    }
+  ],
+  "workflows": {
+    "ci.yml": "# The tests need a Pi Pocket checkout: link.mjs symlinks node_modules, _pocket.d.ts and _pocket into the\n# checkout at PI_POCKET_CHECKOUT. The job \"pocket\" clones each pinned Pi Pocket release of the matrix into the\n# runner's temporary folder, installs its dependencies, points the links at it, and runs the gate, make ci:\n#   - upstream TannerMidd/pi-pocket at v0.27.0, the release to roll back to;\n#   - the fork bketelsen/pi-pocket at v0.28.0-bk.1, the server's release: upstream v0.28.0 plus the patches listed\n#     in BK-PATCHES.md on its branch bk/v0.28.0.\n# Each entry also names the tag's commit, and the job fails when the clone is another one. Actions are pinned by\n# commit SHA, and the token can only read (frostyard/core ADR-0021).\n# The ruleset requires the check \"Test\". A matrix job gets 1 check for each entry, named with the entry, so the job\n# \"Test\" waits for every entry and passes only when all of them pass: keep its name.\nname: CI\n\non:\n    pull_request:\n    push:\n        branches: [main]\n\npermissions: {}\n\nconcurrency:\n    group: ci-${{ github.workflow }}-${{ github.ref }}\n    cancel-in-progress: true\n\njobs:\n  # (job bodies trimmed; only the uses: lines are kept)\n              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1\n              uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5.2.6\n",
+    "risk-paths.yml": "# Risk paths (ADR-0068, docs/specs/risk-paths.md): this caller runs on\n# pull_request_target so the base risk list and trusted caller execute. It does\n# not run a PR branch. It checks out nothing. It is not a required check. The\n# repository must have the risk:high label, or this job fails.\nname: Risk paths caller\n\non:\n  pull_request_target:\n    types: [opened, synchronize, reopened, edited]\n\npermissions: {}\n\njobs:\n  # (job bodies trimmed; only the uses: lines are kept)\n    uses: frostyard/core/.github/workflows/risk-paths.yml@1b02a129026329cef2b46d1fbd0465a863c1cd81\n",
+    "site.yml": "# Build the documentation site for pi-pocket-team and deploy it to GitHub Pages.\n# Copy this file to .github/workflows/site.yml. The site itself comes from\n# the frostyard-docs-site skill's scaffold, copied as site/.\nname: Site\non:\n  push:\n    branches: [main]\n    paths: ['site/**', 'Makefile', '.github/workflows/site.yml']\n  pull_request:\n    branches: [main]\n    paths: ['site/**', 'Makefile', '.github/workflows/site.yml']\n  workflow_dispatch:\npermissions: {}\njobs:\n  # (job bodies trimmed; only the uses: lines are kept)\n        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1\n",
+    "upstream.yml": "# Tests this project against upstream Pi Pocket, not the pinned tag that ci.yml uses. The purpose is to see\n# a break before the next upstream release. It runs each Monday, and by hand. A red run only warns: this is\n# a separate workflow, not a required check, so it never blocks a merge.\n#\n# To test the next release's draft PR, run it by hand with `ref` set to the draft PR's branch (for example\n# release/0.22.0) or to pull/<number>/head:\n#   gh workflow run upstream.yml -f ref=pull/150/head\nname: Upstream\n\non:\n    schedule:\n        - cron: \"17 6 * * 1\"\n    workflow_dispatch:\n        inputs:\n            ref:\n                description: A branch, a tag, or pull/<number>/head of TannerMidd/pi-pocket\n                type: string\n                default: main\n    pull_request:\n        paths: [.github/workflows/upstream.yml]\n\npermissions: {}\n\nconcurrency:\n    group: ci-${{ github.workflow }}-${{ github.ref }}\n    cancel-in-progress: true\n\njobs:\n  # (job bodies trimmed; only the uses: lines are kept)\n              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1\n              uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5.2.6\n"
+  },
+  "labels": [
+    {
+      "name": "bug"
+    },
+    {
+      "name": "ready-for-human"
+    },
+    {
+      "name": "risk:high"
+    }
+  ]
+}
