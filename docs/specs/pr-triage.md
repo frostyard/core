@@ -140,9 +140,16 @@ An empty or missing string, invalid JSON, a non-array, an empty array, or any fa
 
 **S4: required checks exist.** The step reads all pages of `GET /repos/{owner}/{repo}/rules/branches/{ref}?per_page=100`, with each part of the ref encoded. It collects each entry of `parameters.required_status_checks` of each rule whose `type` is `required_status_checks` as `{ context, integration_id }`; a missing `integration_id` is `null`. It drops exact duplicates (the same context and the same integration_id) and keeps first-seen order. 1 or more entries pass. 0 entries fail.
 
-**Comment.** When all 4 criteria pass and the live head is the event head, the step reads all pages of `GET /repos/{owner}/{repo}/issues/{number}/comments?per_page=100`. When a line of a comment body, trimmed, starts with `<!-- frostyard:dependabot-shadow v1 head=<head> `, the step writes nothing. Else it writes 1 comment with `POST /repos/{owner}/{repo}/issues/{number}/comments`, which returns the comment with its id.
+**Call comments.** A call comment of this head is a comment whose author (`user.login`) is `github-actions[bot]` (the author of every comment that `github.token` writes), whose `id` is a positive integer, and that has a marker line for this head: a line of its body, trimmed, starts with `<!-- frostyard:dependabot-shadow v1 head=<head> `. A comment by another author never counts, never stops a call, and is never deleted.
 
-Each head keeps at most 1 comment. The write follows a read, so 2 runs for the same head can both write. After the write, the step reads the comments again. When a comment for the same head has a lower comment id, the step deletes its own comment with `DELETE /repos/{owner}/{repo}/issues/comments/{id}` and reports `exists`. The comment with the lowest id stays. The step deletes only the comment that it wrote.
+**Dedupe.** Each head keeps at most 1 comment: the call comment with the lowest comment id. On both paths below, the step keeps that comment and deletes every other call comment of this head with `DELETE /repos/{owner}/{repo}/issues/comments/{id}`. A run whose cleanup failed therefore leaves a duplicate that the next run for the same head removes.
+
+**Comment.** When all 4 criteria pass and the live head is the event head, the step reads all pages of `GET /repos/{owner}/{repo}/issues/{number}/comments?per_page=100`.
+
+- With 1 or more call comment of this head, the step writes nothing, applies the dedupe, and reports `exists`, with `deduplicated: true` when it deleted 1 or more comments.
+- Else it writes 1 comment with `POST /repos/{owner}/{repo}/issues/{number}/comments`, which returns the comment with its id (a positive integer; else the step fails). It then reads the comments again and applies the dedupe. When the kept comment is not its own, it removed its own comment and reports `exists` with `deduplicated: true`. Else it reports `called`.
+
+The write follows a read, so 2 runs for the same head can both write. The second list can also lag behind the write, so the step counts its own comment as a call comment even when the list does not hold it yet.
 
 The marker is the first line of the comment:
 
@@ -162,7 +169,7 @@ Shadow call: auto-merge would be enabled at `<head 12>` (patch or minor; manifes
 
 **Errors.** An error from the pull request read, the file list or the rule list fails the step, and then no comment is written. An error while reading the risk list fails S3 only. A comment POST that returns no positive integer id fails the step.
 
-**Summary.** The step writes a `## Dependabot shadow` section: a table `| Criterion | Result | Detail |` with 1 row for each criterion S1 to S4 (`pass` or `fail`, the detail through `escapeCell`), then 1 line: the comment was written, a call for this head exists, the head moved so no comment was written, or no call.
+**Summary.** The step writes a `## Dependabot shadow` section: a table `| Criterion | Result | Detail |` with 1 row for each criterion S1 to S4 (`pass` or `fail`, the detail through `escapeCell`), then 1 line: the comment was written, a call for this head exists (with the count of the duplicates it removed), the head moved so no comment was written, or no call.
 
 ## Derived artifacts
 

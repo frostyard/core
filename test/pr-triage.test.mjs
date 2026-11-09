@@ -12,6 +12,7 @@ import {
   MARKER_PREFIX,
   READY_LABEL,
   SHADOW_ACTIONS,
+  SHADOW_AUTHOR,
   SHADOW_MARKER_PREFIX,
   checkS1,
   checkS2,
@@ -1008,7 +1009,8 @@ test("the shadow step ignores the labels of the pull request", async () => {
 
 test("the shadow step writes 1 comment for each head", async () => {
   const existing = shadowMarker({ head: HEAD, level: "L3", checks: CI_CHECKS });
-  const { api, calls } = shadowApi({ comments: [{ body: "unrelated" }, { body: `older\n  ${existing}  \nmore` }] });
+  const own = { id: 9, user: { login: SHADOW_AUTHOR }, body: `older\n  ${existing}  \nmore` };
+  const { api, calls } = shadowApi({ comments: [{ id: 4, user: { login: "someone" }, body: "unrelated" }, own] });
   const { result, summary } = await shadow(api);
   assert.deepEqual(result, { outcome: "exists", level: "L3", checks: CI_CHECKS });
   assert.deepEqual(names(calls), [
@@ -1021,7 +1023,7 @@ test("the shadow step writes 1 comment for each head", async () => {
   ]);
   assert.match(summary, /A shadow call for this head exists/);
   const other = shadowMarker({ head: BASE_SHA, level: "L3", checks: CI_CHECKS });
-  const again = shadowApi({ comments: [{ body: other }] });
+  const again = shadowApi({ comments: [{ id: 7, user: { login: SHADOW_AUTHOR }, body: other }] });
   const second = await shadow(again.api);
   assert.equal(second.result.outcome, "called");
   assert.equal(callsOf(again.calls, "createIssueComment").length, 1);
@@ -1091,7 +1093,7 @@ test("the shadow step calls only the 5 methods it may call and has no label or m
   const scenarios = [
     shadowApi(),
     shadowApi({ list: null }),
-    shadowApi({ comments: [{ body: existing }] }),
+    shadowApi({ comments: [{ id: 9, user: { login: SHADOW_AUTHOR }, body: existing }] }),
     shadowApi({ fail: { getFileAtRef: httpError("boom") } }),
   ];
   for (const { api, calls } of scenarios) {
@@ -1147,37 +1149,100 @@ test("an error from the pull request read fails the shadow step, with no comment
   assert.deepEqual(names(calls), ["getPullRequest"]);
 });
 
-test("the shadow step removes its own comment when an earlier one exists for this head", async () => {
+const call = (id, login = SHADOW_AUTHOR, body = shadowMarker({ head: HEAD, level: "L3", checks: CI_CHECKS })) => ({
+  id,
+  user: { login },
+  body,
+});
+
+test("a retry after a failed cleanup removes the duplicate", async () => {
   const marker = shadowMarker({ head: HEAD, level: "L3", checks: CI_CHECKS });
-  const { api, calls } = shadowApi({
-    ownId: 900,
-    commentLists: [[], [{ id: 700, body: `${marker}\nanother run` }, { id: 900, body: "own" }]],
+  const earlier = { id: 12, user: { login: SHADOW_AUTHOR }, body: `${marker}\nanother run` };
+  const own = { id: 20, user: { login: SHADOW_AUTHOR }, body: marker };
+  // Run 1 wrote its comment, saw the earlier one, and the delete failed: both stay.
+  const first = shadowApi({
+    ownId: 20,
+    commentLists: [[], [earlier, own]],
+    fail: { deleteIssueComment: httpError("GitHub API DELETE c failed: HTTP 500") },
   });
+  await assert.rejects(shadow(first.api), /HTTP 500/);
+  assert.equal(callsOf(first.calls, "listIssueComments").length, 2);
+  // A retry finds both call comments in the first list and removes the higher one.
+  const retry = shadowApi({ commentLists: [[earlier, own]] });
+  const { result, summary } = await shadow(retry.api);
+  assert.deepEqual(result, { outcome: "exists", level: "L3", checks: CI_CHECKS, deduplicated: true });
+  assert.equal(callsOf(retry.calls, "createIssueComment").length, 0);
+  assert.deepEqual(
+    callsOf(retry.calls, "deleteIssueComment").map((entry) => entry.args),
+    [["frostyard", "core", 20]],
+  );
+  assert.match(summary, /Removed 1 duplicate call comment/);
+});
+
+test("the shadow step keeps the lowest of 3 call comments for this head", async () => {
+  const { api, calls } = shadowApi({ comments: [call(5), call(9), call(7)] });
+  const { result } = await shadow(api);
+  assert.deepEqual(result, { outcome: "exists", level: "L3", checks: CI_CHECKS, deduplicated: true });
+  assert.equal(callsOf(calls, "createIssueComment").length, 0);
+  assert.deepEqual(
+    callsOf(calls, "deleteIssueComment").map((entry) => entry.args[2]),
+    [7, 9],
+  );
+});
+
+test("the shadow step removes its own comment when an earlier call exists for this head", async () => {
+  const { api, calls } = shadowApi({ ownId: 20, commentLists: [[], [call(12), call(20)]] });
   const { result, summary } = await shadow(api);
   assert.deepEqual(result, { outcome: "exists", level: "L3", checks: CI_CHECKS, deduplicated: true });
-  assert.deepEqual(
-    callsOf(calls, "deleteIssueComment").map((call) => call.args),
-    [["frostyard", "core", 900]],
-  );
-  assert.equal(callsOf(calls, "createIssueComment").length, 1);
   assert.deepEqual(names(calls).slice(-3), ["createIssueComment", "listIssueComments", "deleteIssueComment"]);
+  assert.deepEqual(
+    callsOf(calls, "deleteIssueComment").map((entry) => entry.args),
+    [["frostyard", "core", 20]],
+  );
   assert.match(summary, /removed its own comment/);
 });
 
-test("the shadow step keeps its comment when only its own is in the second list", async () => {
-  const { api, calls } = shadowApi({ ownId: 900, commentLists: [[], [{ id: 900, body: "own" }]] });
+test("the shadow step keeps its comment when the second list has only its own", async () => {
+  const { api, calls } = shadowApi({ ownId: 20, commentLists: [[], [call(20)]] });
   const { result } = await shadow(api);
   assert.deepEqual(result, { outcome: "called", level: "L3", checks: CI_CHECKS });
   assert.equal(callsOf(calls, "deleteIssueComment").length, 0);
 });
 
-test("the shadow step keeps its comment when a marker for another head has a lower id", async () => {
-  const other = shadowMarker({ head: BASE_SHA, level: "L3", checks: CI_CHECKS });
-  const { api, calls } = shadowApi({ ownId: 900, commentLists: [[], [{ id: 700, body: other }]] });
+test("the shadow step keeps its comment when the second list lags behind the write", async () => {
+  const { api, calls } = shadowApi({ ownId: 20, commentLists: [[], []] });
   const { result } = await shadow(api);
-  assert.equal(result.outcome, "called");
+  assert.deepEqual(result, { outcome: "called", level: "L3", checks: CI_CHECKS });
   assert.equal(callsOf(calls, "deleteIssueComment").length, 0);
 });
+
+test("the shadow step keeps its own comment and removes a later duplicate of another run", async () => {
+  const { api, calls } = shadowApi({ ownId: 20, commentLists: [[], [call(20), call(25)]] });
+  const { result } = await shadow(api);
+  assert.deepEqual(result, { outcome: "called", level: "L3", checks: CI_CHECKS });
+  assert.deepEqual(
+    callsOf(calls, "deleteIssueComment").map((entry) => entry.args[2]),
+    [25],
+  );
+});
+
+test("a marker that another author wrote never stops the call and is never deleted", async () => {
+  const { api, calls } = shadowApi({ comments: [call(5, "someone")] });
+  const { result } = await shadow(api);
+  assert.deepEqual(result, { outcome: "called", level: "L3", checks: CI_CHECKS });
+  assert.equal(callsOf(calls, "createIssueComment").length, 1);
+  assert.equal(callsOf(calls, "deleteIssueComment").length, 0);
+});
+
+test("a marker of github-actions[bot] for another head is never deleted and stops nothing", async () => {
+  const other = shadowMarker({ head: BASE_SHA, level: "L3", checks: CI_CHECKS });
+  const { api, calls } = shadowApi({ comments: [call(5, SHADOW_AUTHOR, other)] });
+  const { result } = await shadow(api);
+  assert.deepEqual(result, { outcome: "called", level: "L3", checks: CI_CHECKS });
+  assert.equal(callsOf(calls, "createIssueComment").length, 1);
+  assert.equal(callsOf(calls, "deleteIssueComment").length, 0);
+});
+
 
 test("the shadow step fails when the comment API returns no usable id", async () => {
   for (const created of [{}, null, { id: 0 }, { id: "900" }, { id: 1.5 }]) {

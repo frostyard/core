@@ -806,6 +806,8 @@ jobs:
           export const DEPENDABOT_LOGIN = "dependabot[bot]";
           export const SHADOW_MARKER_PREFIX = "<!-- frostyard:dependabot-shadow v1";
           export const SHADOW_ACTIONS = ["opened", "synchronize", "reopened"];
+          // The author of every comment that github.token writes.
+          export const SHADOW_AUTHOR = "github-actions[bot]";
           const SHADOW_PREFIX = "pr-triage: shadow: ";
           const MANIFEST_NAMES = [
             "go.mod",
@@ -1260,6 +1262,31 @@ jobs:
             );
           }
 
+          // A call comment of this head: a comment that github.token wrote, with a marker
+          // line for the head. A comment by another author never counts, and it is never
+          // deleted.
+          const isCallComment = (comment, markerPrefix) =>
+            comment?.user?.login === SHADOW_AUTHOR &&
+            Number.isSafeInteger(comment?.id) &&
+            comment.id > 0 &&
+            typeof comment?.body === "string" &&
+            comment.body.split(/\r?\n/).some((line) => line.trim().startsWith(markerPrefix));
+
+          // Each head keeps 1 call: the call comment with the lowest id. Every other call
+          // comment of this head is deleted, whoever wrote it, so a run after a failed
+          // cleanup repairs the duplicates. Returns { kept, deleted }; kept is null when
+          // there is no call comment.
+          async function keepLowestCall(api, owner, repo, number, comments, markerPrefix) {
+            const calls = comments.filter((comment) => isCallComment(comment, markerPrefix)).sort((a, b) => a.id - b.id);
+            const [lowest, ...duplicates] = calls;
+            const deleted = [];
+            for (const comment of duplicates) {
+              await api.deleteIssueComment(owner, repo, comment.id);
+              deleted.push(comment.id);
+            }
+            return { kept: lowest === undefined ? null : lowest.id, deleted };
+          }
+
           // The summary line of a run whose event head is not the live head.
           const staleLine = (eventHead, liveHead) =>
             typeof liveHead === "string" && SHA_PATTERN.test(liveHead)
@@ -1377,29 +1404,35 @@ jobs:
             }
 
             const markerPrefix = `${SHADOW_MARKER_PREFIX} head=${head} `;
-            const holdsMarker = (comment) =>
-              typeof comment?.body === "string" && comment.body.split(/\r?\n/).some((line) => line.trim().startsWith(markerPrefix));
             const comments = await api.listIssueComments(owner, repo, number);
-            if (comments.some(holdsMarker)) {
-              say("a call for this head exists", head);
-              lines.push("", "A shadow call for this head exists. No second comment.");
+            const existing = comments.filter((comment) => isCallComment(comment, markerPrefix));
+            if (existing.length > 0) {
+              // The cleanup also runs here: a run whose own cleanup failed leaves 2 call
+              // comments, and the next run for this head removes the higher one.
+              const cleanup = await keepLowestCall(api, owner, repo, number, comments, markerPrefix);
+              say("a call for this head exists", { head, kept: cleanup.kept, deleted: cleanup.deleted });
+              lines.push("", `A shadow call for this head exists: comment ${cleanup.kept}. No second comment.`);
+              if (cleanup.deleted.length === 1) lines.push("", "Removed 1 duplicate call comment.");
+              else if (cleanup.deleted.length > 1) lines.push("", `Removed ${cleanup.deleted.length} duplicate call comments.`);
               await summary(`${lines.join("\n")}\n`);
-              return { outcome: "exists", level, checks };
+              return cleanup.deleted.length > 0
+                ? { outcome: "exists", level, checks, deduplicated: true }
+                : { outcome: "exists", level, checks };
             }
             const written = await api.createIssueComment(owner, repo, number, shadowComment({ head, level, checks }));
             const ownId = written?.id;
             if (!Number.isSafeInteger(ownId) || ownId < 1) throw new Error("the comment API returned no comment id");
+            const comment = shadowComment({ head, level, checks });
             say("wrote the shadow call", { head, id: ownId });
 
-            // Check-then-write is not atomic: another run for the same head can have
-            // written between the list and the write. The lowest comment id stays.
+            // The write follows a read, so another run can have written between them. The
+            // own comment is a call comment too, even when the new list lags behind it.
             const after = await api.listIssueComments(owner, repo, number);
-            const earlier = after.some(
-              (comment) => Number.isSafeInteger(comment?.id) && comment.id < ownId && holdsMarker(comment),
-            );
-            if (earlier) {
-              await api.deleteIssueComment(owner, repo, ownId);
-              say("removed this run's duplicate comment", ownId);
+            const owned = { id: ownId, user: { login: SHADOW_AUTHOR }, body: comment };
+            const candidates = [owned, ...after.filter((entry) => entry?.id !== ownId)];
+            const cleanup = await keepLowestCall(api, owner, repo, number, candidates, markerPrefix);
+            if (cleanup.kept !== ownId) {
+              say("removed this run's duplicate comment", { own: ownId, kept: cleanup.kept });
               lines.push(
                 "",
                 "Another run wrote a comment for this head first. This run removed its own comment. Nothing is enabled. A person still merges.",
@@ -1407,6 +1440,7 @@ jobs:
               await summary(`${lines.join("\n")}\n`);
               return { outcome: "exists", level, checks, deduplicated: true };
             }
+            if (cleanup.deleted.length > 0) say("removed a later duplicate comment", cleanup.deleted);
             lines.push("", "Wrote the shadow call. Nothing is enabled. A person still merges.");
             await summary(`${lines.join("\n")}\n`);
             return { outcome: "called", level, checks };

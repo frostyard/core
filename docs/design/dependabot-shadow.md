@@ -41,13 +41,16 @@ its event, it writes nothing and returns `stale`, so a delayed or re-run job
 never judges the files of a newer head. Between the 2 reads it reads the changed
 files, the risk-paths list at the base SHA, and the branch rules of the base ref.
 
-It writes at most 1 comment for each head SHA, and it finds an earlier comment by
-the marker line `<!-- frostyard:dependabot-shadow v1 head=<sha> ...`. Two runs
-for the same head can both find no marker and both write. After a write, the step
-reads the comments again: when another comment for the same head has a lower
-comment id, the step deletes its own comment, so the comment with the lowest id
-stays and 2 runs converge on 1 comment. It deletes only the comment that it
-wrote.
+It writes at most 1 comment for each head SHA. A call comment is a comment of the
+author `github-actions[bot]` with the marker line
+`<!-- frostyard:dependabot-shadow v1 head=<sha> ...` for this head. Each head
+keeps the call comment with the lowest comment id: on both the path that finds a
+call and the path that writes one, the step deletes every other call comment of
+the head. A comment by another author never counts and is never deleted, and a
+comment for another head is never deleted.
+
+Two runs for the same head can both write. A run whose cleanup fails leaves 2
+comments, and the next run for the same head removes the extra one.
 
 The exact contract, the criteria S1 to S4, the API reads and the comment bodies
 are in [PR triage, section G](../specs/pr-triage.md#g-the-shadow-step). The
