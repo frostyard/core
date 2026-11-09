@@ -1149,4 +1149,6 @@ WOULD  POST repos/bketelsen/truenas-mcp/labels (create label level:L4)
 - Names: [core#222](https://github.com/frostyard/core/issues/222); background:
   [core#218](https://github.com/frostyard/core/issues/218)
 - Context: [design: quality loop](quality-loop.md),
-  [design: Dependabot shadow](dependabot-shadow.md)
+  [design: Dependabot shadow](dependabot-shadow.md),
+  [design: pull_request_target event policy](pull-request-target-policy.md)
+  (the Actions policy that keeps the caller running on public repositories)
