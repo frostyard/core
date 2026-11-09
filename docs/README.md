@@ -109,6 +109,7 @@ which baseline rows do not apply here.
 - [Problem reports](design/problem-reports.md)
 - [Dependabot shadow](design/dependabot-shadow.md)
 - [PR triage rollout: settings runbook](design/pr-triage-rollout.md)
+- [pull_request_target event policy: settings runbook](design/pull-request-target-policy.md)
 
 ### Specs
 
