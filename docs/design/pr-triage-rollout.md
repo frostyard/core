@@ -76,7 +76,8 @@ Web UI, for each repository with required names in the table:
    - "Require branches to be up to date before merging": on only for
      frostyard/repogen; off everywhere else.
    - Add checks: type each name of the row exactly (case, spaces and
-     brackets count). Source: GitHub Actions. A name marked "(any app)":
+     brackets count). Source: GitHub Actions. A name followed by "(any app)"
+     outside its code span: type the name without "(any app)", and set
      Source: any source.
 6. frostyard/repogen only: turn on "Require merge queue" with the ADR-0042
    values: Merge method "Squash and merge", Build concurrency 5, Minimum
@@ -166,7 +167,7 @@ had no required status check.
 | [frostyard/lodge](#frostyardlodge) | Irulan | B | `Verify (make verify)`, `Race detector and cross-builds (make race cross)`, `lodge-client (make client-check)`, `lodge-ui (make ui-check)`, `the shell (make shell-check)`, `The kit off Linux (go test on Windows)`, `Snapshot .deb (make deb)` | no |  |
 | [frostyard/porter](#frostyardporter) | Irulan | B | `Verify (make verify)`, `Race detector (make race)`, `Web bundle (make web-check)`, `Snapshot .deb (make deb)` | no |  |
 | [frostyard/bootc-debian](#frostyardbootc-debian) | Lucilla | B | `ci` (waiting for the comment) | no |  |
-| [frostyard/frostyard-org](#frostyardfrostyard-org) | Tamalane | B | `ci`, `Workers Builds: frostyard-org (any app)` | no |  |
+| [frostyard/frostyard-org](#frostyardfrostyard-org) | Tamalane | B | `ci`, `Workers Builds: frostyard-org` (any app) | no |  |
 | [bketelsen/fleet](#bketelsenfleet) | Teg | B | `pytest`, `ansible-lint`, `tofu` | no |  |
 | [bketelsen/trimlights](#bketelsentrimlights) | Irulan | B | `check` | no |  |
 | [bketelsen/pi-pocket-team](#bketelsenpi-pocket-team) | Sheeana | B | `Test` | no |  |
@@ -513,7 +514,7 @@ WOULD  POST repos/frostyard/bootc-debian/labels (create label level:L4)
 #### frostyard/frostyard-org
 
 - Owner: Tamalane. Group B. Merge queue: no.
-- Required names, from [the owner's comment](https://github.com/frostyard/core/issues/222#issuecomment-6741491586): `ci`, `Workers Builds: frostyard-org (any app)`.
+- Required names, from [the owner's comment](https://github.com/frostyard/core/issues/222#issuecomment-6741491586): `ci`, `Workers Builds: frostyard-org` (any app).
 
 Command (with `--apply`; the dry run is the same command without it):
 
