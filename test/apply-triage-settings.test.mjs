@@ -685,6 +685,40 @@ test("a failed label page read stops the run before any change", async () => {
   assert.deepEqual(await mutations(fixture), []);
 });
 
+// A page that gh returns with exit 0 but that is not JSON, or whose selected
+// value is not an array, must stop the run: paged_json runs in an `if`
+// condition, where `set -e` does not stop a failed jq.
+for (const [what, page2] of [
+  ["is not JSON", { raw: "<html>not json</html>" }],
+  ["is an object, not an array", { message: "Server Error" }],
+]) {
+  test(`a label page 2 that ${what} stops --apply before any change`, async () => {
+    const routes = world({ labels: Array.from({ length: 100 }, (_, index) => ({ name: `area/${index}` })) });
+    routes[`repos/${REPO}/labels?per_page=100&page=2`] = page2;
+    const fixture = await setup(routes);
+    const { status, stdout, stderr } = await run(fixture, ["--required-check", "Verify", "--apply"]);
+
+    assert.equal(status, 1, stdout);
+    assert.match(stderr, /cannot read the labels.*page 2/);
+    assert.doesNotMatch(stdout, /^(WOULD|APPLY)/m);
+    assert.deepEqual(await mutations(fixture), []);
+  });
+}
+
+test("a malformed page 2 of the workflow runs stops --merge-queue --apply before any change", async () => {
+  const runs = [...Array.from({ length: 100 }, (_, index) => ({ id: 5000 + index, path: ".github/workflows/other.yml" }))];
+  const jobs = Object.fromEntries(runs.map((entry) => [entry.id, ["Other"]]));
+  const routes = world({ runs, jobs });
+  routes[`repos/${REPO}/actions/runs?head_sha=${SHA}&per_page=100&page=2`] = { raw: "{\"workflow_runs\": [" };
+  const fixture = await setup(routes);
+  const { status, stdout, stderr } = await run(fixture, ["--required-check", "Verify", "--merge-queue", "--apply"]);
+
+  assert.equal(status, 1, stdout);
+  assert.match(stderr, /cannot list the workflow runs/);
+  assert.doesNotMatch(stdout, /^(WOULD|APPLY)/m);
+  assert.deepEqual(await mutations(fixture), []);
+});
+
 // A real page of 100 pull requests, runs or labels is far larger than the
 // kernel's limit for one command-line argument (128 KiB): the script must pass
 // page data on stdin, never as an argument.

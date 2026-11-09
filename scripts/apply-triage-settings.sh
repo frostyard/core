@@ -78,7 +78,9 @@ plan() { # plan <METHOD> <endpoint> <reason> <json body>: print, and call only w
 
 # Read-all-pages helper: paged_json <endpoint> <jq selector of the page's array>
 # prints one JSON array that joins every page (100 items a page). When a page read
-# fails, or the pages do not end within MAX_PAGES, it prints the reason and returns 1.
+# fails, a page is not JSON or its selected value is not an array, or the pages do
+# not end within MAX_PAGES, it prints the reason and returns 1. Callers run it in an
+# `if` condition, where `set -e` does not apply: every step checks its own status.
 MAX_PAGES=50
 paged_json() {
   local endpoint="$1" selector="$2" sep="?" page=1 acc='[]' out items n
@@ -88,10 +90,19 @@ paged_json() {
       printf '%s' "$out"
       return 1
     fi
-    items="$(jq -c "$selector" <<<"$out")"
-    n="$(jq length <<<"$items")"
+    if ! items="$(jq -c "($selector) | if type == \"array\" then . else error(\"not an array\") end" <<<"$out" 2>/dev/null)" || [[ -z $items ]]; then
+      printf 'page %s of %s is not a JSON array at %s' "$page" "$endpoint" "$selector"
+      return 1
+    fi
+    if ! n="$(jq length <<<"$items")" || [[ ! $n =~ ^[0-9]+$ ]]; then
+      printf 'cannot count page %s of %s' "$page" "$endpoint"
+      return 1
+    fi
     # Pages can be large: join them on stdin, never through the argument list.
-    acc="$(printf '%s\n%s\n' "$acc" "$items" | jq -cs '.[0] + .[1]')"
+    if ! acc="$(printf '%s\n%s\n' "$acc" "$items" | jq -cs '.[0] + .[1]')" || [[ -z $acc ]]; then
+      printf 'cannot join page %s of %s' "$page" "$endpoint"
+      return 1
+    fi
     if [[ $n -lt 100 ]]; then
       printf '%s' "$acc"
       return 0
