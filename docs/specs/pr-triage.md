@@ -72,6 +72,8 @@ The step computes the level of the PR and sets the level label by the ratchet, w
 - With 1 or more checks that are not green, the step revokes the label.
 - With every check green, the label stays.
 - With no check run left and no status, the label stays.
+- Readiness unknown. When the check-run read or the commit-status read gets HTTP 403, the token cannot read checks. This happens in a private repository: there, the job permissions `contents: read` and `pull-requests: write` do not cover check runs and commit statuses ([bketelsen/fleet run 42646228960](https://github.com/bketelsen/fleet/actions/runs/42646228960)). The step then stops with the outcome `unknown`. It writes a `::notice::` annotation and a `## Readiness` section that start with `readiness unknown`, changes no label, writes no comment, and passes. After a 403 on the check runs, it does not read the statuses.
+- Only HTTP 403 gives `unknown`. The step reads the status from the `status` field of the client error, not from its message. Any other HTTP status, or a network error, on these reads fails the step.
 
 ### E. The `readiness` step: revoke
 
@@ -107,6 +109,7 @@ The step writes a `## Readiness` section to the job summary with the result. For
 - Open case: review at A, push B, CI on B green, then the label. The step keeps the label, because nothing moved after it and CI is green.
 - A workflow that itself runs on `labeled` can be pending at that moment. The step then revokes the label.
 - The workflow never adds `ready-for-human`. A person or an agent adds it again.
+- In a private repository, only trigger 1 (`head-moved`) works. Trigger 2 gives readiness unknown (rule D). The workflow does not ask for `checks: read` and `statuses: read`: a reusable workflow cannot get more permissions than its caller grants, so each caller would need a change first. A secondary rate limit also answers HTTP 403. It then gives readiness unknown and not a red run. In both cases, the label stays, as it does after a failed run.
 
 ### G. The shadow step
 

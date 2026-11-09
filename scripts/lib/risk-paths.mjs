@@ -546,7 +546,11 @@ export function createGitHubApi({ token, apiUrl = "https://api.github.com", fetc
     }
     if (allow404 && response.status === 404) return null;
     if (response.status < 200 || response.status > 299) {
-      throw new Error(`GitHub API ${method} ${shownPath} failed: HTTP ${response.status}`);
+      // The message stays as it was for existing callers; `status` lets a
+      // caller tell one HTTP status from another without parsing the text.
+      const error = new Error(`GitHub API ${method} ${shownPath} failed: HTTP ${response.status}`);
+      error.status = response.status;
+      throw error;
     }
     return response;
   };

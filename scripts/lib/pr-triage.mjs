@@ -126,7 +126,20 @@ export function evaluateChecks(checkRuns, statuses) {
 
 // ---- Step -----------------------------------------------------------------
 
-export async function runReadinessStep({ api, eventName, event, summary, log }) {
+// Reads 1 list of checks at the head. HTTP 403 gives null: the token cannot
+// read checks (a private repository, where the job's `contents: read` and
+// `pull-requests: write` do not cover check runs and commit statuses). Any
+// other error throws.
+async function readChecksOrNull(read) {
+  try {
+    return await read();
+  } catch (error) {
+    if (error?.status === 403) return null;
+    throw error;
+  }
+}
+
+export async function runReadinessStep({ api, eventName, event, summary, log, notice }) {
   const say = (message, value) =>
     log(value === undefined ? `${READINESS_PREFIX}${message}` : `${READINESS_PREFIX}${message} ${JSON.stringify(value)}`);
 
@@ -174,8 +187,16 @@ export async function runReadinessStep({ api, eventName, event, summary, log }) 
       throw new Error("the event has no valid pull request head SHA (40 hex characters)");
     }
     say("head", head);
-    const checkRuns = await api.listCheckRuns(owner, repo, head);
-    const statuses = await api.listCommitStatuses(owner, repo, head);
+    const checkRuns = await readChecksOrNull(() => api.listCheckRuns(owner, repo, head));
+    const statuses = checkRuns === null ? null : await readChecksOrNull(() => api.listCommitStatuses(owner, repo, head));
+    if (checkRuns === null || statuses === null) {
+      const what = checkRuns === null ? "the check runs" : "the commit statuses";
+      const text =
+        `readiness unknown: the token cannot read ${what} at the head (HTTP 403). ` +
+        "No label change and no comment. A push after the label still removes it.";
+      if (typeof notice === "function") notice(`pr-triage readiness: ${text}`);
+      return done("unknown", text);
+    }
     const evaluated = evaluateChecks(checkRuns, statuses);
     say("checks counted", evaluated.relevant);
     if (evaluated.relevant === 0) {
@@ -713,7 +734,11 @@ export async function main(env) {
       process.stdout.write(`${text.startsWith(prefix) ? text : prefix + JSON.stringify(text)}\n`);
     };
     const run = step === "levels" ? runLevelsStep : step === "readiness" ? runReadinessStep : runShadowStep;
-    const options = { api, eventName: env.GITHUB_EVENT_NAME, event, summary, log };
+    // A workflow annotation: the run page shows it without the log open.
+    const notice = (text) => {
+      process.stdout.write(`::notice::${commandValue(text)}\n`);
+    };
+    const options = { api, eventName: env.GITHUB_EVENT_NAME, event, summary, log, notice };
     if (step === "shadow") options.updates = env.DEPENDABOT_UPDATES;
     return await run(options);
   } catch (error) {

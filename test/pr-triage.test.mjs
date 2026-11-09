@@ -89,18 +89,22 @@ function fakeApi({ comments = [], checkRuns = [], statuses = [], removed = true,
 async function step(api, { eventName = "pull_request_target", ev } = {}) {
   const summaries = [];
   const logs = [];
+  const notices = [];
   const result = await runReadinessStep({
     api,
     eventName,
     event: ev,
     summary: (markdown) => summaries.push(markdown),
     log: (line) => logs.push(line),
+    notice: (text) => notices.push(text),
   });
-  return { result, summary: summaries.join(""), logs };
+  return { result, summary: summaries.join(""), logs, notices };
 }
 
 const names = (calls) => calls.map((call) => call.method);
 const httpError = (message) => new Error(message);
+// An error as the GitHub client in risk-paths.mjs throws it: the HTTP status in `status`.
+const statusError = (status) => Object.assign(new Error(`GitHub API GET x failed: HTTP ${status}`), { status });
 
 // ---- Comments -------------------------------------------------------------
 
@@ -286,6 +290,47 @@ test("any other action does nothing", async () => {
   const { result } = await step(api, { ev });
   assert.deepEqual(result, { outcome: "ignored" });
   assert.equal(calls.length, 0);
+});
+
+// ---- Readiness unknown (HTTP 403 on the check reads) -----------------------
+
+// A private repository: the job's contents: read and pull-requests: write do
+// not cover check runs and commit statuses, so GitHub answers HTTP 403.
+for (const [title, fail, readCalls, what] of [
+  ["the check runs", { listCheckRuns: statusError(403) }, ["listCheckRuns"], "check runs"],
+  ["the commit statuses", { listCommitStatuses: statusError(403) }, ["listCheckRuns", "listCommitStatuses"], "commit statuses"],
+]) {
+  test(`labeled with HTTP 403 on ${title} is readiness unknown: no label change, no comment, no failure`, async () => {
+    const { result, calls, summary, logs, notices } = await labeled({ checkRuns: [run("ci", "failure")], fail });
+    assert.deepEqual(result, { outcome: "unknown" });
+    assert.deepEqual(names(calls), readCalls);
+    assert.match(summary, /^## Readiness\n\nreadiness unknown: /);
+    assert.ok(summary.includes(`cannot read the ${what} at the head (HTTP 403)`), summary);
+    assert.ok(logs.some((line) => line.includes("readiness unknown")), logs.join("\n"));
+    assert.equal(notices.length, 1);
+    assert.match(notices[0], /readiness unknown/);
+  });
+}
+
+for (const [title, fail] of [
+  ["HTTP 500 on the check runs", { listCheckRuns: statusError(500) }],
+  ["HTTP 404 on the check runs", { listCheckRuns: statusError(404) }],
+  ["HTTP 500 on the commit statuses", { listCommitStatuses: statusError(500) }],
+  ["a 403 only in the message, with no status", { listCheckRuns: httpError("GitHub API GET x failed: HTTP 403") }],
+]) {
+  test(`labeled with ${title} still fails the step and changes nothing`, async () => {
+    const { api, calls } = fakeApi({ checkRuns: [run("ci", "failure")], fail });
+    await assert.rejects(step(api, { ev: labeledEvent() }), /failed: HTTP/);
+    assert.ok(!names(calls).includes("createIssueComment"));
+    assert.ok(!names(calls).includes("removeIssueLabel"));
+  });
+}
+
+test("synchronize still revokes when the check reads would get HTTP 403", async () => {
+  const { api, calls } = fakeApi({ fail: { listCheckRuns: statusError(403), listCommitStatuses: statusError(403) } });
+  const { result } = await step(api, { ev: syncEvent() });
+  assert.equal(result.outcome, "revoked");
+  assert.deepEqual(names(calls), ["listIssueComments", "createIssueComment", "removeIssueLabel"]);
 });
 
 // ---- Validation -----------------------------------------------------------
@@ -1319,6 +1364,57 @@ test("main runs the shadow step with PR_TRIAGE_STEP=shadow and the shadow log pr
   assert.match(await readFile(summaryPath, "utf8"), /## Dependabot shadow/);
 });
 
+// The real client and main, as in a private repository: HTTP 403 on the check
+// runs at the head (bketelsen/fleet run 42646228960).
+test("main on labeled with HTTP 403 on the check runs passes with a notice and makes no change", async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), "pr-triage-readiness-"));
+  const eventPath = path.join(dir, "event.json");
+  const summaryPath = path.join(dir, "summary.md");
+  await writeFile(eventPath, JSON.stringify(labeledEvent()));
+  const saved = process.exitCode;
+  const write = process.stdout.write;
+  const savedFetch = globalThis.fetch;
+  const requests = [];
+  let out = "";
+  process.stdout.write = (chunk) => {
+    out += chunk;
+    return true;
+  };
+  globalThis.fetch = async (url, init) => {
+    requests.push(`${init.method} ${url}`);
+    return {
+      status: 403,
+      headers: { get: () => null },
+      json: async () => ({ message: "Resource not accessible by integration" }),
+      text: async () => "",
+    };
+  };
+  try {
+    const result = await main({
+      GITHUB_TOKEN: "secret-token",
+      GITHUB_API_URL: "https://api.example.test",
+      GITHUB_EVENT_PATH: eventPath,
+      GITHUB_STEP_SUMMARY: summaryPath,
+      GITHUB_EVENT_NAME: "pull_request_target",
+      PR_TRIAGE_STEP: "readiness",
+    });
+    assert.deepEqual(result, { outcome: "unknown" });
+    assert.equal(process.exitCode, saved);
+  } finally {
+    process.stdout.write = write;
+    process.exitCode = saved;
+    globalThis.fetch = savedFetch;
+  }
+  assert.deepEqual(requests, [
+    `GET https://api.example.test/repos/frostyard/core/commits/${HEAD}/check-runs?filter=latest&per_page=100`,
+  ]);
+  const lines = out.trimEnd().split("\n");
+  assert.ok(lines.some((line) => line.startsWith("::notice::pr-triage readiness: readiness unknown")), out);
+  assert.ok(!lines.some((line) => line.startsWith("::error::")), out);
+  assert.ok(!out.includes("secret-token"));
+  assert.match(await readFile(summaryPath, "utf8"), /## Readiness\n\nreadiness unknown: .*HTTP 403/);
+});
+
 // ---- GitHub API client: the new methods -----------------------------------
 
 function response(status, body, headers = {}) {
@@ -1426,6 +1522,24 @@ test("removeIssueLabel gives true on 200, false on 404 and throws on 500", async
   await assert.rejects(api.removeIssueLabel("o", "r", 9, "ready-for-human"), (error) => {
     assert.match(error.message, /HTTP 500/);
     assert.ok(!error.message.includes("secret-token"));
+    return true;
+  });
+});
+
+test("an HTTP error from the client carries the status and keeps its message", async () => {
+  for (const status of [403, 500]) {
+    const api = client(async () => response(status, { message: "Resource not accessible by integration" }));
+    await assert.rejects(api.listCheckRuns("o", "r", HEAD), (error) => {
+      assert.equal(error.status, status);
+      assert.equal(error.message, `GitHub API GET /repos/o/r/commits/${HEAD}/check-runs failed: HTTP ${status}`);
+      return true;
+    });
+  }
+  const network = client(async () => {
+    throw new Error("offline");
+  });
+  await assert.rejects(network.listCommitStatuses("o", "r", HEAD), (error) => {
+    assert.equal(error.status, undefined);
     return true;
   });
 });
