@@ -212,7 +212,7 @@ The PR that converts the list changes the list, so it is at least L2 (rule G), a
 | Artifact | Derivation |
 | --- | --- |
 | Core validator and matcher (`scripts/lib/risk-paths.mjs`) | Implement this interface and validation contract (`validateRiskPaths`, `matchGlob`, `parseStrictJson`, `matchFiles`), the levels (`LEVELS`, `levelOfFile`, `levelOfPullRequest`), the floors (`ORG_FLOORS`, rule G) and rule C (`checkRequiredPaths`) |
-| PR triage library (`scripts/lib/pr-triage.mjs`) | Pick the step, and run the `levels` step (rule E) and the readiness step ([PR triage spec](pr-triage.md)) |
+| PR triage library (`scripts/lib/pr-triage.mjs`) | Pick the step, and run the `levels` step (rule E), the readiness step and the Dependabot shadow step ([PR triage spec](pr-triage.md)) |
 | Gate (`scripts/check-risk-paths.mjs`, `npm run check:risk-paths`) | Validate a list and rule C (with the level check of version 2), and fail when an embedded copy of a library in the reusable workflow drifts |
 | Reusable workflow (`.github/workflows/pr-triage.yml`) | Embed `scripts/lib/risk-paths.mjs` (no trailer) and `scripts/lib/pr-triage.mjs` (with the trailer `await main(process.env);`) verbatim, run with Node with no checkout, and add labels |
 | Sync (`scripts/sync-risk-paths-workflow.mjs`, `npm run sync:risk-paths-workflow`) | Rewrite the 2 embedded copies from the libraries |

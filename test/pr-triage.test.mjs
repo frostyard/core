@@ -1,18 +1,32 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import { createGitHubApi } from "../scripts/lib/risk-paths.mjs";
+import { FILE_LIST_LIMIT, createGitHubApi } from "../scripts/lib/risk-paths.mjs";
 import {
+  DEPENDABOT_LOGIN,
   LEVEL_LABELS,
+  MANIFEST_FILES,
   MARKER_PREFIX,
   READY_LABEL,
+  SHADOW_ACTIONS,
+  SHADOW_AUTHOR,
+  SHADOW_MARKER_PREFIX,
+  checkS1,
+  checkS2,
+  checkS3,
+  checkS4,
   main,
+  parseVersion,
   readinessComment,
   readinessMarker,
   runLevelsStep,
   runReadinessStep,
+  runShadowStep,
+  shadowComment,
+  shadowMarker,
 } from "../scripts/lib/pr-triage.mjs";
 import { PR_TRIAGE_BLOCK, RISK_PATHS_BLOCK, renderBlock, syncWorkflow } from "../scripts/sync-risk-paths-workflow.mjs";
 
@@ -625,6 +639,619 @@ test("levels only calls the methods it may call", async () => {
   }
 });
 
+// ---- Shadow step ----------------------------------------------------------
+
+const shadowUpdate = (overrides = {}) => ({
+  dependencyName: "left-pad",
+  updateType: "version-update:semver-patch",
+  prevVersion: "1.2.3",
+  newVersion: "1.2.4",
+  ...overrides,
+});
+const updatesOf = (entries) => JSON.stringify(entries);
+const PATCH_UPDATES = updatesOf([shadowUpdate()]);
+
+const shadowList = (defaultLevel = "L3") =>
+  JSON.stringify({
+    schema_version: 2,
+    default_level: defaultLevel,
+    paths: [
+      { glob: "secure/**", level: "L1", why: "boot chain" },
+      { glob: ".github/workflows/**", level: "L2", why: "workflows" },
+      { glob: "docs/**", level: "L4", why: "docs" },
+    ],
+  });
+
+const shadowRules = () => [
+  { type: "required_status_checks", parameters: { required_status_checks: [{ context: "ci" }] } },
+];
+const CI_CHECKS = [{ context: "ci", integration_id: null }];
+const GO_FILES = [file("go.mod"), file("go.sum")];
+
+function shadowEvent(pr = {}, overrides = {}) {
+  return {
+    action: "opened",
+    pull_request: {
+      number: 12,
+      draft: false,
+      user: { login: DEPENDABOT_LOGIN },
+      labels: [],
+      head: { sha: HEAD },
+      base: { sha: BASE_SHA, ref: "main" },
+      ...pr,
+    },
+    repository: { name: "core", owner: { login: "frostyard" } },
+    ...overrides,
+  };
+}
+
+// A fake API for the shadow step. It carries no label and no merge method.
+// `liveHeads` lists the head that getPullRequest returns, in order, and the last
+// one repeats. `commentLists` lists what listIssueComments returns, in order, and
+// the last one repeats. `created` is what createIssueComment returns; without it,
+// a comment with the id `ownId`.
+function shadowApi({
+  files = GO_FILES,
+  list = shadowList(),
+  rules = shadowRules(),
+  comments = [],
+  commentLists,
+  liveHeads = [HEAD],
+  created,
+  ownId = 500,
+  fail = {},
+} = {}) {
+  const calls = [];
+  let liveReads = 0;
+  let commentReads = 0;
+  const record = (method, args, value) => {
+    calls.push({ method, args });
+    if (fail[method]) throw fail[method];
+    return value;
+  };
+  const api = {
+    async getPullRequest(...args) {
+      const heads = liveHeads.length > 0 ? liveHeads : [HEAD];
+      const sha = heads[Math.min(liveReads, heads.length - 1)];
+      liveReads++;
+      return record("getPullRequest", args, { number: 12, head: { sha } });
+    },
+    async listPullFiles(...args) {
+      return record("listPullFiles", args, files);
+    },
+    async getFileAtRef(...args) {
+      return record("getFileAtRef", args, list);
+    },
+    async listBranchRules(...args) {
+      return record("listBranchRules", args, rules);
+    },
+    async listIssueComments(...args) {
+      const lists = Array.isArray(commentLists) ? commentLists : [comments];
+      const value = lists[Math.min(commentReads, lists.length - 1)];
+      commentReads++;
+      return record("listIssueComments", args, value);
+    },
+    async createIssueComment(...args) {
+      return record("createIssueComment", args, created === undefined ? { id: ownId } : created);
+    },
+    async deleteIssueComment(...args) {
+      return record("deleteIssueComment", args, true);
+    },
+  };
+  return { api, calls };
+}
+
+async function shadow(api, { eventName = "pull_request_target", ev = shadowEvent(), updates = PATCH_UPDATES } = {}) {
+  const summaries = [];
+  const logs = [];
+  const result = await runShadowStep({
+    api,
+    eventName,
+    event: ev,
+    updates,
+    summary: (markdown) => summaries.push(markdown),
+    log: (line) => logs.push(line),
+  });
+  return { result, summary: summaries.join(""), logs };
+}
+
+test("the shadow constants, marker and comment bodies are exact", () => {
+  assert.equal(DEPENDABOT_LOGIN, "dependabot[bot]");
+  assert.equal(SHADOW_MARKER_PREFIX, "<!-- frostyard:dependabot-shadow v1");
+  assert.deepEqual(SHADOW_ACTIONS, ["opened", "synchronize", "reopened"]);
+  assert.ok(MANIFEST_FILES instanceof Set);
+  for (const name of ["go.mod", "go.sum", "package-lock.json", "Cargo.lock", "poetry.lock", "Gemfile.lock"]) {
+    assert.ok(MANIFEST_FILES.has(name), name);
+  }
+  assert.equal(MANIFEST_FILES.has("requirements.txt"), false);
+  const checks = [{ context: "ci", integration_id: null }, { context: "lint", integration_id: 4 }];
+  assert.equal(
+    shadowMarker({ head: HEAD, level: "L3", checks }),
+    `<!-- frostyard:dependabot-shadow v1 head=${HEAD} level=L3 checks=` +
+      '[{"context":"ci","integration_id":null},{"context":"lint","integration_id":4}] -->',
+  );
+  assert.equal(
+    shadowComment({ head: HEAD, level: "L3", checks }),
+    `<!-- frostyard:dependabot-shadow v1 head=${HEAD} level=L3 checks=` +
+      '[{"context":"ci","integration_id":null},{"context":"lint","integration_id":4}] -->\n' +
+      `Shadow call: auto-merge would be enabled at \`${"c".repeat(12)}\` ` +
+      "(patch or minor; manifest and lock files only; level L3; 2 required checks). " +
+      "Nothing is enabled. A person still merges.",
+  );
+});
+
+test("the shadow step writes 1 comment when S1 to S4 all pass", async () => {
+  const { api, calls } = shadowApi({ comments: [{ body: "unrelated" }] });
+  const { result, summary } = await shadow(api);
+  assert.deepEqual(result, { outcome: "called", level: "L3", checks: CI_CHECKS });
+  assert.deepEqual(names(calls), [
+    "getPullRequest",
+    "listPullFiles",
+    "getFileAtRef",
+    "listBranchRules",
+    "getPullRequest",
+    "listIssueComments",
+    "createIssueComment",
+    "listIssueComments",
+  ]);
+  assert.deepEqual(calls[0].args, ["frostyard", "core", 12]);
+  assert.deepEqual(calls[1].args, ["frostyard", "core", 12]);
+  assert.deepEqual(calls[2].args, ["frostyard", "core", ".github/risk-paths.json", BASE_SHA]);
+  assert.deepEqual(calls[3].args, ["frostyard", "core", "main"]);
+  assert.deepEqual(calls[4].args, ["frostyard", "core", 12]);
+  assert.deepEqual(calls[5].args, ["frostyard", "core", 12]);
+  assert.deepEqual(calls[6].args, ["frostyard", "core", 12, shadowComment({ head: HEAD, level: "L3", checks: CI_CHECKS })]);
+  assert.deepEqual(calls[7].args, ["frostyard", "core", 12]);
+  assert.match(summary, /^## Dependabot shadow/);
+  assert.match(summary, /\| Criterion \| Result \| Detail \|/);
+  assert.match(summary, /\| S1 patch or minor \| pass \|/);
+  assert.match(summary, /\| S4 required checks \| pass \|/);
+  assert.match(summary, /Wrote the shadow call/);
+});
+
+const ONE_FAILURE = [
+  {
+    id: "S1",
+    title: "a major update",
+    updates: updatesOf([shadowUpdate({ updateType: "version-update:semver-major" })]),
+    options: { files: GO_FILES, list: shadowList(), rules: shadowRules() },
+  },
+  {
+    id: "S2",
+    title: "a file that is not a manifest or lock file",
+    updates: PATCH_UPDATES,
+    options: { files: [file("README.md")], list: shadowList(), rules: shadowRules() },
+  },
+  {
+    id: "S3",
+    title: "no list at the base SHA",
+    updates: PATCH_UPDATES,
+    options: { files: GO_FILES, list: null, rules: shadowRules() },
+  },
+  {
+    id: "S4",
+    title: "no required status check",
+    updates: PATCH_UPDATES,
+    options: { files: GO_FILES, list: shadowList(), rules: [] },
+  },
+];
+
+for (const scenario of ONE_FAILURE) {
+  test(`the shadow step fails only ${scenario.id} with ${scenario.title}: no comment, no comment list`, async () => {
+    const { api, calls } = shadowApi(scenario.options);
+    const { result, summary } = await shadow(api, { updates: scenario.updates });
+    assert.equal(result.outcome, "no-call");
+    assert.deepEqual(result.failed, [scenario.id]);
+    assert.ok(!names(calls).includes("listIssueComments"), "no comment list");
+    assert.ok(!names(calls).includes("createIssueComment"), "no comment");
+    assert.match(summary, new RegExp(`\\| ${scenario.id} [a-z ]+\\| fail \\|`));
+  });
+}
+
+test("parseVersion reads a v prefix and 2 or more dot-separated numbers", () => {
+  assert.deepEqual(parseVersion("1.2.3"), [1n, 2n, 3n]);
+  assert.deepEqual(parseVersion("v1.2"), [1n, 2n]);
+  assert.deepEqual(parseVersion("1.2.3.4"), [1n, 2n, 3n, 4n]);
+  assert.deepEqual(parseVersion("0.0.1"), [0n, 0n, 1n]);
+  for (const bad of ["1", "1.2.3-rc1", "1.2.3+build", "2024-01-02", "abc123def", "", "v", "1.", ".1.2", "1..2", undefined, null, 1.2]) {
+    assert.equal(parseVersion(bad), null, String(bad));
+  }
+});
+
+test("checkS1 passes patch and minor updates only", () => {
+  const pass = (entries) => checkS1(updatesOf(entries)).pass;
+  assert.equal(pass([shadowUpdate()]), true);
+  assert.equal(pass([shadowUpdate({ updateType: "version-update:semver-minor", prevVersion: "1.2.3", newVersion: "1.3.0" })]), true);
+  assert.equal(pass([shadowUpdate({ prevVersion: "v1.2.3" })]), true);
+  assert.equal(pass([shadowUpdate({ prevVersion: "0.3.1", newVersion: "0.3.2" })]), true);
+  assert.equal(pass([shadowUpdate({ updateType: "version-update:semver-major" })]), false);
+  assert.equal(pass([shadowUpdate({ prevVersion: "1.2.0", newVersion: "2.0.0", updateType: "version-update:semver-minor" })]), false);
+  assert.equal(pass([shadowUpdate({ prevVersion: "0.3.1", newVersion: "0.4.0", updateType: "version-update:semver-minor" })]), false);
+  assert.equal(pass([shadowUpdate({ updateType: "version-update:security" })]), false);
+  assert.equal(
+    pass([
+      shadowUpdate(),
+      shadowUpdate({ dependencyName: "other", updateType: "version-update:semver-minor", prevVersion: "1.3.0", newVersion: "1.4.0" }),
+    ]),
+    true,
+  );
+  assert.equal(
+    pass([
+      shadowUpdate(),
+      shadowUpdate({ dependencyName: "other", updateType: "version-update:semver-major", prevVersion: "1.3.0", newVersion: "2.0.0" }),
+    ]),
+    false,
+  );
+});
+
+test("checkS1 fails a version it cannot parse, and names the entry", () => {
+  for (const version of ["1.2.3-rc1", "1.2.3+build", "2024-01-02", "abc123def", "", "1"]) {
+    assert.equal(checkS1(updatesOf([shadowUpdate({ prevVersion: version })])).pass, false, version);
+    assert.equal(checkS1(updatesOf([shadowUpdate({ newVersion: version })])).pass, false, version);
+  }
+  const missing = checkS1(updatesOf([{ dependencyName: "left-pad", updateType: "version-update:semver-patch" }]));
+  assert.equal(missing.pass, false);
+  assert.match(missing.detail, /left-pad/);
+  const grouped = checkS1(
+    updatesOf([
+      shadowUpdate(),
+      shadowUpdate({ dependencyName: "big-lib", updateType: "version-update:semver-major", prevVersion: "1.0.0", newVersion: "2.0.0" }),
+      shadowUpdate({ dependencyName: "later", updateType: "version-update:semver-major", prevVersion: "1.0.0", newVersion: "3.0.0" }),
+    ]),
+  );
+  assert.ok(grouped.detail.includes("big-lib"));
+  assert.ok(!grouped.detail.includes("later"));
+});
+
+test("checkS1 compares version numbers exactly, with no size limit", () => {
+  const pass = (before, after, updateType = "version-update:semver-minor") =>
+    checkS1(updatesOf([shadowUpdate({ prevVersion: before, newVersion: after, updateType })])).pass;
+  // Number would make these 2 versions equal.
+  assert.equal(pass("0.9007199254740992.1", "0.9007199254740993.0"), false);
+  assert.equal(pass("99999999999999999999.0.0", "100000000000000000000.0.0"), false);
+  assert.equal(pass("1.2.3", "1.99999999999999999999999.0"), true);
+  const long = "9".repeat(400);
+  assert.deepEqual(parseVersion(`${long}.0`), [BigInt(long), 0n]);
+  assert.equal(pass(`${long}.0.0`, `${long}.1.0`), true);
+  assert.equal(pass(`${long}.0.0`, `${long}0.0.0`), false);
+});
+
+test("checkS1 fails on empty or malformed update metadata", () => {
+  for (const text of ["", "   ", "[]", "{", '{"a":1}', "null", '"x"', "[1]"]) {
+    assert.equal(checkS1(text).pass, false, text);
+  }
+  assert.equal(checkS1(undefined).pass, false);
+  assert.equal(checkS1(null).pass, false);
+});
+
+test("checkS2 passes manifest and lock files only", () => {
+  assert.equal(checkS2(GO_FILES).pass, true);
+  assert.equal(checkS2([file("sub/dir/package-lock.json")]).pass, true);
+  assert.equal(checkS2([file("requirements.txt")]).pass, true);
+  assert.equal(checkS2([file("requirements-dev.txt")]).pass, true);
+  assert.equal(checkS2([{ filename: "go.mod", previous_filename: "old/go.mod", status: "renamed" }]).pass, true);
+  const readme = checkS2([file("README.md")]);
+  assert.equal(readme.pass, false);
+  assert.match(readme.detail, /README\.md/);
+  assert.equal(checkS2([{ filename: "go.mod", previous_filename: "docs/README.md", status: "renamed" }]).pass, false);
+  assert.equal(checkS2([]).pass, false);
+  assert.equal(checkS2(undefined).pass, false);
+  const many = Array.from({ length: FILE_LIST_LIMIT }, () => file("go.mod"));
+  assert.equal(checkS2(many).pass, false);
+  assert.match(checkS2(many).detail, /truncated/);
+});
+
+test("checkS3 wants the computed level at L3 or L4 and fails on any error", () => {
+  const none = checkS3(null, GO_FILES);
+  assert.equal(none.pass, false);
+  assert.equal(none.level, null);
+  assert.match(none.detail, /no list at the base SHA/);
+  assert.equal(checkS3("{", GO_FILES).pass, false);
+  assert.equal(checkS3('{"schema_version":3,"paths":[]}', GO_FILES).pass, false);
+  const loose = checkS3(shadowList("L3"), GO_FILES);
+  assert.equal(loose.pass, true);
+  assert.equal(loose.level, "L3");
+  assert.equal(checkS3(shadowList("L4"), GO_FILES).pass, true);
+  const strict = checkS3(shadowList("L3"), [file("secure/a.sh")]);
+  assert.equal(strict.pass, false);
+  assert.equal(strict.level, "L1");
+  const l2 = checkS3(shadowList("L2"), GO_FILES);
+  assert.equal(l2.pass, false);
+  assert.equal(l2.level, "L2");
+  const l1 = checkS3(shadowList("L1"), GO_FILES);
+  assert.equal(l1.pass, false);
+  assert.equal(l1.level, "L1");
+});
+
+test("checkS4 collects the required checks of every rule and drops exact duplicates", () => {
+  assert.equal(checkS4([]).pass, false);
+  assert.equal(checkS4(undefined).pass, false);
+  assert.equal(checkS4([{ type: "deletion" }]).pass, false);
+  assert.equal(checkS4([{ type: "required_status_checks", parameters: {} }]).pass, false);
+  const two = checkS4([
+    {
+      type: "required_status_checks",
+      parameters: { required_status_checks: [{ context: "ci" }, { context: "lint", integration_id: 7 }] },
+    },
+    { type: "required_status_checks", parameters: { required_status_checks: [{ context: "ci" }, { context: "review" }] } },
+  ]);
+  assert.equal(two.pass, true);
+  assert.deepEqual(two.checks, [
+    { context: "ci", integration_id: null },
+    { context: "lint", integration_id: 7 },
+    { context: "review", integration_id: null },
+  ]);
+  assert.deepEqual(checkS4([{ type: "required_status_checks", parameters: { required_status_checks: [{ context: "<x>" }] } }]).checks, [
+    { context: "<x>", integration_id: null },
+  ]);
+});
+
+test("the shadow marker escapes <, > and & and stays valid JSON", () => {
+  const checks = [{ context: "ci <a> & b", integration_id: null }];
+  const marker = shadowMarker({ head: HEAD, level: "L3", checks });
+  assert.ok(marker.endsWith(" -->"));
+  assert.ok(!marker.slice(0, -4).includes("-->"));
+  assert.ok(!marker.includes("<a>"));
+  const json = /checks=(.*) -->$/.exec(marker)[1];
+  assert.ok(json.includes("\\u003c"));
+  assert.ok(json.includes("\\u003e"));
+  assert.ok(json.includes("\\u0026"));
+  assert.deepEqual(JSON.parse(json), checks);
+});
+
+test("the shadow step ignores the labels of the pull request", async () => {
+  const { api, calls } = shadowApi();
+  const { result } = await shadow(api, { ev: shadowEvent({ labels: [{ name: "level:L1" }, { name: "risk:high" }] }) });
+  assert.equal(result.outcome, "called");
+  assert.equal(result.level, "L3");
+  assert.ok(!names(calls).some((method) => /label/i.test(method)));
+});
+
+test("the shadow step writes 1 comment for each head", async () => {
+  const existing = shadowMarker({ head: HEAD, level: "L3", checks: CI_CHECKS });
+  const own = { id: 9, user: { login: SHADOW_AUTHOR }, body: `older\n  ${existing}  \nmore` };
+  const { api, calls } = shadowApi({ comments: [{ id: 4, user: { login: "someone" }, body: "unrelated" }, own] });
+  const { result, summary } = await shadow(api);
+  assert.deepEqual(result, { outcome: "exists", level: "L3", checks: CI_CHECKS });
+  assert.deepEqual(names(calls), [
+    "getPullRequest",
+    "listPullFiles",
+    "getFileAtRef",
+    "listBranchRules",
+    "getPullRequest",
+    "listIssueComments",
+  ]);
+  assert.match(summary, /A shadow call for this head exists/);
+  const other = shadowMarker({ head: BASE_SHA, level: "L3", checks: CI_CHECKS });
+  const again = shadowApi({ comments: [{ id: 7, user: { login: SHADOW_AUTHOR }, body: other }] });
+  const second = await shadow(again.api);
+  assert.equal(second.result.outcome, "called");
+  assert.equal(callsOf(again.calls, "createIssueComment").length, 1);
+});
+
+test("the shadow step ignores a pull request that is not Dependabot's, another action and a draft", async () => {
+  const cases = [
+    shadowEvent({ user: { login: "frostyard-machines" } }),
+    shadowEvent({ user: undefined }),
+    { ...shadowEvent(), action: "edited" },
+    { ...shadowEvent(), action: "labeled" },
+    shadowEvent({ draft: true }),
+  ];
+  for (const ev of cases) {
+    const { api, calls } = shadowApi();
+    const { result, summary } = await shadow(api, { ev });
+    assert.deepEqual(result, { outcome: "ignored" });
+    assert.equal(calls.length, 0);
+    assert.match(summary, /^## Dependabot shadow/);
+    assert.match(summary, /No comment\./);
+  }
+});
+
+test("the shadow step fails on a wrong event name, a bad owner, number, head, base SHA or base ref", async () => {
+  const { api, calls } = shadowApi();
+  await assert.rejects(shadow(api, { eventName: "pull_request" }), /must run on pull_request_target/);
+  await assert.rejects(
+    shadow(api, { ev: shadowEvent({}, { repository: { name: "a b", owner: { login: "x" } } }) }),
+    /owner and name/,
+  );
+  await assert.rejects(shadow(api, { ev: shadowEvent({ number: 0 }) }), /pull request number/);
+  await assert.rejects(shadow(api, { ev: shadowEvent({ head: { sha: "abc" } }) }), /head SHA/);
+  await assert.rejects(shadow(api, { ev: shadowEvent({ head: { sha: "C".repeat(40) } }) }), /head SHA/);
+  await assert.rejects(shadow(api, { ev: shadowEvent({ base: { sha: "main", ref: "main" } }) }), /base\.sha/);
+  await assert.rejects(shadow(api, { ev: shadowEvent({ base: { sha: BASE_SHA, ref: "" } }) }), /base\.ref/);
+  assert.equal(calls.length, 0);
+});
+
+test("an error from the file list or the rule list fails the shadow step, with no comment", async () => {
+  const files = shadowApi({ fail: { listPullFiles: httpError("GitHub API GET x failed: HTTP 500") } });
+  await assert.rejects(shadow(files.api), /HTTP 500/);
+  assert.ok(!names(files.calls).includes("createIssueComment"));
+  const rules = shadowApi({ fail: { listBranchRules: httpError("GitHub API GET y failed: HTTP 502") } });
+  await assert.rejects(shadow(rules.api), /HTTP 502/);
+  assert.ok(!names(rules.calls).includes("createIssueComment"));
+});
+
+test("an error while reading the list fails S3 only, and the step does not throw", async () => {
+  const { api, calls } = shadowApi({ fail: { getFileAtRef: httpError("GitHub API GET z failed: HTTP 500") } });
+  const { result } = await shadow(api);
+  assert.equal(result.outcome, "no-call");
+  assert.deepEqual(result.failed, ["S3"]);
+  assert.ok(!names(calls).includes("createIssueComment"));
+});
+
+test("the shadow step calls only the 5 methods it may call and has no label or merge method", async () => {
+  const allowed = new Set([
+    "getPullRequest",
+    "listPullFiles",
+    "getFileAtRef",
+    "listBranchRules",
+    "listIssueComments",
+    "createIssueComment",
+    "deleteIssueComment",
+  ]);
+  const existing = shadowMarker({ head: HEAD, level: "L3", checks: CI_CHECKS });
+  const scenarios = [
+    shadowApi(),
+    shadowApi({ list: null }),
+    shadowApi({ comments: [{ id: 9, user: { login: SHADOW_AUTHOR }, body: existing }] }),
+    shadowApi({ fail: { getFileAtRef: httpError("boom") } }),
+  ];
+  for (const { api, calls } of scenarios) {
+    await shadow(api).catch(() => undefined);
+    for (const call of calls) assert.ok(allowed.has(call.method), call.method);
+  }
+  const { api } = shadowApi();
+  for (const name of [
+    "addLabels",
+    "removeIssueLabel",
+    "listIssueLabels",
+    "labelExists",
+    "approvePullRequest",
+    "enableAutoMerge",
+    "mergePullRequest",
+    "updatePullRequest",
+  ]) {
+    assert.equal(api[name], undefined, name);
+  }
+});
+
+test("the shadow step writes nothing when the live head is not the event head", async () => {
+  const { api, calls } = shadowApi({ liveHeads: [BASE_SHA] });
+  const { result, summary } = await shadow(api);
+  assert.deepEqual(result, { outcome: "stale" });
+  assert.deepEqual(names(calls), ["getPullRequest"]);
+  assert.match(summary, /^## Dependabot shadow/);
+  assert.ok(summary.includes("c".repeat(12)), summary);
+  assert.ok(summary.includes("d".repeat(12)), summary);
+});
+
+test("the shadow step names a live head it cannot read and writes nothing", async () => {
+  const { api, calls } = shadowApi({ liveHeads: [null] });
+  const { result, summary } = await shadow(api);
+  assert.deepEqual(result, { outcome: "stale" });
+  assert.deepEqual(names(calls), ["getPullRequest"]);
+  assert.match(summary, /to a head that is unknown/);
+});
+
+test("the shadow step writes nothing when the head moves during the evaluation", async () => {
+  const { api, calls } = shadowApi({ liveHeads: [HEAD, BASE_SHA] });
+  const { result, summary } = await shadow(api);
+  assert.deepEqual(result, { outcome: "stale", level: "L3", checks: CI_CHECKS });
+  assert.equal(callsOf(calls, "getPullRequest").length, 2);
+  assert.ok(!names(calls).includes("listIssueComments"));
+  assert.ok(!names(calls).includes("createIssueComment"));
+  assert.match(summary, /No comment\./);
+});
+
+test("an error from the pull request read fails the shadow step, with no comment", async () => {
+  const { api, calls } = shadowApi({ fail: { getPullRequest: httpError("GitHub API GET p failed: HTTP 500") } });
+  await assert.rejects(shadow(api), /HTTP 500/);
+  assert.deepEqual(names(calls), ["getPullRequest"]);
+});
+
+const call = (id, login = SHADOW_AUTHOR, body = shadowMarker({ head: HEAD, level: "L3", checks: CI_CHECKS })) => ({
+  id,
+  user: { login },
+  body,
+});
+
+test("a retry after a failed cleanup removes the duplicate", async () => {
+  const marker = shadowMarker({ head: HEAD, level: "L3", checks: CI_CHECKS });
+  const earlier = { id: 12, user: { login: SHADOW_AUTHOR }, body: `${marker}\nanother run` };
+  const own = { id: 20, user: { login: SHADOW_AUTHOR }, body: marker };
+  // Run 1 wrote its comment, saw the earlier one, and the delete failed: both stay.
+  const first = shadowApi({
+    ownId: 20,
+    commentLists: [[], [earlier, own]],
+    fail: { deleteIssueComment: httpError("GitHub API DELETE c failed: HTTP 500") },
+  });
+  await assert.rejects(shadow(first.api), /HTTP 500/);
+  assert.equal(callsOf(first.calls, "listIssueComments").length, 2);
+  // A retry finds both call comments in the first list and removes the higher one.
+  const retry = shadowApi({ commentLists: [[earlier, own]] });
+  const { result, summary } = await shadow(retry.api);
+  assert.deepEqual(result, { outcome: "exists", level: "L3", checks: CI_CHECKS, deduplicated: true });
+  assert.equal(callsOf(retry.calls, "createIssueComment").length, 0);
+  assert.deepEqual(
+    callsOf(retry.calls, "deleteIssueComment").map((entry) => entry.args),
+    [["frostyard", "core", 20]],
+  );
+  assert.match(summary, /Removed 1 duplicate call comment/);
+});
+
+test("the shadow step keeps the lowest of 3 call comments for this head", async () => {
+  const { api, calls } = shadowApi({ comments: [call(5), call(9), call(7)] });
+  const { result } = await shadow(api);
+  assert.deepEqual(result, { outcome: "exists", level: "L3", checks: CI_CHECKS, deduplicated: true });
+  assert.equal(callsOf(calls, "createIssueComment").length, 0);
+  assert.deepEqual(
+    callsOf(calls, "deleteIssueComment").map((entry) => entry.args[2]),
+    [7, 9],
+  );
+});
+
+test("the shadow step removes its own comment when an earlier call exists for this head", async () => {
+  const { api, calls } = shadowApi({ ownId: 20, commentLists: [[], [call(12), call(20)]] });
+  const { result, summary } = await shadow(api);
+  assert.deepEqual(result, { outcome: "exists", level: "L3", checks: CI_CHECKS, deduplicated: true });
+  assert.deepEqual(names(calls).slice(-3), ["createIssueComment", "listIssueComments", "deleteIssueComment"]);
+  assert.deepEqual(
+    callsOf(calls, "deleteIssueComment").map((entry) => entry.args),
+    [["frostyard", "core", 20]],
+  );
+  assert.match(summary, /removed its own comment/);
+});
+
+test("the shadow step keeps its comment when the second list has only its own", async () => {
+  const { api, calls } = shadowApi({ ownId: 20, commentLists: [[], [call(20)]] });
+  const { result } = await shadow(api);
+  assert.deepEqual(result, { outcome: "called", level: "L3", checks: CI_CHECKS });
+  assert.equal(callsOf(calls, "deleteIssueComment").length, 0);
+});
+
+test("the shadow step keeps its comment when the second list lags behind the write", async () => {
+  const { api, calls } = shadowApi({ ownId: 20, commentLists: [[], []] });
+  const { result } = await shadow(api);
+  assert.deepEqual(result, { outcome: "called", level: "L3", checks: CI_CHECKS });
+  assert.equal(callsOf(calls, "deleteIssueComment").length, 0);
+});
+
+test("the shadow step keeps its own comment and removes a later duplicate of another run", async () => {
+  const { api, calls } = shadowApi({ ownId: 20, commentLists: [[], [call(20), call(25)]] });
+  const { result } = await shadow(api);
+  assert.deepEqual(result, { outcome: "called", level: "L3", checks: CI_CHECKS });
+  assert.deepEqual(
+    callsOf(calls, "deleteIssueComment").map((entry) => entry.args[2]),
+    [25],
+  );
+});
+
+test("a marker that another author wrote never stops the call and is never deleted", async () => {
+  const { api, calls } = shadowApi({ comments: [call(5, "someone")] });
+  const { result } = await shadow(api);
+  assert.deepEqual(result, { outcome: "called", level: "L3", checks: CI_CHECKS });
+  assert.equal(callsOf(calls, "createIssueComment").length, 1);
+  assert.equal(callsOf(calls, "deleteIssueComment").length, 0);
+});
+
+test("a marker of github-actions[bot] for another head is never deleted and stops nothing", async () => {
+  const other = shadowMarker({ head: BASE_SHA, level: "L3", checks: CI_CHECKS });
+  const { api, calls } = shadowApi({ comments: [call(5, SHADOW_AUTHOR, other)] });
+  const { result } = await shadow(api);
+  assert.deepEqual(result, { outcome: "called", level: "L3", checks: CI_CHECKS });
+  assert.equal(callsOf(calls, "createIssueComment").length, 1);
+  assert.equal(callsOf(calls, "deleteIssueComment").length, 0);
+});
+
+
+test("the shadow step fails when the comment API returns no usable id", async () => {
+  for (const created of [{}, null, { id: 0 }, { id: "900" }, { id: 1.5 }]) {
+    const { api, calls } = shadowApi({ created });
+    await assert.rejects(shadow(api), /no comment id/);
+    assert.equal(callsOf(calls, "deleteIssueComment").length, 0);
+  }
+});
+
 // ---- main -----------------------------------------------------------------
 
 test("main fails on an unknown PR_TRIAGE_STEP and redacts the token", async () => {
@@ -659,6 +1286,37 @@ test("main fails when no step is set", async () => {
     process.stdout.write = write;
     process.exitCode = saved;
   }
+});
+
+test("main runs the shadow step with PR_TRIAGE_STEP=shadow and the shadow log prefix", async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), "pr-triage-shadow-"));
+  const eventPath = path.join(dir, "event.json");
+  const summaryPath = path.join(dir, "summary.md");
+  await writeFile(eventPath, JSON.stringify(shadowEvent({ user: { login: "frostyard-machines" } })));
+  const saved = process.exitCode;
+  const write = process.stdout.write;
+  let out = "";
+  process.stdout.write = (chunk) => {
+    out += chunk;
+    return true;
+  };
+  try {
+    const result = await main({
+      GITHUB_TOKEN: "t",
+      GITHUB_EVENT_PATH: eventPath,
+      GITHUB_STEP_SUMMARY: summaryPath,
+      GITHUB_EVENT_NAME: "pull_request_target",
+      PR_TRIAGE_STEP: "shadow",
+      DEPENDABOT_UPDATES: "",
+    });
+    assert.deepEqual(result, { outcome: "ignored" });
+    assert.equal(process.exitCode, saved);
+  } finally {
+    process.stdout.write = write;
+    process.exitCode = saved;
+  }
+  assert.ok(out.split("\n").some((line) => line.startsWith("pr-triage: shadow: ")), out);
+  assert.match(await readFile(summaryPath, "utf8"), /## Dependabot shadow/);
 });
 
 // ---- GitHub API client: the new methods -----------------------------------
@@ -733,14 +1391,14 @@ test("listIssueComments reads 2 pages of comments", async () => {
   assert.equal(urls[0], "https://api.example.test/repos/o/r/issues/5/comments?per_page=100");
 });
 
-test("createIssueComment posts the body; an error throws without the token", async () => {
+test("createIssueComment posts the body, returns the comment; an error throws without the token", async () => {
   const requests = [];
   let status = 201;
   const api = client(async (url, init) => {
     requests.push({ url, init });
-    return response(status, {});
+    return response(status, { id: 42 });
   });
-  await api.createIssueComment("o", "r", 9, "hello");
+  assert.deepEqual(await api.createIssueComment("o", "r", 9, "hello"), { id: 42 });
   assert.equal(requests[0].url, "https://api.example.test/repos/o/r/issues/9/comments");
   assert.equal(requests[0].init.method, "POST");
   assert.deepEqual(JSON.parse(requests[0].init.body), { body: "hello" });
@@ -785,6 +1443,57 @@ test("listIssueLabels reads 2 pages of labels", async () => {
   assert.deepEqual((await api.listIssueLabels("o", "r", 9)).map((label) => label.name), ["bug", "level:L1"]);
   assert.equal(urls[0], "https://api.example.test/repos/o/r/issues/9/labels?per_page=100");
   assert.equal(urls.length, 2);
+});
+
+test("listBranchRules reads 2 pages and encodes each part of the branch", async () => {
+  const urls = [];
+  const api = client(async (url) => {
+    urls.push(url);
+    return url.includes("page=2")
+      ? response(200, [{ type: "deletion" }])
+      : response(200, [{ type: "required_status_checks" }], {
+          link: '<https://api.example.test/repositories/1/rules/branches/main?per_page=100&page=2>; rel="next"',
+        });
+  });
+  const rules = await api.listBranchRules("o", "r", "release/v1");
+  assert.deepEqual(rules.map((rule) => rule.type), ["required_status_checks", "deletion"]);
+  assert.equal(urls[0], "https://api.example.test/repos/o/r/rules/branches/release/v1?per_page=100");
+  assert.equal(urls[1], "https://api.example.test/repositories/1/rules/branches/main?per_page=100&page=2");
+  const encoded = [];
+  const other = client(async (url) => {
+    encoded.push(url);
+    return response(200, []);
+  });
+  assert.deepEqual(await other.listBranchRules("o", "r", "a b/c#d"), []);
+  assert.equal(encoded[0], "https://api.example.test/repos/o/r/rules/branches/a%20b/c%23d?per_page=100");
+  await assert.rejects(client(async () => response(200, {})).listBranchRules("o", "r", "main"), /not an array/);
+});
+
+test("getPullRequest reads the pull request body", async () => {
+  const urls = [];
+  const api = client(async (url) => {
+    urls.push(url);
+    return response(200, { number: 9, head: { sha: HEAD } });
+  });
+  const pr = await api.getPullRequest("o", "r", 9);
+  assert.equal(pr.head.sha, HEAD);
+  assert.equal(urls[0], "https://api.example.test/repos/o/r/pulls/9");
+});
+
+test("deleteIssueComment gives true on 204, false on 404 and throws on 500", async () => {
+  const requests = [];
+  let status = 204;
+  const api = client(async (url, init) => {
+    requests.push({ url, init });
+    return response(status, {});
+  });
+  assert.equal(await api.deleteIssueComment("o", "r", 700), true);
+  assert.equal(requests[0].url, "https://api.example.test/repos/o/r/issues/comments/700");
+  assert.equal(requests[0].init.method, "DELETE");
+  status = 404;
+  assert.equal(await api.deleteIssueComment("o", "r", 700), false);
+  status = 500;
+  await assert.rejects(api.deleteIssueComment("o", "r", 700), /HTTP 500/);
 });
 
 test("a network error never carries the token", async () => {
@@ -899,11 +1608,11 @@ test("the workflow has the input, the job, the permissions and no checkout", asy
   const uses = codeLines(lines.join("\n")).filter((line) => /\buses:/.test(line));
   assert.ok(uses.length > 0);
   for (const line of uses) assert.match(line, /uses:\s*[\w.-]+\/[\w./-]+@[0-9a-f]{40}(\s|$)/);
-  assert.equal(code.match(/GITHUB_TOKEN: \$\{\{ github\.token \}\}/g).length, 2);
+  assert.equal(code.match(/GITHUB_TOKEN: \$\{\{ github\.token \}\}/g).length, 3);
   assert.ok(!/secrets\./.test(code));
 });
 
-test("the workflow writes the scripts, then runs the 2 steps with exact conditions", async () => {
+test("the workflow writes the scripts, then runs the levels, readiness and shadow steps with exact conditions", async () => {
   const workflow = await readFile(workflowPath, "utf8");
   const text = outsideBlocks(workflow).join("\n");
   assert.ok(text.includes('mkdir -p "$RUNNER_TEMP/pr-triage"'));
@@ -929,6 +1638,35 @@ test("the workflow writes the scripts, then runs the 2 steps with exact conditio
         "          PR_TRIAGE_STEP: readiness\n" +
         '        run: node "$RUNNER_TEMP/pr-triage/pr-triage.mjs"\n',
     ),
+  );
+  const shadowIf =
+    "${{ !cancelled() && inputs.dependabot-shadow && github.event.pull_request.user.login == 'dependabot[bot]' && " +
+    "contains(fromJSON('[\"opened\",\"synchronize\",\"reopened\"]'), github.event.action) }}";
+  assert.ok(
+    text.includes(
+      "      - name: Fetch the Dependabot metadata\n" +
+        "        id: deps\n" +
+        `        if: ${shadowIf}\n` +
+        "        continue-on-error: true\n" +
+        "        uses: dependabot/fetch-metadata@21025c705c08248db411dc16f3619e6b5f9ea21a # v2.5.0\n" +
+        "        with:\n" +
+        "          github-token: ${{ github.token }}\n" +
+        "      - name: Write the Dependabot shadow call\n" +
+        "        id: shadow\n" +
+        `        if: ${shadowIf}\n` +
+        "        env:\n" +
+        "          GITHUB_TOKEN: ${{ github.token }}\n" +
+        "          PR_TRIAGE_STEP: shadow\n" +
+        "          DEPENDABOT_UPDATES: ${{ steps.deps.outputs.updated-dependencies-json }}\n" +
+        '        run: node "$RUNNER_TEMP/pr-triage/pr-triage.mjs"\n',
+    ),
+  );
+  assert.ok(
+    text.includes("        uses: dependabot/fetch-metadata@21025c705c08248db411dc16f3619e6b5f9ea21a # v2.5.0\n"),
+  );
+  assert.ok(
+    text.includes("        description: Run the Dependabot shadow step (docs/design/dependabot-shadow.md). " +
+      "It only writes a comment; it never enables auto-merge.\n"),
   );
 });
 
