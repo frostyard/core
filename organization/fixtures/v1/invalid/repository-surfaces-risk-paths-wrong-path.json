@@ -31,7 +31,7 @@
     },
     {
       "id": "risk-paths",
-      "path": ".github/risk-paths.yml",
+      "path": ".github/risk-paths.yaml",
       "artifact_type": "file",
       "media_type": "application/json"
     }

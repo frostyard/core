@@ -2,7 +2,7 @@
   "schema_version": 1,
   "paths": [
     { "glob": ".github/risk-paths.json", "why": "quality-gates: the high-risk path list that adds the risk:high label" },
-    { "glob": ".github/workflows/**", "why": "workflow-and-permissions: CI, the risk-paths workflow and its caller, and token permissions" },
+    { "glob": ".github/workflows/**", "why": "workflow-and-permissions: CI, the pr-triage workflow and its caller, and token permissions" },
     { "glob": ".github/skills-sync.json", "why": "workflow-and-permissions: the repositories that the skills sync writes to" },
     { "glob": "policies/**", "why": "workflow-and-permissions: the agent-governance policy that sets agent actions and boundaries" },
     { "glob": "organization/contracts/**", "why": "deployment-and-infrastructure: organization contracts, such as repository settings and surfaces" },
@@ -12,6 +12,8 @@
     { "glob": "scripts/sync-skills.sh", "why": "workflow-and-permissions: writes skills to other repositories with an app token" },
     { "glob": "scripts/lib/skills-sync-*.sh", "why": "workflow-and-permissions: authentication and containment of the skills sync" },
     { "glob": "scripts/lib/risk-paths.mjs", "why": "quality-gates: the risk-paths validator, matcher and labeling job" },
+    { "glob": "scripts/lib/pr-triage.mjs", "why": "quality-gates: the pr-triage steps that add risk:high and remove ready-for-human" },
+    { "glob": "scripts/sync-risk-paths-workflow.mjs", "why": "quality-gates: writes the scripts that the pr-triage workflow runs" },
     { "glob": "scripts/check-risk-paths.mjs", "why": "quality-gates: the gate that validates the risk-path list" }
   ]
 }

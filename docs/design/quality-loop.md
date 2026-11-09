@@ -31,7 +31,10 @@ PR template ──► review rubric ──► CI gates ──► corrections ─
   `.github/risk-paths.json`; core's reusable workflow labels a PR that
   touches 1 path with `risk:high`; the label routes the PR to the owner's
   review or the accountable owner's read ([ADR-0068](../adr/0068-label-pull-requests-that-touch-high-risk-paths.md),
-  [risk paths spec](../specs/risk-paths.md)).
+  [risk paths spec](../specs/risk-paths.md)). The same workflow removes
+  `ready-for-human` when the head moves after the label or CI is not green
+  ([ADR-0077](../adr/0077-bind-ready-for-human-to-the-head-commit.md),
+  [PR triage spec](../specs/pr-triage.md)).
 - **Review** — the [PR review rubric](../specs/pr-review-rubric.md) is the
   contract a review applies; the
   [review runbook](../../.github/prompts/review.prompt.md) is its task-shaped
@@ -143,10 +146,12 @@ copy it as-is.
   [ADR-0044](../adr/0044-expose-the-make-gate-triad-in-every-repository.md),
   [ADR-0070](../adr/0070-build-tool-docs-sites-with-materialx-on-github-pages.md),
   [ADR-0071](../adr/0071-hold-every-code-repository-to-one-baseline.md),
-  [ADR-0072](../adr/0072-write-every-readme-to-one-standard.md)
+  [ADR-0072](../adr/0072-write-every-readme-to-one-standard.md),
+  [ADR-0077](../adr/0077-bind-ready-for-human-to-the-head-commit.md)
 - Contracts: [specs/pr-review-rubric.md](../specs/pr-review-rubric.md),
   [specs/pr-acceptance-metric.md](../specs/pr-acceptance-metric.md),
   [specs/risk-paths.md](../specs/risk-paths.md),
+  [specs/pr-triage.md](../specs/pr-triage.md),
   [specs/flaky-test-scan.md](../specs/flaky-test-scan.md),
   [specs/repository-baseline.md](../specs/repository-baseline.md),
   [specs/readme.md](../specs/readme.md)

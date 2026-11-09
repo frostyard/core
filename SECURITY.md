@@ -7,7 +7,7 @@ the reusable workflows that other frostyard repositories call.
 
 Core makes no releases and has no tags. Only the `main` branch gets fixes.
 Consuming repositories copy skills and templates from `main`; a fix reaches
-them through the skills sync or their next copy. Their risk-paths caller pins
+them through the skills sync or their next copy. Their PR triage caller pins
 core's reusable workflow by commit SHA (ADR-0068); a workflow fix reaches them
 when they update that pin.
 
@@ -31,7 +31,7 @@ an issue, a pull request or a discussion.
 
 The high-risk areas are:
 
-- `.github/workflows/`: the risk-paths reusable workflow that other
+- `.github/workflows/`: the PR triage reusable workflow that other
   repositories call, and the skills sync that writes to other repositories
   with an app token.
 - `scripts/sync-skills.sh` and `scripts/lib/skills-sync-*.sh`.
