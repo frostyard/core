@@ -22,7 +22,7 @@ const SHA = "0123456789abcdef0123456789abcdef01234567";
 // every other call instead of making it. The method is derived as real
 // `gh api` derives it: -X wins, else a body (--input, -f) makes it a POST.
 // A GET with no route fails loudly (exit 4) instead of answering an empty body.
-const GH_STUB = `#!/usr/bin/env node
+const GH_STUB = `#!${process.execPath}
 import { spawnSync } from "node:child_process";
 import { appendFileSync, existsSync, readFileSync } from "node:fs";
 
@@ -126,40 +126,71 @@ function liveRuleset(id, body) {
   return { ...body, id, source_type: "Repository", source: REPO, current_user_can_bypass: "never", created_at: "2026-11-01T00:00:00Z" };
 }
 
+// Routes for a list endpoint that the script reads page by page (100 items a
+// page, `&page=N`). A full last page is followed by an empty page, as on GitHub.
+function pagedRoutes(routes, endpoint, items, wrap = (page) => page) {
+  const sep = endpoint.includes("?") ? "&" : "?";
+  const pages = Math.max(1, Math.floor(items.length / 100) + 1);
+  for (let page = 1; page <= pages; page += 1) {
+    routes[`${endpoint}${sep}per_page=100&page=${page}`] = wrap(items.slice((page - 1) * 100, page * 100));
+  }
+}
+
+const DEFAULT_PULLS = [
+  { number: 9, merged_at: null, updated_at: "2026-11-03T00:00:00Z", head: { sha: "f".repeat(40) } },
+  { number: 8, merged_at: "2026-11-02T10:00:00Z", updated_at: "2026-11-02T10:05:00Z", head: { sha: SHA } },
+  { number: 7, merged_at: "2026-11-01T10:00:00Z", updated_at: "2026-11-01T10:05:00Z", head: { sha: "e".repeat(40) } },
+];
+const DEFAULT_RUNS = [
+  { id: 101, path: ".github/workflows/ci.yml" },
+  { id: 102, path: ".github/workflows/risk-paths.yml" },
+];
+const DEFAULT_JOBS = { 101: ["Verify"], 102: ["pr-triage / pr-triage"] };
+
 // The routes of a healthy organization-owned repository whose last merged pull
 // request ran ci.yml (job "Verify", with merge_group) and the pr-triage caller.
-function world({ ownerType = "Organization", rulesets = [], rulesetBodies = {}, labels = LABELS, workflows = {} } = {}) {
+function world({
+  ownerType = "Organization",
+  rulesets = [],
+  rulesetBodies = {},
+  labels = LABELS,
+  workflows = {},
+  pulls = DEFAULT_PULLS,
+  headSha = SHA,
+  runs = DEFAULT_RUNS,
+  jobs = DEFAULT_JOBS,
+} = {}) {
   const e = (suffix = "") => `repos/${REPO}${suffix}`;
   const files = { ".github/workflows/ci.yml": CI_WITH_QUEUE, ".github/workflows/risk-paths.yml": CALLER_WORKFLOW, ...workflows };
   const routes = {
     [e()]: { full_name: REPO, default_branch: "main", owner: { type: ownerType } },
     [e("/rulesets?includes_parents=false&per_page=100")]: rulesets,
-    [e("/labels?per_page=100")]: labels,
-    [e("/pulls?state=closed&base=main&sort=updated&direction=desc&per_page=50")]: [
-      { number: 9, merged_at: null, head: { sha: "f".repeat(40) } },
-      { number: 8, merged_at: "2026-11-02T10:00:00Z", head: { sha: SHA } },
-      { number: 7, merged_at: "2026-11-01T10:00:00Z", head: { sha: "e".repeat(40) } },
-    ],
-    [e(`/actions/runs?head_sha=${SHA}&per_page=100`)]: {
-      workflow_runs: [
-        { id: 101, path: ".github/workflows/ci.yml" },
-        { id: 102, path: ".github/workflows/risk-paths.yml" },
-      ],
-    },
-    [e("/actions/runs/101/jobs?per_page=100")]: { jobs: [{ name: "Verify" }] },
-    [e("/actions/runs/102/jobs?per_page=100")]: { jobs: [{ name: "pr-triage / pr-triage" }] },
   };
+  pagedRoutes(routes, e("/labels"), labels);
+  pagedRoutes(routes, e("/pulls?state=closed&base=main&sort=updated&direction=desc"), pulls);
+  pagedRoutes(routes, e(`/actions/runs?head_sha=${headSha}`), runs, (page) => ({ workflow_runs: page }));
+  for (const [id, names] of Object.entries(jobs)) {
+    pagedRoutes(routes, e(`/actions/runs/${id}/jobs`), names.map((name) => ({ name })), (page) => ({ jobs: page }));
+  }
   for (const [file, text] of Object.entries(files)) routes[e(`/contents/${file}?ref=main`)] = { raw: text };
   for (const [id, body] of Object.entries(rulesetBodies)) routes[e(`/rulesets/${id}`)] = body;
   return routes;
 }
 
-async function setup(routes) {
+async function setup(routes, { nodeStub = false } = {}) {
   const base = await mkdtemp(path.join(os.tmpdir(), "apply-triage-settings-"));
   const binDir = path.join(base, "bin");
   await mkdir(binDir, { recursive: true });
   await writeFile(path.join(binDir, "gh"), GH_STUB);
   await chmod(path.join(binDir, "gh"), 0o755);
+  if (nodeStub) {
+    // A `node` that fails for the trigger helper and runs everything else on the real node.
+    await writeFile(
+      path.join(binDir, "node"),
+      `#!/usr/bin/env bash\ncase "$1" in *workflow-triggers.mjs) echo "stub: the trigger helper crashed" >&2; exit 9 ;; esac\nexec "${process.execPath}" "$@"\n`,
+    );
+    await chmod(path.join(binDir, "node"), 0o755);
+  }
   const callsLog = path.join(base, "calls.log");
   const mutationsLog = path.join(base, "mutations.log");
   const routesFile = path.join(base, "routes.json");
@@ -412,9 +443,7 @@ test("the preflight refuses a --required-check-any name that no Actions job repo
 });
 
 test("the preflight refuses a repository with no merged pull request", async () => {
-  const routes = world();
-  routes[`repos/${REPO}/pulls?state=closed&base=main&sort=updated&direction=desc&per_page=50`] = [{ number: 9, merged_at: null, head: { sha: SHA } }];
-  const fixture = await setup(routes);
+  const fixture = await setup(world({ pulls: [{ number: 9, merged_at: null, updated_at: "2026-11-03T00:00:00Z", head: { sha: SHA } }] }));
   const { status, stderr } = await run(fixture, ["--required-check", "Verify", "--merge-queue"]);
 
   assert.equal(status, 1);
@@ -526,4 +555,159 @@ test("the merge_queue parameters equal the ones in apply-repo-settings.sh (ADR-0
   const { stdout } = await run(fixture, ["--required-check", "Verify", "--merge-queue"]);
   const queueRule = plannedChanges(stdout)[0].body.rules.find((rule) => rule.type === "merge_queue");
   assert.deepEqual(queueRule.parameters, parsed);
+});
+
+// ---- Trigger helper errors, and every page of every list ----------------------
+
+// n closed, unmerged pull requests, newest-updated first, from `start` going back one minute each.
+function unmergedPulls(count, start = "2026-11-05T12:00:00Z", firstNumber = 1000) {
+  const base = Date.parse(start);
+  return Array.from({ length: count }, (_, index) => ({
+    number: firstNumber + index,
+    merged_at: null,
+    updated_at: new Date(base - index * 60_000).toISOString().replace(".000Z", "Z"),
+    head: { sha: "d".repeat(40) },
+  }));
+}
+
+const withVerifyAt = (sha) => ({ headSha: sha });
+
+test("a failing trigger helper stops --apply: exit 1, the workflow and the exit code named, no mutation", async () => {
+  const fixture = await setup(world(), { nodeStub: true });
+  const { status, stdout, stderr } = await run(fixture, ["--required-check", "Verify", "--merge-queue", "--apply"]);
+
+  assert.equal(status, 1, stdout);
+  assert.match(stderr, /trigger helper failed on \.github\/workflows\/ci\.yml \(exit code 9\)/);
+  assert.match(stderr, /"Verify"/);
+  assert.match(stderr, /nothing was changed/);
+  assert.doesNotMatch(stdout, /^(WOULD|APPLY)/m, stdout);
+  assert.deepEqual(await mutations(fixture), []);
+});
+
+test("the merged pull request is found on page 2 when page 1 holds 100 unmerged ones", async () => {
+  const sha = "a".repeat(40);
+  const merged = { number: 5, merged_at: "2026-10-20T10:00:00Z", updated_at: "2026-10-20T10:05:00Z", head: { sha } };
+  const fixture = await setup(world({ pulls: [...unmergedPulls(100), merged], ...withVerifyAt(sha) }));
+  const { status, stdout, stderr } = await run(fixture, ["--required-check", "Verify", "--merge-queue"]);
+
+  assert.equal(status, 0, stderr);
+  assert.match(stdout, /preflight: Verify -> \.github\/workflows\/ci\.yml \(merge_group: yes\)/);
+  assert.match(await readFile(fixture.callsLog, "utf8"), new RegExp(`actions/runs\\?head_sha=${sha}`));
+});
+
+test("a later-merged pull request on page 2 beats an earlier-merged one on page 1 while page 1 is still newer", async () => {
+  const earlySha = "1".repeat(40);
+  const lateSha = "2".repeat(40);
+  // Page 1: 99 unmerged and 1 merged on 2026-10-20; its last updated_at (2026-11-01 and later) is newer than that merge.
+  const page1 = [
+    { number: 3, merged_at: "2026-10-20T10:00:00Z", updated_at: "2026-11-05T11:00:00Z", head: { sha: earlySha } },
+    ...unmergedPulls(98, "2026-11-05T10:00:00Z", 2000),
+    { number: 4, merged_at: null, updated_at: "2026-11-01T00:00:00Z", head: { sha: "d".repeat(40) } },
+  ];
+  assert.equal(page1.length, 100);
+  const page2 = [{ number: 6, merged_at: "2026-10-25T10:00:00Z", updated_at: "2026-10-26T10:00:00Z", head: { sha: lateSha } }];
+  // Only the later head has runs: choosing the earlier one fails with a missing route.
+  const fixture = await setup(world({ pulls: [...page1, ...page2], ...withVerifyAt(lateSha) }));
+  const { status, stdout, stderr } = await run(fixture, ["--required-check", "Verify", "--merge-queue"]);
+
+  assert.equal(status, 0, stderr);
+  assert.match(stdout, /preflight: Verify/);
+  const calls = await readFile(fixture.callsLog, "utf8");
+  assert.match(calls, new RegExp(`head_sha=${lateSha}`));
+  assert.doesNotMatch(calls, new RegExp(`head_sha=${earlySha}`));
+});
+
+test("the pull request scan stops at a page whose last updated_at is older than the best merge", async () => {
+  const merged = { number: 3, merged_at: "2026-11-04T10:00:00Z", updated_at: "2026-11-05T11:00:00Z", head: { sha: SHA } };
+  // 100 PRs; the last one was updated before the merge, so no later page can hold a later merge.
+  const page1 = [merged, ...unmergedPulls(98, "2026-11-05T10:00:00Z", 2000), { number: 4, merged_at: null, updated_at: "2026-11-03T00:00:00Z", head: { sha: "d".repeat(40) } }];
+  assert.equal(page1.length, 100);
+  const fixture = await setup(world({ pulls: page1 }));
+  const { status, stderr } = await run(fixture, ["--required-check", "Verify", "--merge-queue"]);
+
+  assert.equal(status, 0, stderr);
+  assert.doesNotMatch(await readFile(fixture.callsLog, "utf8"), /pulls\?[^ ]*page=2/);
+});
+
+test("the pull request scan refuses at the page limit with no answer, and reads no page past it", async () => {
+  const fixture = await setup(world({ pulls: unmergedPulls(2000) }));
+  const { status, stderr } = await run(fixture, ["--required-check", "Verify", "--merge-queue", "--apply"]);
+
+  assert.equal(status, 1);
+  assert.match(stderr, /page limit 20 reached/);
+  assert.deepEqual(await mutations(fixture), []);
+  const calls = await readFile(fixture.callsLog, "utf8");
+  assert.match(calls, /pulls\?[^ ]*page=20/);
+  assert.doesNotMatch(calls, /pulls\?[^ ]*page=21/);
+});
+
+test("a workflow run only on page 2 of the runs is matched", async () => {
+  const fillers = Array.from({ length: 100 }, (_, index) => ({ id: 5000 + index, path: ".github/workflows/filler.yml" }));
+  const jobs = { ...DEFAULT_JOBS, ...Object.fromEntries(fillers.map((run) => [run.id, ["Filler"]])) };
+  const fixture = await setup(world({ runs: [...fillers, ...DEFAULT_RUNS], jobs }));
+  const { status, stdout, stderr } = await run(fixture, ["--required-check", "Verify", "--merge-queue"]);
+
+  assert.equal(status, 0, stderr);
+  assert.match(stdout, /preflight: Verify -> \.github\/workflows\/ci\.yml \(merge_group: yes\)/);
+});
+
+test("a matrix job only on page 2 of a run's jobs is matched", async () => {
+  const names = [...Array.from({ length: 100 }, (_, index) => `Build (${index})`), "Verify"];
+  const fixture = await setup(world({ jobs: { ...DEFAULT_JOBS, 101: names } }));
+  const { status, stdout, stderr } = await run(fixture, ["--required-check", "Verify", "--merge-queue"]);
+
+  assert.equal(status, 0, stderr);
+  assert.match(stdout, /preflight: Verify -> \.github\/workflows\/ci\.yml/);
+});
+
+test("a level label only on page 2 of more than 100 labels is not created again", async () => {
+  const filler = Array.from({ length: 120 }, (_, index) => ({ name: `area/${index}` }));
+  const fixture = await setup(world({ labels: [...filler, { name: "level:L2" }] }));
+  const { status, stdout } = await run(fixture, []);
+
+  assert.equal(status, 0, stdout);
+  assert.deepEqual(
+    plannedChanges(stdout).map((change) => change.body.name),
+    ["level:L1", "level:L3", "level:L4"],
+  );
+  assert.match(await readFile(fixture.callsLog, "utf8"), /labels\?per_page=100&page=2/);
+});
+
+test("a failed label page read stops the run before any change", async () => {
+  const routes = world({ labels: Array.from({ length: 100 }, (_, index) => ({ name: `area/${index}` })) });
+  delete routes[`repos/${REPO}/labels?per_page=100&page=2`];
+  const fixture = await setup(routes);
+  const { status, stdout, stderr } = await run(fixture, ["--required-check", "Verify", "--apply"]);
+
+  assert.equal(status, 1);
+  assert.match(stderr, /cannot read the labels/);
+  assert.doesNotMatch(stdout, /^(WOULD|APPLY)/m);
+  assert.deepEqual(await mutations(fixture), []);
+});
+
+// A real page of 100 pull requests, runs or labels is far larger than the
+// kernel's limit for one command-line argument (128 KiB): the script must pass
+// page data on stdin, never as an argument.
+test("pages larger than one command-line argument (128 KiB) are read: pull requests, runs and labels", async () => {
+  const pad = "x".repeat(2500);
+  const sha = "a".repeat(40);
+  // Page 1 holds an older merge, so the scan also runs its stop check on this big page.
+  const bigPulls = unmergedPulls(100).map((pull, index) => ({
+    ...pull,
+    body: pad,
+    ...(index === 0 ? { merged_at: "2026-10-10T10:00:00Z", head: { sha: "9".repeat(40) } } : {}),
+  }));
+  const merged = { number: 5, merged_at: "2026-10-20T10:00:00Z", updated_at: "2026-10-20T10:05:00Z", head: { sha } };
+  const fillers = Array.from({ length: 100 }, (_, index) => ({ id: 5000 + index, path: ".github/workflows/filler.yml", display_title: pad }));
+  const jobs = { ...DEFAULT_JOBS, ...Object.fromEntries(fillers.map((run) => [run.id, ["Filler"]])) };
+  const labels = Array.from({ length: 100 }, (_, index) => ({ name: `area/${index}`, description: pad }));
+  const fixture = await setup(
+    world({ pulls: [...bigPulls, merged], headSha: sha, runs: [...fillers, ...DEFAULT_RUNS], jobs, labels }),
+  );
+  const { status, stdout, stderr } = await run(fixture, ["--required-check", "Verify", "--merge-queue"]);
+
+  assert.equal(status, 0, stderr);
+  assert.doesNotMatch(stderr, /Argument list too long/);
+  assert.match(stdout, /preflight: Verify -> \.github\/workflows\/ci\.yml/);
+  assert.equal(plannedChanges(stdout).length, 5);
 });

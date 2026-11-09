@@ -26,6 +26,14 @@ const PRESENT = {
   "single-quoted 'on' key": `'on':\n  merge_group:\n${JOBS}`,
   "YAML 1.1 true key": `true:\n  merge_group:\n${JOBS}`,
   "CRLF line ends": `on:\r\n  merge_group:\r\n${JOBS}`,
+  "compact flow mapping, double-quoted key": `on: {"merge_group":{}}\n${JOBS}`,
+  "flow mapping, single-quoted key": `on: {'merge_group': {}}\n${JOBS}`,
+  "flow mapping, quoted key among others": `on: {"push":{"branches":["main"]},"merge_group":{"types":["checks_requested"]}}\n${JOBS}`,
+  "flow mapping, plain key with a flow value": `on: {push: {}, merge_group:{}}\n${JOBS}`,
+  'quoted "on" key, flow list, no space after the colon': `"on":[merge_group]\n${JOBS}`,
+  'quoted "on" key, flow list, a space after the colon': `"on": [merge_group]\n${JOBS}`,
+  "quoted 'on' key, flow mapping, no space after the colon": `'on':{merge_group: null}\n${JOBS}`,
+  "quoted key in a block mapping, no space after the colon": `on:\n  "merge_group":{}\n${JOBS}`,
   "key after other top-level keys": `name: x\npermissions: {}\non:\n  merge_group:\njobs: {}\n`,
 };
 
@@ -48,6 +56,10 @@ const ABSENT = {
   "no on key": `name: x\n${JOBS}`,
   "empty on key": `on:\njobs: {}\n`,
   "empty text": "",
+  "compact flow mapping without it": `on: {"push":{}}\n${JOBS}`,
+  "compact flow mapping with it only nested": `on: {"push":{"branches":["merge_group"]}}\n${JOBS}`,
+  'quoted "on" key, flow list without it': `"on":[push]\n${JOBS}`,
+  "unquoted on key with no space is no key": `on:[merge_group]\n${JOBS}`,
   "merge_group in the workflow name": `name: merge_group\non: push\n${JOBS}`,
 };
 

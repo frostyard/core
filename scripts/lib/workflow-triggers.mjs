@@ -41,17 +41,26 @@ function unquote(text) {
 }
 
 // The key of a `key:` or `key: value` text, or null when the text is no mapping entry.
-function entryKey(text) {
-  let quote = null;
+// A quoted key ends at its closing quote, and the `:` after it is a key indicator
+// even with no space after it (`"merge_group":{}`). A plain key needs `: `, or
+// the end of the text; in a flow collection a flow indicator after `:` also counts.
+function entryKey(text, flow = false) {
+  const first = text[0];
+  if (first === '"' || first === "'") {
+    const close = text.indexOf(first, 1);
+    if (close !== -1) {
+      const after = text.slice(close + 1).trimStart();
+      if (after.startsWith(":")) return text.slice(1, close);
+    }
+    return null;
+  }
   for (let index = 0; index < text.length; index += 1) {
     const char = text[index];
-    if (quote) {
-      if (char === quote) quote = null;
-      continue;
-    }
-    if (char === '"' || char === "'") quote = char;
-    else if (char === ":" && (index === text.length - 1 || /\s/.test(text[index + 1]))) {
-      return unquote(text.slice(0, index));
+    if (char === ":") {
+      const next = text[index + 1];
+      if (next === undefined || /\s/.test(next) || (flow && /[\[\]{},]/.test(next))) {
+        return text.slice(0, index).trim();
+      }
     }
   }
   return null;
@@ -102,7 +111,7 @@ function inlineEvents(value, lines, next) {
     cursor += 1;
   }
   const inner = joined.slice(1, joined.lastIndexOf(text[0] === "[" ? "]" : "}"));
-  const events = splitFlow(inner).map((item) => (text[0] === "{" ? (entryKey(item) ?? unquote(item)) : unquote(item)));
+  const events = splitFlow(inner).map((item) => (text[0] === "{" ? (entryKey(item, true) ?? unquote(item)) : unquote(item)));
   return { events, next: cursor };
 }
 
@@ -112,7 +121,9 @@ export function triggerEvents(yamlText) {
   const events = [];
   for (let index = 0; index < lines.length; index += 1) {
     const line = stripComment(lines[index]);
-    const match = /^(?:on|"on"|'on'|true|True|TRUE)\s*:(?:\s+(.*))?$/.exec(line.trimEnd());
+    const text = line.trimEnd();
+    // A quoted key may have no space after its colon; a plain key needs one.
+    const match = /^(?:"on"|'on')\s*:(.*)$/.exec(text) ?? /^(?:on|true|True|TRUE)\s*:(?:\s+(.*))?$/.exec(text);
     if (!match) continue;
     const rest = match[1] ?? "";
     if (rest.trim() !== "") {

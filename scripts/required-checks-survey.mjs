@@ -21,6 +21,21 @@ function ghGet(endpoint, { raw = false } = {}) {
   return execFileAsync("gh", args, { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 }).then((result) => result.stdout);
 }
 
+const PAGE_SIZE = 100;
+const MAX_PAGES = 50;
+
+// Every page of a list endpoint, joined (100 items a page). Throws when a page
+// read fails or the pages do not end within MAX_PAGES.
+async function allPages(endpoint) {
+  const items = [];
+  for (let page = 1; page <= MAX_PAGES; page += 1) {
+    const batch = JSON.parse(await ghGet(`${endpoint}?per_page=${PAGE_SIZE}&page=${page}`));
+    items.push(...batch);
+    if (batch.length < PAGE_SIZE) return items;
+  }
+  throw new Error(`more than ${MAX_PAGES} pages of ${PAGE_SIZE} for ${endpoint}`);
+}
+
 async function attempt(read) {
   try {
     return { value: await read() };
@@ -63,7 +78,7 @@ async function collect(repo) {
     }
   }
 
-  const labels = await attempt(async () => JSON.parse(await ghGet(`repos/${repo}/labels?per_page=100`)));
+  const labels = await attempt(() => allPages(`repos/${repo}/labels`));
   if (labels.error) data.errors.labels = shortReason(labels.error);
   else data.labels = labels.value;
   return data;

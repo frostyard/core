@@ -171,7 +171,10 @@ if (rest === "") out({ default_branch: fixture.default_branch });
 else if (rest === "rules/branches/" + fixture.default_branch) {
   if (fixture.fail_rules) fail("gh: Resource not accessible by integration (HTTP 403)");
   out(fixture.rules);
-} else if (rest === "labels?per_page=100") out(fixture.labels);
+} else if (/^labels\\?per_page=100&page=\\d+$/.test(rest)) {
+  const page = Number(rest.split("&page=")[1]);
+  out(fixture.labels.slice((page - 1) * 100, page * 100));
+}
 else if (rest === "contents/.github/workflows?ref=" + fixture.default_branch) {
   if (fixture.no_workflows_dir) fail("gh: Not Found (HTTP 404)");
   out(Object.keys(fixture.workflows).map((name) => ({ name, type: "file" })));
@@ -258,6 +261,27 @@ test("a repository with no .github/workflows directory has no workflows and is n
 
   assert.equal(status, 0);
   assert.match(stdout.trimEnd().split("\n")[2], /^\| frostyard\/bare \| main \| none \| - \| no \| none \| none \| 0\/4 \|$/);
+});
+
+test("a level label only on page 2 of more than 100 labels is counted", async () => {
+  const filler = Array.from({ length: 120 }, (_, index) => ({ name: `area/${index}` }));
+  const fixture = await setupGh({
+    "frostyard/many": { ...FIXTURES["frostyard/repogen"], repo: "frostyard/many", labels: [...filler, { name: "level:L1" }, { name: "Level:l3" }] },
+  });
+  const { status, stdout, stderr } = await survey(fixture, ["frostyard/many"]);
+
+  assert.equal(status, 0, stderr);
+  assert.match(stdout.trimEnd().split("\n")[2], /\| 2\/4 \|$/);
+  assert.match(await readFile(fixture.callsLog, "utf8"), /labels\?per_page=100&page=2/);
+});
+
+test("a label list that does not end within the page limit is an error in the label cell", async () => {
+  const many = Array.from({ length: 5100 }, (_, index) => ({ name: `area/${index}` }));
+  const fixture = await setupGh({ "frostyard/endless": { ...FIXTURES["frostyard/repogen"], repo: "frostyard/endless", labels: many } });
+  const { status, stdout } = await survey(fixture, ["frostyard/endless"]);
+
+  assert.equal(status, 1);
+  assert.match(stdout.trimEnd().split("\n")[2], /\| error: more than 50 pages of 100 for repos\/frostyard\/endless\/labels \|$/);
 });
 
 test("no argument, an option, or a malformed slug is a usage error (exit 2)", async () => {

@@ -76,6 +76,32 @@ plan() { # plan <METHOD> <endpoint> <reason> <json body>: print, and call only w
   fi
 }
 
+# Read-all-pages helper: paged_json <endpoint> <jq selector of the page's array>
+# prints one JSON array that joins every page (100 items a page). When a page read
+# fails, or the pages do not end within MAX_PAGES, it prints the reason and returns 1.
+MAX_PAGES=50
+paged_json() {
+  local endpoint="$1" selector="$2" sep="?" page=1 acc='[]' out items n
+  [[ $endpoint == *\?* ]] && sep="&"
+  while [[ $page -le $MAX_PAGES ]]; do
+    if ! out="$(gh api "$endpoint${sep}per_page=100&page=$page" 2>&1 </dev/null)"; then
+      printf '%s' "$out"
+      return 1
+    fi
+    items="$(jq -c "$selector" <<<"$out")"
+    n="$(jq length <<<"$items")"
+    # Pages can be large: join them on stdin, never through the argument list.
+    acc="$(printf '%s\n%s\n' "$acc" "$items" | jq -cs '.[0] + .[1]')"
+    if [[ $n -lt 100 ]]; then
+      printf '%s' "$acc"
+      return 0
+    fi
+    page=$((page + 1))
+  done
+  printf 'more than %s pages of 100 for %s' "$MAX_PAGES" "$endpoint"
+  return 1
+}
+
 live="$(gh api "repos/$repo")"
 default_branch="$(jq -r .default_branch <<<"$live")"
 owner_type="$(jq -r .owner.type <<<"$live")"
@@ -98,28 +124,48 @@ if [[ $merge_queue -eq 1 ]]; then
     fail "$repo is owned by a $owner_type account; a merge queue needs an organization-owned repository"
   else
     base_q="$(jq -rn --arg b "$default_branch" '$b | @uri')"
-    sha=""
-    if pulls="$(gh api "repos/$repo/pulls?state=closed&base=$base_q&sort=updated&direction=desc&per_page=50" 2>&1)"; then
-      sha="$(jq -r '[.[] | select(.merged_at != null)] | sort_by(.merged_at) | last | .head.sha // empty' <<<"$pulls")"
-    else
-      fail "cannot list the closed pull requests of $repo: $(head -c 200 <<<"$pulls")"
-    fi
-    if [[ -z $sha && $failures -eq 0 ]]; then
+    # The last merged pull request. The closed pull requests come newest-updated first, and a
+    # merged one has updated_at >= merged_at, so the scan stops at a page whose last
+    # updated_at is older than the best merged_at found (no later page can beat it).
+    sha="" best_at="" scan_done=0 pr_page=1 MAX_PR_PAGES=20
+    while [[ $pr_page -le $MAX_PR_PAGES ]]; do
+      if ! pulls="$(gh api "repos/$repo/pulls?state=closed&base=$base_q&sort=updated&direction=desc&per_page=100&page=$pr_page" 2>&1 </dev/null)"; then
+        fail "cannot list the closed pull requests of $repo: $(head -c 200 <<<"$pulls")"
+        scan_done=1
+        break
+      fi
+      count="$(jq length <<<"$pulls")"
+      candidate="$(jq -r '[.[] | select(.merged_at != null)] | max_by(.merged_at) | select(. != null) | [.merged_at, .head.sha] | @tsv' <<<"$pulls")"
+      if [[ -n $candidate ]]; then
+        cand_at="${candidate%%$'\t'*}"
+        if [[ -z $best_at ]] || jq -en --arg a "$cand_at" --arg b "$best_at" '$a > $b' >/dev/null; then
+          best_at="$cand_at"
+          sha="${candidate#*$'\t'}"
+        fi
+      fi
+      if [[ $count -lt 100 ]]; then scan_done=1; break; fi
+      if [[ -n $best_at ]] && jq -e --arg m "$best_at" '.[-1].updated_at < $m' <<<"$pulls" >/dev/null; then scan_done=1; break; fi
+      pr_page=$((pr_page + 1))
+    done
+    if [[ $scan_done -eq 0 ]]; then
+      fail "the last merged pull request of $repo is not among the newest $((MAX_PR_PAGES * 100)) closed pull requests on $default_branch (page limit $MAX_PR_PAGES reached); the preflight stops here"
+      sha=""
+    elif [[ -z $sha && $failures -eq 0 ]]; then
       fail "$repo has no merged pull request on $default_branch; the preflight reads the workflow runs at its head and has none to read"
     fi
 
     if [[ -n $sha ]]; then
-      # Every job that ran at that head: [{path, name}].
+      # Every job that ran at that head, from every page of runs and of jobs: [{path, name}].
       jobs_json='[]'
-      if runs="$(gh api "repos/$repo/actions/runs?head_sha=$sha&per_page=100" 2>&1)"; then
+      if runs="$(paged_json "repos/$repo/actions/runs?head_sha=$sha" '.workflow_runs')"; then
         while IFS=$'\t' read -r run_id run_path; do
           [[ -n $run_id ]] || continue
-          if run_jobs="$(gh api "repos/$repo/actions/runs/$run_id/jobs?per_page=100" 2>&1 </dev/null)"; then
-            jobs_json="$(jq -c --arg p "${run_path%%@*}" --argjson j "$(jq -c '[.jobs[].name]' <<<"$run_jobs")" '. + ($j | map({path: $p, name: .}))' <<<"$jobs_json")"
+          if run_jobs="$(paged_json "repos/$repo/actions/runs/$run_id/jobs" '.jobs')"; then
+            jobs_json="$(jq -c --arg p "${run_path%%@*}" --argjson j "$(jq -c 'map(.name)' <<<"$run_jobs")" '. + ($j | map({path: $p, name: .}))' <<<"$jobs_json")"
           else
             fail "cannot read the jobs of workflow run $run_id: $(head -c 200 <<<"$run_jobs")"
           fi
-        done < <(jq -r '.workflow_runs | unique_by(.id)[] | [.id, .path] | @tsv' <<<"$runs")
+        done < <(jq -r 'unique_by(.id)[] | [.id, .path] | @tsv' <<<"$runs")
       else
         fail "cannot list the workflow runs at $sha: $(head -c 200 <<<"$runs")"
       fi
@@ -137,7 +183,11 @@ if [[ $merge_queue -eq 1 ]]; then
             if text="$(gh api -H 'Accept: application/vnd.github.raw' "repos/$repo/contents/$path?ref=$default_branch" 2>&1 </dev/null)"; then
               rc=0
               printf '%s\n' "$text" | node "$here/scripts/lib/workflow-triggers.mjs" merge_group || rc=$?
-              case $rc in 0) wf_has_queue[$path]=yes ;; 1) wf_has_queue[$path]=no ;; *) wf_has_queue[$path]=error ;; esac
+              case $rc in
+                0) wf_has_queue[$path]=yes ;;
+                1) wf_has_queue[$path]=no ;;
+                *) wf_has_queue[$path]=error; fail "the trigger helper failed on $path (exit code $rc); cannot tell whether required check \"$name\" runs on merge_group" ;;
+              esac
             else
               wf_has_queue[$path]=error
               fail "cannot read $path at $default_branch of $repo: $(head -c 200 <<<"$text")"
@@ -156,6 +206,13 @@ if [[ $merge_queue -eq 1 ]]; then
     exit 1
   fi
 fi
+
+# Read every label page now, so a failed read stops the run before any change.
+if ! all_labels="$(paged_json "repos/$repo/labels" '.')"; then
+  echo "cannot read the labels of $repo: $(head -c 200 <<<"$all_labels")" >&2
+  exit 1
+fi
+existing_labels="$(jq -c '[.[].name | ascii_downcase]' <<<"$all_labels")"
 
 # ---- 2. Ruleset "frostyard: required checks" --------------------------------
 if [[ ${#required[@]} -eq 0 ]]; then
@@ -186,7 +243,6 @@ else
 fi
 
 # ---- 3. Level labels (missing ones only; an existing label is never changed) --
-existing_labels="$(gh api "repos/$repo/labels?per_page=100" --jq '[.[].name | ascii_downcase]')"
 while IFS='|' read -r label color description; do
   if ! jq -e --arg l "${label,,}" 'index($l)' <<<"$existing_labels" >/dev/null; then
     plan POST "repos/$repo/labels" "create label $label" "$(jq -cn --arg n "$label" --arg c "$color" --arg d "$description" '{name:$n, color:$c, description:$d}')"
