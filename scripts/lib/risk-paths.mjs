@@ -645,6 +645,15 @@ export function createGitHubApi({ token, apiUrl = "https://api.github.com", fetc
       });
     },
 
+    // The rules that apply to a branch (the rulesets API), all pages. The branch
+    // is encoded part by part, as a path is.
+    async listBranchRules(owner, repo, branch) {
+      const encodedBranch = String(branch).split("/").map(enc).join("/");
+      return paginate(`/repos/${enc(owner)}/${enc(repo)}/rules/branches/${encodedBranch}?per_page=100`, {
+        what: "branch rule list",
+      });
+    },
+
     async labelExists(owner, repo, name) {
       const response = await request("GET", `/repos/${enc(owner)}/${enc(repo)}/labels/${enc(name)}`, { allow404: true });
       return response !== null;

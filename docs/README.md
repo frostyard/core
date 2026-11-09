@@ -107,6 +107,7 @@ which baseline rows do not apply here.
 - [Stable repository drift alarm](design/stable-repository-drift-alarm.md)
 - [Debian publication](design/debian-publication.md)
 - [Problem reports](design/problem-reports.md)
+- [Dependabot shadow](design/dependabot-shadow.md)
 
 ### Specs
 
