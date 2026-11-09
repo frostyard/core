@@ -48,9 +48,9 @@ inactive), bketelsen/homewiki (no pull requests).
 - Every repository below has the label `risk:high`, which the `levels` step
   needs (read on 2026-11-09). frostyard/incus got it on 2026-11-09.
 - The owners' pull requests that add the `pr-triage` caller and the jobs
-  behind the names have merged, except frostyard/bootc-debian#23 and
-  frostyard/omarchy-apps#16. Do those 2 rows only after their pull request
-  has merged (see the condition in the row).
+  behind the names have merged. The last 2, frostyard/bootc-debian#23
+  (`66ef763`) and frostyard/omarchy-apps#16 (`6aff8a2`), merged on
+  2026-11-09.
 - A name that a ruleset requires must report on every pull request. An open
   pull request whose head is older than a newly required job shows that check
   as "Expected — Waiting for status". Push to it, or use "Update branch", to
@@ -146,6 +146,82 @@ run prints "already matches". With `--merge-queue` (repogen only) it first
 checks that the workflow of each required name triggers on `merge_group`,
 and refuses otherwise.
 
+### Rollout check (2026-11-09)
+
+The settings step was applied on 2026-11-09 between 16:12 and 16:34 UTC.
+`node scripts/required-checks-survey.mjs` over the 34 repositories of the
+table below, read only as `frostyard-machines` at 2026-11-09T16:56:52Z, with
+core at `781c8b1`:
+
+| Repository | Default branch | Required checks | Strict | Queue | `merge_group` in | PR-triage caller | Level labels |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| frostyard/core | main | `docs-gate`, `fleet-conventions`, `scaffold-e2e` | yes | yes | ci.yml | risk-paths-caller.yml → ./pr-triage.yml | 4/4 |
+| frostyard/updex | main | `Build (linux, amd64)`, `Build (linux, arm64)`, `Conventional PR title`, `Docs integrity`, `E2E Tests`, `Lint`, `Race Detection`, `Security Scan`, `Unit Tests`, `Verify` | yes | yes | ci.yml, pr-title.yml | risk-paths.yml → pr-triage.yml@c996ea3fb54b | 4/4 |
+| frostyard/std | main | `Docs integrity`, `Lint`, `Race Detection`, `Unit Tests`, `Verify` | yes | yes | ci.yml | risk-paths.yml → pr-triage.yml@c996ea3fb54b | 4/4 |
+| frostyard/clix | main | `Docs integrity`, `Lint`, `Race Detection`, `Security Scan`, `Unit Tests`, `Verify` | yes | yes | ci.yml | risk-paths.yml → pr-triage.yml@c996ea3fb54b | 4/4 |
+| frostyard/firn | main | `E2E Harness Syntax`, `Repository gate`, `Security Scan`, `Unit Tests` | yes | yes | ci.yml | risk-paths.yml → pr-triage.yml@c996ea3fb54b | 4/4 |
+| frostyard/nsl | main | `release-config`, `verify`, `vulncheck` | no | no | ci.yml | risk-paths.yml → pr-triage.yml@c996ea3fb54b | 4/4 |
+| frostyard/frostmail | main | `App UI (make ui-check)`, `App shell (make app-build, app-test)`, `Flatpak (build and test)`, `Flatpak sources (make flatpak-sources)`, `Race detector`, `Snapshot .deb (make deb)`, `Verify (make verify)`, `Windows (go test)`, `Windows app (installer, WebView2 e2e)` | no | no | ci.yml | risk-paths.yml → pr-triage.yml@c996ea3fb54b | 4/4 |
+| frostyard/frostnotes | main | `App UI (make ui-check)`, `App shell (make app-build, app-test)`, `Flatpak (build and test)`, `Flatpak sources (make flatpak-sources)`, `Race detector`, `Snapshot .deb (make deb)`, `Verify (make verify)` | no | no | ci.yml | risk-paths.yml → pr-triage.yml@c996ea3fb54b | 4/4 |
+| frostyard/frostread | main | `Desktop app (make app-check app-build)`, `Flatpak (build and test)`, `Flatpak sources (make flatpak-sources)`, `Race detector and cross-builds (make race cross)`, `Snapshot .deb (make deb)`, `Verify (make verify)`, `web bundle (make web-check)` | no | no | ci.yml | risk-paths.yml → pr-triage.yml@c996ea3fb54b | 4/4 |
+| frostyard/lodge | main | `Race detector and cross-builds (make race cross)`, `Snapshot .deb (make deb)`, `The kit off Linux (go test on Windows)`, `Verify (make verify)`, `lodge-client (make client-check)`, `lodge-ui (make ui-check)`, `the shell (make shell-check)` | no | no | ci.yml | risk-paths.yml → pr-triage.yml@c996ea3fb54b | 4/4 |
+| frostyard/porter | main | `Race detector (make race)`, `Snapshot .deb (make deb)`, `Verify (make verify)`, `Web bundle (make web-check)` | no | no | ci.yml | risk-paths.yml → pr-triage.yml@c996ea3fb54b | 4/4 |
+| frostyard/bootc-debian | main | `Build (Debian Trixie)`, `ci` | no | no | none | risk-paths.yml → pr-triage.yml@c996ea3fb54b | 4/4 |
+| frostyard/frostyard-org | main | `Workers Builds: frostyard-org`, `Workers Builds: frostyard-org` (any app), `ci` | no | no | none | risk-paths.yml → pr-triage.yml@c996ea3fb54b | 4/4 |
+| bketelsen/fleet | main | `ansible-lint`, `pytest`, `tofu` | no | no | none | risk-paths.yml → pr-triage.yml@267421dc7de3 | 4/4 |
+| bketelsen/trimlights | main | `check` | no | no | none | risk-paths.yml → pr-triage.yml@c996ea3fb54b | 4/4 |
+| bketelsen/pi-pocket-team | main | `Test` | no | no | none | risk-paths.yml → pr-triage.yml@c996ea3fb54b | 4/4 |
+| bketelsen/pi-pocket-dune | main | `Check` | no | no | none | risk-paths.yml → pr-triage.yml@c996ea3fb54b | 4/4 |
+| bketelsen/agentic-template | main | `verify` | no | no | ci.yml | risk-paths.yml → pr-triage.yml@c996ea3fb54b | 4/4 |
+| frostyard/apt-publisher | main | `ci` | no | no | none | risk-paths.yml → pr-triage.yml@267421dc7de3 | 4/4 |
+| frostyard/chairlift | main | `Build (linux, amd64)`, `Build (linux, arm64)`, `E2E`, `Lint`, `Race Detection`, `Unit Tests`, `Verify` | no | no | none | risk-paths.yml → pr-triage.yml@c996ea3fb54b | 4/4 |
+| frostyard/flatpak-index | main | `Test` | no | no | none | risk-paths.yml → pr-triage.yml@c996ea3fb54b | 4/4 |
+| frostyard/homebrew-tap | main | `Test` | no | no | none | risk-paths.yml → pr-triage.yml@c996ea3fb54b | 4/4 |
+| frostyard/igloo | main | `Build`, `test`, `verify` | no | no | ci.yml | risk-paths.yml → pr-triage.yml@c996ea3fb54b | 4/4 |
+| frostyard/incus | stable | `Build Incus (Debian Trixie)` | no | no | none | risk-paths.yml → pr-triage.yml@c996ea3fb54b | 4/4 |
+| frostyard/intuneme | main | `Build`, `Verify`, `Vulncheck` | no | no | none | risk-paths.yml → pr-triage.yml@c996ea3fb54b | 4/4 |
+| frostyard/lab | main | `CI result` | no | no | ci.yml | risk-paths.yml → pr-triage.yml@c996ea3fb54b | 4/4 |
+| frostyard/omarchy-apps | main | `ci` | no | no | none | risk-paths.yml → pr-triage.yml@c996ea3fb54b | 4/4 |
+| frostyard/pilothouse | main | `Build (linux, amd64)`, `Build (linux, arm64)`, `Lint`, `Race Detection`, `Security Scan`, `Unit Tests`, `Verify` | no | no | none | risk-paths.yml → pr-triage.yml@c996ea3fb54b | 4/4 |
+| frostyard/problem-intake | main | `ci` | no | no | ci.yml, glitchtip.yml | risk-paths-caller.yml → pr-triage.yml@c996ea3fb54b | 4/4 |
+| frostyard/repogen | main | `make ci` | yes | yes | ci.yml | risk-paths.yml → pr-triage.yml@c996ea3fb54b | 4/4 |
+| frostyard/snosi | main | `bootc-secure-contracts`, `installer-redirect-worker`, `mkosi-config-sanity`, `publication-guard-tests`, `runtime-etc-guard`, `shell-lint`, `verify` | no | no | ci.yml | risk-paths.yml → pr-triage.yml@c996ea3fb54b | 4/4 |
+| frostyard/snowkit | main | `Lint`, `Race Detection`, `Unit Tests`, `Verify`, `Vulnerability Check` | no | no | ci.yml | risk-paths.yml → pr-triage.yml@c996ea3fb54b | 4/4 |
+| frostyard/testsuite | main | `Repository gate` | no | no | none | risk-paths.yml → pr-triage.yml@c996ea3fb54b | 4/4 |
+| bketelsen/truenas-mcp | main | `Build (darwin, arm64)`, `Build (linux, amd64)`, `Build (linux, arm64)`, `Build (windows, amd64)`, `Lint`, `Tests`, `Verify` | no | no | ci.yml | risk-paths.yml → pr-triage.yml@c996ea3fb54b | 4/4 |
+
+Compared with the owners' names on core#222 (the newest comment for each
+repository):
+
+- 32 of 34 repositories match their row: they require each name of the
+  row and no name that the row removes. Every repository
+  has 4 of 4 level labels and a caller of `pr-triage.yml` (frostyard/core: its
+  local caller). frostyard/repogen has strict checks and the merge queue.
+- Open: frostyard/nsl still requires `release-config` (step 3, remove), and
+  frostyard/firn does not require `Graphical installer gate` yet (step 3,
+  add).
+- frostyard/bootc-debian requires both names, but `Build (Debian Trixie)`
+  comes only from its hand-made ruleset `main rules`; its row has the command
+  that adds it to `frostyard: required checks` too.
+- Group B names are required by 2 rulesets (the hand-made one and
+  `frostyard: required checks`). GitHub requires each name once; the survey
+  lists it once. In frostyard/frostyard-org, `Workers Builds: frostyard-org`
+  is required from the Cloudflare app (hand-made ruleset) and from any app
+  (`frostyard: required checks`), so the survey shows it twice.
+- Group A keeps its required names in the ADR-0040 ruleset
+  `frostyard: default branch`; it has no `frostyard: required checks`
+  ruleset.
+
+Level backfill: `node scripts/pr-triage-backfill.mjs` over the same 34
+repositories found 4 open pull requests without a level label
+(frostyard/frostmail#215 and frostyard/snosi#1260 at L1,
+frostyard/frostmail#216 and bketelsen/pi-pocket-team#190 at L3); `--apply`
+labelled them. A second dry run printed no change. 5 open pull requests
+(frostyard/core#140 and #184, frostyard/intuneme#205, frostyard/snosi#924,
+frostyard/testsuite#73) have a base SHA from before their repository had a
+risk list, so they get no level label until their next event, as in the
+workflow.
+
 ### Repositories
 
 Group A has strict checks and the merge queue from ADR-0040 and ADR-0042;
@@ -166,7 +242,7 @@ had no required status check.
 | [frostyard/frostread](#frostyardfrostread) | Irulan | B | `Verify (make verify)`, `Race detector and cross-builds (make race cross)`, `web bundle (make web-check)`, `Desktop app (make app-check app-build)`, `Snapshot .deb (make deb)`, `Flatpak sources (make flatpak-sources)`, `Flatpak (build and test)` | no |  |
 | [frostyard/lodge](#frostyardlodge) | Irulan | B | `Verify (make verify)`, `Race detector and cross-builds (make race cross)`, `lodge-client (make client-check)`, `lodge-ui (make ui-check)`, `the shell (make shell-check)`, `The kit off Linux (go test on Windows)`, `Snapshot .deb (make deb)` | no |  |
 | [frostyard/porter](#frostyardporter) | Irulan | B | `Verify (make verify)`, `Race detector (make race)`, `Web bundle (make web-check)`, `Snapshot .deb (make deb)` | no |  |
-| [frostyard/bootc-debian](#frostyardbootc-debian) | Lucilla | B | `ci` | no | do it after bootc-debian#23 merges |
+| [frostyard/bootc-debian](#frostyardbootc-debian) | Lucilla | B | `Build (Debian Trixie)`, `ci` | no |  |
 | [frostyard/frostyard-org](#frostyardfrostyard-org) | Tamalane | B | `ci`, `Workers Builds: frostyard-org` (any app) | no |  |
 | [bketelsen/fleet](#bketelsenfleet) | Teg | B | `pytest`, `ansible-lint`, `tofu` | no |  |
 | [bketelsen/trimlights](#bketelsentrimlights) | Irulan | B | `check` | no |  |
@@ -181,7 +257,7 @@ had no required status check.
 | [frostyard/incus](#frostyardincus) | Lucilla | C | `Build Incus (Debian Trixie)` | no |  |
 | [frostyard/intuneme](#frostyardintuneme) | Duncan | C | `Verify`, `Vulncheck`, `Build` | no |  |
 | [frostyard/lab](#frostyardlab) | Murbella | C | `CI result` | no |  |
-| [frostyard/omarchy-apps](#frostyardomarchy-apps) | Lucilla | C | `ci` | no | do it after omarchy-apps#16 merges |
+| [frostyard/omarchy-apps](#frostyardomarchy-apps) | Lucilla | C | `ci` | no |  |
 | [frostyard/pilothouse](#frostyardpilothouse) | Duncan | C | `Lint`, `Security Scan`, `Unit Tests`, `Race Detection`, `Verify`, `Build (linux, amd64)`, `Build (linux, arm64)` | no |  |
 | [frostyard/problem-intake](#frostyardproblem-intake) | Murbella | C | `ci` | no |  |
 | [frostyard/repogen](#frostyardrepogen) | Lucilla | C | `make ci` | yes |  |
@@ -487,29 +563,22 @@ WOULD  POST repos/frostyard/porter/labels (create label level:L4)
 #### frostyard/bootc-debian
 
 - Owner: Lucilla. Group B. Merge queue: no.
-- Required names, from [the owner's comment](https://github.com/frostyard/core/issues/222#issuecomment-6744294849): `ci`.
-- Condition: its bot pull requests (branch `auto-update-checksums`, opened by `check-dependencies.yml` with `GITHUB_TOKEN`) start no `pull_request` workflow, so `ci` reports on them only when `check-dependencies.yml` dispatches `ci.yml`. frostyard/bootc-debian#23 adds that dispatch. Do this row only after that pull request has merged.
+- Required names, from [the owner's comment](https://github.com/frostyard/core/issues/222#issuecomment-6744914410): `Build (Debian Trixie)`, `ci`. The hand-made ruleset `main rules` requires `Build (Debian Trixie)` already; the command puts both names in `frostyard: required checks`, as for the other group B rows.
+- Bot pull requests (branch `auto-update-checksums`, opened by `check-dependencies.yml` with `GITHUB_TOKEN`) start no `pull_request` workflow; `check-dependencies.yml` dispatches `build.yml` and `ci.yml` for them (frostyard/bootc-debian#23, merged as `66ef763`).
+- State on 2026-11-09T16:48Z: `frostyard: required checks` exists with `ci` only, and the 4 level labels exist. Both names are required (the other one from `main rules`), so the dry run below is the only change left: it adds `Build (Debian Trixie)` to `frostyard: required checks`.
 
 Command (with `--apply`; the dry run is the same command without it):
 
 ```sh
-scripts/apply-triage-settings.sh frostyard/bootc-debian --required-check ci --apply
+scripts/apply-triage-settings.sh frostyard/bootc-debian --required-check "Build (Debian Trixie)" --required-check ci --apply
 ```
 
-Dry run (2026-11-09T15:45:24Z, JSON bodies in compact form):
+Dry run (2026-11-09T16:48:49Z, core at `781c8b1`, JSON body in compact form):
 
 ```text
-WOULD  POST repos/frostyard/bootc-debian/rulesets (create the required-checks ruleset: 1 check(s))
-{"name":"frostyard: required checks","target":"branch","enforcement":"active","bypass_actors":[],"conditions":{"ref_name":{"include":["~DEFAULT_BRANCH"],"exclude":[]}},"rules":[{"type":"required_status_checks","parameters":{"strict_required_status_checks_policy":false,"do_not_enforce_on_create":false,"required_status_checks":[{"context":"ci","integration_id":15368}]}}]}
-WOULD  POST repos/frostyard/bootc-debian/labels (create label level:L1)
-{"name":"level:L1","color":"B60205","description":"Read every line"}
-WOULD  POST repos/frostyard/bootc-debian/labels (create label level:L2)
-{"name":"level:L2","color":"D93F0B","description":"Read the diff"}
-WOULD  POST repos/frostyard/bootc-debian/labels (create label level:L3)
-{"name":"level:L3","color":"FBCA04","description":"Skim"}
-WOULD  POST repos/frostyard/bootc-debian/labels (create label level:L4)
-{"name":"level:L4","color":"0E8A16","description":"Title and CI"}
-5 change(s) planned for frostyard/bootc-debian; re-run with --apply to make them.
+WOULD  PUT repos/frostyard/bootc-debian/rulesets/26868615 (repair the required-checks ruleset)
+{"name":"frostyard: required checks","target":"branch","enforcement":"active","bypass_actors":[],"conditions":{"ref_name":{"include":["~DEFAULT_BRANCH"],"exclude":[]}},"rules":[{"type":"required_status_checks","parameters":{"strict_required_status_checks_policy":false,"do_not_enforce_on_create":false,"required_status_checks":[{"context":"Build (Debian Trixie)","integration_id":15368},{"context":"ci","integration_id":15368}]}}]}
+1 change(s) planned for frostyard/bootc-debian; re-run with --apply to make them.
 ```
 
 #### frostyard/frostyard-org
@@ -893,8 +962,9 @@ WOULD  POST repos/frostyard/lab/labels (create label level:L4)
 #### frostyard/omarchy-apps
 
 - Owner: Lucilla. Group C. Merge queue: no.
-- Required names, from [the owner's comment](https://github.com/frostyard/core/issues/222#issuecomment-6744299712): `ci`.
-- Condition: its bot pull requests (branch `update-upstream-versions`, opened by `check-dependencies.yml` with `GITHUB_TOKEN`) start no `pull_request` workflow, so `ci` reports on them only when `check-dependencies.yml` dispatches `ci.yml`. frostyard/omarchy-apps#16 adds that dispatch. Do this row only after that pull request has merged.
+- Required names, from [the owner's comment](https://github.com/frostyard/core/issues/222#issuecomment-6744914993): `ci`.
+- Bot pull requests (branch `update-upstream-versions`, opened by `check-dependencies.yml` with `GITHUB_TOKEN`) start no `pull_request` workflow; `check-dependencies.yml` dispatches `build.yml` and `ci.yml` for them (frostyard/omarchy-apps#16, merged as `6aff8a2`).
+- State on 2026-11-09T16:48Z: done. The dry run prints no change.
 
 Command (with `--apply`; the dry run is the same command without it):
 
@@ -902,20 +972,10 @@ Command (with `--apply`; the dry run is the same command without it):
 scripts/apply-triage-settings.sh frostyard/omarchy-apps --required-check ci --apply
 ```
 
-Dry run (2026-11-09T15:45:24Z, JSON bodies in compact form):
+Dry run (2026-11-09T16:48:49Z, core at `781c8b1`):
 
 ```text
-WOULD  POST repos/frostyard/omarchy-apps/rulesets (create the required-checks ruleset: 1 check(s))
-{"name":"frostyard: required checks","target":"branch","enforcement":"active","bypass_actors":[],"conditions":{"ref_name":{"include":["~DEFAULT_BRANCH"],"exclude":[]}},"rules":[{"type":"required_status_checks","parameters":{"strict_required_status_checks_policy":false,"do_not_enforce_on_create":false,"required_status_checks":[{"context":"ci","integration_id":15368}]}}]}
-WOULD  POST repos/frostyard/omarchy-apps/labels (create label level:L1)
-{"name":"level:L1","color":"B60205","description":"Read every line"}
-WOULD  POST repos/frostyard/omarchy-apps/labels (create label level:L2)
-{"name":"level:L2","color":"D93F0B","description":"Read the diff"}
-WOULD  POST repos/frostyard/omarchy-apps/labels (create label level:L3)
-{"name":"level:L3","color":"FBCA04","description":"Skim"}
-WOULD  POST repos/frostyard/omarchy-apps/labels (create label level:L4)
-{"name":"level:L4","color":"0E8A16","description":"Title and CI"}
-5 change(s) planned for frostyard/omarchy-apps; re-run with --apply to make them.
+frostyard/omarchy-apps already matches.
 ```
 
 #### frostyard/pilothouse
@@ -1131,7 +1191,22 @@ WOULD  POST repos/bketelsen/truenas-mcp/labels (create label level:L4)
   merges it.
 - The `levels` step labels a pull request on its next event (opened,
   synchronize, reopened, edited). Pull requests that were open before the
-  labels existed get their level label in the rollout check, by a backfill.
+  labels existed get their level label from
+  `node scripts/pr-triage-backfill.mjs OWNER/REPO... [--apply]`: it runs the
+  same `levels` step on each open pull request. Without `--apply` it is a dry
+  run that writes nothing; a second run after `--apply` prints no change.
+- Every caller runs on `pull_request_target`. GitHub adds a default Actions
+  policy that blocks `pull_request_target` in public repositories that have
+  no Actions event policy of their own, and enforces it on 2026-12-02
+  ([Securely using pull_request_target](https://docs.github.com/en/actions/reference/security/securely-using-pull_request_target#default-policy-for-pull_request_target)).
+  In a brownout of that policy on 2026-11-09 (until 18:00 UTC), the
+  caller runs of frostyard/bootc-debian#23 and frostyard/omarchy-apps#16
+  ended in `startup_failure` with no job. From the enforcement date, the
+  `pr-triage` workflow does not start in a public repository unless an
+  Actions event policy (Settings > Actions > Policies, at the organization
+  or repository level) allows `pull_request_target` for the caller file.
+  Private repositories (frostyard/apt-publisher, bketelsen/fleet) are not
+  affected.
 
 ## References
 
@@ -1145,7 +1220,8 @@ WOULD  POST repos/bketelsen/truenas-mcp/labels (create label level:L4)
   (row B18), [specs/pr-triage.md](../specs/pr-triage.md),
   [specs/risk-paths.md](../specs/risk-paths.md)
 - Tools: [scripts/apply-triage-settings.sh](../../scripts/apply-triage-settings.sh),
-  [scripts/required-checks-survey.mjs](../../scripts/required-checks-survey.mjs)
+  [scripts/required-checks-survey.mjs](../../scripts/required-checks-survey.mjs),
+  [scripts/pr-triage-backfill.mjs](../../scripts/pr-triage-backfill.mjs)
 - Names: [core#222](https://github.com/frostyard/core/issues/222); background:
   [core#218](https://github.com/frostyard/core/issues/218)
 - Context: [design: quality loop](quality-loop.md),
