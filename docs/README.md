@@ -108,6 +108,7 @@ which baseline rows do not apply here.
 - [Debian publication](design/debian-publication.md)
 - [Problem reports](design/problem-reports.md)
 - [Dependabot shadow](design/dependabot-shadow.md)
+- [PR triage rollout: settings runbook](design/pr-triage-rollout.md)
 
 ### Specs
 
