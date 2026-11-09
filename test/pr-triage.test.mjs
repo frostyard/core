@@ -350,7 +350,7 @@ function client(fetch) {
   return createGitHubApi({ token: "secret-token", apiUrl: "https://api.example.test", fetch });
 }
 
-test("listCheckRuns reads the check_runs of 2 pages", async () => {
+test("listCheckRuns asks for the latest run of each check name and reads the check_runs of 2 pages", async () => {
   const requests = [];
   const api = client(async (url, init) => {
     requests.push({ url, init });
@@ -363,7 +363,8 @@ test("listCheckRuns reads the check_runs of 2 pages", async () => {
   });
   const runs = await api.listCheckRuns("o", "r", HEAD);
   assert.deepEqual(runs.map((item) => item.name), ["a", "b"]);
-  assert.equal(requests[0].url, `https://api.example.test/repos/o/r/commits/${HEAD}/check-runs?per_page=100`);
+  // filter=latest is explicit: an older failed run that a re-run replaced must not revoke the label.
+  assert.equal(requests[0].url, `https://api.example.test/repos/o/r/commits/${HEAD}/check-runs?filter=latest&per_page=100`);
   assert.equal(requests[0].init.method, "GET");
   assert.equal(requests[0].init.headers.Authorization, "Bearer secret-token");
 });

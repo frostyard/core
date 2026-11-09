@@ -483,8 +483,11 @@ export function createGitHubApi({ token, apiUrl = "https://api.github.com", fetc
       return response !== null;
     },
 
+    // The latest run of each check name (filter=latest), as GitHub's checks
+    // rollup counts them: an older failed run that a re-run replaced does not
+    // count.
     async listCheckRuns(owner, repo, sha) {
-      return paginate(`/repos/${enc(owner)}/${enc(repo)}/commits/${enc(sha)}/check-runs?per_page=100`, {
+      return paginate(`/repos/${enc(owner)}/${enc(repo)}/commits/${enc(sha)}/check-runs?filter=latest&per_page=100`, {
         field: "check_runs",
         what: "check run list",
       });

@@ -61,7 +61,8 @@ The step runs the risk-paths job. Its behavior is the behavior of [risk-paths ru
 
 ### D. The `readiness` step: check evaluation
 
-- The step reads all pages of `GET /repos/{owner}/{repo}/commits/{head}/check-runs?per_page=100` (the `check_runs` array) and of `GET /repos/{owner}/{repo}/commits/{head}/status?per_page=100` (the `statuses` array).
+- The step reads all pages of `GET /repos/{owner}/{repo}/commits/{head}/check-runs?filter=latest&per_page=100` (the `check_runs` array) and of `GET /repos/{owner}/{repo}/commits/{head}/status?per_page=100` (the `statuses` array).
+- The step counts the latest run of each check name (`filter=latest`), as GitHub's checks rollup and merge gate do. An older failed run that a re-run of the same check replaced does not count. The `statuses` array likewise holds the latest status of each context.
 - The step does not use the combined `state`: it is `pending` when the commit has 0 statuses.
 - The step leaves out check runs whose `name` starts with `pr-triage`.
 - A check run is not green when its `status` is not `completed`, or its `conclusion` is not `success`, `neutral` or `skipped`.
