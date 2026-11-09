@@ -7,11 +7,16 @@ import test from "node:test";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 import {
+  FILE_LIST_LIMIT,
+  LEVELS,
+  ORG_FLOORS,
+  checkRequiredPaths,
   createGitHubApi,
+  levelOfFile,
+  levelOfPullRequest,
   matchFiles,
   matchGlob,
   parseStrictJson,
-  runRiskPathsJob,
   validateGlob,
   validateRiskPaths,
 } from "../scripts/lib/risk-paths.mjs";
@@ -22,7 +27,6 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."
 const checkScript = path.join(repoRoot, "scripts/check-risk-paths.mjs");
 
 const BASE_SHA = "a".repeat(40);
-const HEAD_SHA = "b".repeat(40);
 
 function list(paths) {
   return { schema_version: 1, paths };
@@ -130,9 +134,9 @@ test("validation fails on an unknown entry key", () => {
   assert.match(errorsOf(value), /paths\[1\]: unknown key "owner"/);
 });
 
-test("validation fails on schema_version 2 and \"1\"", () => {
-  assert.match(errorsOf({ ...validList(), schema_version: 2 }), /schema_version/);
-  assert.match(errorsOf({ ...validList(), schema_version: "1" }), /schema_version/);
+test("validation fails on schema_version \"1\" and 3", () => {
+  assert.match(errorsOf({ ...validList(), schema_version: "1" }), /schema_version: must be the integer 1 or 2/);
+  assert.match(errorsOf({ ...validList(), schema_version: 3 }), /schema_version: must be the integer 1 or 2/);
 });
 
 test("validation fails on empty paths", () => {
@@ -196,188 +200,331 @@ test("brace expansion above 256 globs fails", () => {
   assert.match(validateGlob(Array(9).fill(group).join("/")).join(), /more than 256/);
 });
 
-// ---- Job ------------------------------------------------------------------
+// ---- Version 1 results ----------------------------------------------------
 
-function event(overrides = {}) {
-  return {
-    pull_request: { number: 7, base: { sha: BASE_SHA }, head: { sha: HEAD_SHA, ref: "feature" } },
-    repository: { name: "core", owner: { login: "frostyard" } },
-    ...overrides,
-  };
-}
+const e = (glob, why = "x") => ({ glob, why });
 
-function fakeApi({ lists = {}, files = [], label = true } = {}) {
-  const calls = [];
-  const api = {
-    async getFileAtRef(owner, repo, filePath, ref) {
-      calls.push({ method: "getFileAtRef", args: [owner, repo, filePath, ref] });
-      return Object.hasOwn(lists, ref) ? lists[ref] : null;
-    },
-    async listPullFiles(owner, repo, number) {
-      calls.push({ method: "listPullFiles", args: [owner, repo, number] });
-      return files;
-    },
-    async labelExists(owner, repo, name) {
-      calls.push({ method: "labelExists", args: [owner, repo, name] });
-      return label;
-    },
-    async addLabels(owner, repo, number, labels) {
-      calls.push({ method: "addLabels", args: [owner, repo, number, labels] });
-    },
-  };
-  return { api, calls };
-}
+// The expected results were made once with the library before version 2 (the
+// library at commit 9a54cb8, before ADR-0078), then written down. A version 1 list
+// must keep its result, error by error.
+const V1_FIXTURES = [
+  ["valid list", () => ({ schema_version: 1, paths: [e(".github/risk-paths.json", "governance"), e(".github/workflows/**", "governance: the caller"), e("shared/bootc-secure/**", "boot chain")] }), {"ok":true,"errors":[]}],
+  ["valid 200-character why", () => ({ schema_version: 1, paths: [e("a", "x".repeat(200))] }), {"ok":true,"errors":[]}],
+  ["valid braces", () => ({ schema_version: 1, paths: [e("{a,b}/**")] }), {"ok":true,"errors":[]}],
+  ["top level array", () => ([]), {"ok":false,"errors":["$: the top level must be an object"]}],
+  ["top level null", () => (null), {"ok":false,"errors":["$: the top level must be an object"]}],
+  ["top level string", () => ("x"), {"ok":false,"errors":["$: the top level must be an object"]}],
+  ["unknown top-level key", () => ({ schema_version: 1, paths: [e("a")], extra: 1 }), {"ok":false,"errors":["$: unknown key \"extra\""]}],
+  ["unknown entry key", () => ({ schema_version: 1, paths: [e("a"), { glob: "b", why: "x", owner: "y" }] }), {"ok":false,"errors":["paths[1]: unknown key \"owner\""]}],
+  ["level key in a v1 entry", () => ({ schema_version: 1, paths: [{ glob: "a", level: "L1", why: "x" }] }), {"ok":false,"errors":["paths[0]: unknown key \"level\""]}],
+  ["default_level key in a v1 list", () => ({ schema_version: 1, default_level: "L3", paths: [e("a")] }), {"ok":false,"errors":["$: unknown key \"default_level\""]}],
+  ["missing paths", () => ({ schema_version: 1 }), {"ok":false,"errors":["$: missing key \"paths\""]}],
+  ["empty paths", () => ({ schema_version: 1, paths: [] }), {"ok":false,"errors":["paths: must have at least 1 entry"]}],
+  ["paths not an array", () => ({ schema_version: 1, paths: {} }), {"ok":false,"errors":["paths: must be an array"]}],
+  ["duplicate glob", () => ({ schema_version: 1, paths: [e("a/**"), e("a/**", "y")] }), {"ok":false,"errors":["paths[1].glob: duplicate glob \"a/**\" (also paths[0])"]}],
+  ["entries that are not objects", () => ({ schema_version: 1, paths: ["x", null, 3] }), {"ok":false,"errors":["paths[0]: must be an object","paths[1]: must be an object","paths[2]: must be an object"]}],
+  ["wrong types", () => ({ schema_version: 1, paths: [{ glob: 3, why: [] }, "x"] }), {"ok":false,"errors":["paths[0].glob: must be a string","paths[0].why: must be a string","paths[1]: must be an object"]}],
+  ["missing glob and why", () => ({ schema_version: 1, paths: [{}] }), {"ok":false,"errors":["paths[0]: missing key \"glob\"","paths[0]: missing key \"why\""]}],
+  ["blank why", () => ({ schema_version: 1, paths: [e("a", "  ")] }), {"ok":false,"errors":["paths[0].why: must not be empty"]}],
+  ["201-character why", () => ({ schema_version: 1, paths: [e("a", "x".repeat(201))] }), {"ok":false,"errors":["paths[0].why: must be at most 200 characters"]}],
+  ["every invalid glob", () => ({ schema_version: 1, paths: ["", "/a", "./a", "a//b", "a/", "a/../b", "[ab]", "!a", "a\\b", "a**", "**b/c", "{a}", "{a,}", "{a,{b,c}}", "{a", "a}"].map((g) => e(g)) }), {"ok":false,"errors":["paths[0].glob: \"\": glob is empty","paths[1].glob: \"/a\": a glob must not start with '/'","paths[1].glob: \"/a\": a glob must not have an empty segment","paths[2].glob: \"./a\": a glob must not start with './'","paths[3].glob: \"a//b\": a glob must not have an empty segment","paths[4].glob: \"a/\": a glob must not have an empty segment","paths[5].glob: \"a/../b\": a glob must not have a '..' segment","paths[6].glob: \"[ab]\": \"[\" is not supported","paths[6].glob: \"[ab]\": \"]\" is not supported","paths[7].glob: \"!a\": \"!\" is not supported","paths[8].glob: \"a\\\\b\": \"\\\\\" is not supported","paths[9].glob: \"a**\": '**' must be a whole segment","paths[10].glob: \"**b/c\": '**' must be a whole segment","paths[11].glob: \"{a}\": a brace group needs at least 2 alternatives","paths[12].glob: \"{a,}\": a brace group has an empty alternative","paths[13].glob: \"{a,{b,c}}\": nested braces are not supported","paths[14].glob: \"{a\": unmatched '{'","paths[15].glob: \"a}\": unmatched '}'"]}],
+  ["brace expansion above 256 globs", () => ({ schema_version: 1, paths: [e(Array(9).fill("{a,b}").join("/"))] }), {"ok":false,"errors":["paths[0].glob: \"{a,b}/{a,b}/{a,b}/{a,b}/{a,b}/{a,b}/{a,b}/{a,b}/{a,b}\": brace expansion gives more than 256 globs"]}],
+  ["several errors at once", () => ({ schema_version: 1, extra: true, paths: [{ glob: "a**", why: "" }, { glob: "a**", why: "x", z: 1 }] }), {"ok":false,"errors":["$: unknown key \"extra\"","paths[0].glob: \"a**\": '**' must be a whole segment","paths[0].why: must not be empty","paths[1]: unknown key \"z\"","paths[1].glob: \"a**\": '**' must be a whole segment","paths[1].glob: duplicate glob \"a**\" (also paths[0])"]}]
+];
 
-async function runJob(api, { eventName = "pull_request_target", ev = event() } = {}) {
-  const summaries = [];
-  const logs = [];
-  const result = await runRiskPathsJob({
-    api,
-    eventName,
-    event: ev,
-    summary: (markdown) => summaries.push(markdown),
-    log: (line) => logs.push(line),
-  });
-  return { result, summary: summaries.join(""), logs };
-}
-
-function methods(calls) {
-  return new Set(calls.map((call) => call.method));
-}
-
-const ALLOWED_METHODS = new Set(["getFileAtRef", "listPullFiles", "labelExists", "addLabels"]);
-
-test("job reads the list at the base SHA, never at the head SHA", async () => {
-  const { api, calls } = fakeApi({
-    lists: {
-      [HEAD_SHA]: JSON.stringify(list([{ glob: "src/**", why: "auth" }])),
-      [BASE_SHA]: JSON.stringify(list([{ glob: "secure/**", why: "boot chain" }])),
-    },
-    files: [{ filename: "src/login.go", status: "modified" }],
-  });
-  const { result, summary } = await runJob(api);
-  assert.equal(result.outcome, "no-match");
-  assert.match(summary, /no high-risk path changed/);
-  const reads = calls.filter((call) => call.method === "getFileAtRef");
-  assert.deepEqual(reads, [{ method: "getFileAtRef", args: ["frostyard", "core", ".github/risk-paths.json", BASE_SHA] }]);
-  assert.ok(!JSON.stringify(calls).includes(HEAD_SHA));
-  assert.ok(!methods(calls).has("addLabels"));
+test("validateRiskPaths gives the same results as before for every v1 fixture", () => {
+  for (const [name, make, expected] of V1_FIXTURES) {
+    assert.deepEqual(validateRiskPaths(make()), expected, name);
+  }
 });
 
-test("job adds risk:high once on a match and writes path, glob and why", async () => {
-  const { api, calls } = fakeApi({
-    lists: { [BASE_SHA]: JSON.stringify(validList()) },
-    files: [
-      { filename: ".github/workflows/ci.yml", status: "modified" },
-      { filename: "shared/bootc-secure/a|b`<c>.sh", status: "added" },
-      { filename: "README.md", status: "modified" },
+// ---- Validation, version 2 ------------------------------------------------
+
+function list2(paths, defaultLevel = "L3") {
+  return { schema_version: 2, default_level: defaultLevel, paths };
+}
+
+const e2 = (glob, level, why = "x") => ({ glob, level, why });
+
+function validList2() {
+  return list2([e2(".github/risk-paths.json", "L2", "quality"), e2(".github/workflows/**", "L2", "workflows"), e2("docs/**", "L4", "docs")]);
+}
+
+test("a valid v2 list passes", () => {
+  assert.deepEqual(validateRiskPaths(validList2()), { ok: true, errors: [] });
+  assert.deepEqual(validateRiskPaths(list2([e2("a", "L1")], "L4")), { ok: true, errors: [] });
+});
+
+test("v2 validation fails on a missing default_level", () => {
+  const { default_level: _unused, ...value } = validList2();
+  assert.deepEqual(validateRiskPaths(value), { ok: false, errors: ['$: missing key "default_level"'] });
+});
+
+test("v2 validation fails on a bad default_level and a bad entry level", () => {
+  const value = list2([e2("a", "L1"), e2("b", "L2"), e2("c", "L3"), e2("d", "L5"), e2("e", 3)], "l3");
+  assert.deepEqual(validateRiskPaths(value), {
+    ok: false,
+    errors: [
+      "default_level: must be 1 of L1, L2, L3, L4",
+      "paths[3].level: must be 1 of L1, L2, L3, L4",
+      "paths[4].level: must be 1 of L1, L2, L3, L4",
     ],
   });
-  const { result, summary, logs } = await runJob(api);
-  assert.equal(result.outcome, "labeled");
-  assert.equal(result.matches.length, 2);
-  const adds = calls.filter((call) => call.method === "addLabels");
-  assert.deepEqual(adds, [{ method: "addLabels", args: ["frostyard", "core", 7, ["risk:high"]] }]);
-  assert.match(summary, /\| \.github\/workflows\/ci\.yml \| \.github\/workflows\/\\\*\\\* \| governance: the caller \|/);
-  // Untrusted file names are escaped in the summary.
-  assert.match(summary, /shared\/bootc-secure\/a\\\|b\\`&lt;c&gt;\.sh/);
-  for (const line of logs) assert.ok(line.startsWith("risk-paths: "), line);
 });
 
-test("job summary shows 500 matches, the count of the rest, and the log has every match", async () => {
-  const files = Array.from({ length: 503 }, (_, i) => ({ filename: `shared/bootc-secure/f${i}.sh`, status: "added" }));
-  const { api } = fakeApi({ lists: { [BASE_SHA]: JSON.stringify(validList()) }, files });
-  const { result, summary, logs } = await runJob(api);
-  assert.equal(result.outcome, "labeled");
-  assert.equal(result.matches.length, 503);
-  assert.equal(summary.split("\n").filter((line) => line.startsWith("| shared/bootc-secure/")).length, 500);
-  assert.match(summary, /3 more matches are not shown/);
-  assert.equal(logs.filter((line) => line.startsWith("risk-paths: match ")).length, 503);
-  assert.ok(logs.some((line) => line.includes("shared/bootc-secure/f502.sh")));
+test("v2 validation fails on a missing level in an entry", () => {
+  const value = list2([e2("a", "L1"), { glob: "b", why: "x" }]);
+  assert.deepEqual(validateRiskPaths(value), { ok: false, errors: ['paths[1]: missing key "level"'] });
 });
 
-test("job with no list on base passes with no label call", async () => {
-  const { api, calls } = fakeApi();
-  const { result, summary } = await runJob(api);
-  assert.equal(result.outcome, "no-list");
-  assert.match(summary, /no list on base/);
-  assert.deepEqual([...methods(calls)], ["getFileAtRef"]);
+test("v2 validation keeps the glob, why, duplicate and empty-paths rules", () => {
+  const errors = errorsOf(list2([e2("a**", "L1", ""), e2("a**", "L1")]));
+  assert.match(errors, /paths\[0\]\.glob: "a\*\*"/);
+  assert.match(errors, /paths\[0\]\.why: must not be empty/);
+  assert.match(errors, /paths\[1\]\.glob: duplicate glob "a\*\*" \(also paths\[0\]\)/);
+  assert.match(errorsOf(list2([])), /paths: must have at least 1 entry/);
+  assert.match(errorsOf({ ...validList2(), extra: 1 }), /\$: unknown key "extra"/);
+  assert.match(errorsOf(list2([{ ...e2("a", "L1"), owner: "x" }])), /paths\[0\]: unknown key "owner"/);
 });
 
-test("job fails when risk:high does not exist and adds nothing", async () => {
-  const { api, calls } = fakeApi({
-    lists: { [BASE_SHA]: JSON.stringify(validList()) },
-    files: [{ filename: ".github/workflows/ci.yml", status: "modified" }],
-    label: false,
+test("a v1 entry with a level key fails", () => {
+  assert.deepEqual(validateRiskPaths({ schema_version: 1, paths: [{ glob: "a", level: "L1", why: "x" }] }), {
+    ok: false,
+    errors: ['paths[0]: unknown key "level"'],
   });
-  await assert.rejects(runJob(api), (error) => {
-    assert.match(error.message, /label risk:high does not exist in frostyard\/core/);
-    assert.match(error.message, /accountable owner must create it/);
-    return true;
+});
+
+test("schema_version 3 fails and checks keys as v1", () => {
+  assert.deepEqual(validateRiskPaths({ schema_version: 3, paths: [e("a")] }), {
+    ok: false,
+    errors: ["schema_version: must be the integer 1 or 2"],
   });
-  assert.ok(!methods(calls).has("addLabels"));
-  assert.ok(!methods(calls).has("listPullFiles"));
-});
-
-test("job checks the label also when nothing matches", async () => {
-  const { api, calls } = fakeApi({ lists: { [BASE_SHA]: JSON.stringify(validList()) }, label: false });
-  await assert.rejects(runJob(api), /risk:high does not exist/);
-  assert.ok(methods(calls).has("labelExists"));
-});
-
-test("job adds the label when the file list is truncated at 3000", async () => {
-  const files = Array.from({ length: 3000 }, (_, i) => ({ filename: `docs/f${i}.md`, status: "added" }));
-  const { api, calls } = fakeApi({ lists: { [BASE_SHA]: JSON.stringify(validList()) }, files });
-  const { result, summary } = await runJob(api);
-  assert.equal(result.outcome, "labeled");
-  assert.equal(result.truncated, true);
-  assert.equal(calls.filter((call) => call.method === "addLabels").length, 1);
-  assert.match(summary, /truncated/);
-});
-
-test("job fails on an invalid list and adds nothing", async () => {
-  const { api, calls } = fakeApi({
-    lists: { [BASE_SHA]: '{"schema_version":2,"paths":[{"glob":"/a","why":""}]}' },
-    files: [{ filename: "a", status: "added" }],
+  assert.deepEqual(validateRiskPaths({ schema_version: 3, default_level: "L3", paths: [e("a")] }), {
+    ok: false,
+    errors: ['$: unknown key "default_level"', "schema_version: must be the integer 1 or 2"],
   });
-  await assert.rejects(runJob(api), (error) => {
-    assert.match(error.message, /schema_version/);
-    assert.match(error.message, /paths\[0\]\.glob/);
-    assert.match(error.message, /paths\[0\]\.why/);
-    return true;
+});
+
+test("a missing schema_version fails", () => {
+  assert.deepEqual(validateRiskPaths({ paths: [e("a")] }), {
+    ok: false,
+    errors: ['$: missing key "schema_version"', "schema_version: must be the integer 1 or 2"],
   });
-  assert.ok(!methods(calls).has("addLabels"));
 });
 
-test("job fails on a duplicate JSON key in the list", async () => {
-  const { api, calls } = fakeApi({ lists: { [BASE_SHA]: '{"schema_version":1,"schema_version":1,"paths":[]}' } });
-  await assert.rejects(runJob(api), /duplicate key/);
-  assert.ok(!methods(calls).has("addLabels"));
+// ---- Levels ---------------------------------------------------------------
+
+test("the levels are frozen and the org floor is frozen", () => {
+  assert.deepEqual([...LEVELS], ["L1", "L2", "L3", "L4"]);
+  assert.ok(Object.isFrozen(LEVELS));
+  assert.ok(Object.isFrozen(ORG_FLOORS) && Object.isFrozen(ORG_FLOORS.L1) && Object.isFrozen(ORG_FLOORS.L1.words));
+  assert.ok(Object.isFrozen(ORG_FLOORS.L1.extensions) && Object.isFrozen(ORG_FLOORS.L2) && Object.isFrozen(ORG_FLOORS.L2.globs));
 });
 
-test("job fails on a wrong event name", async () => {
-  const { api, calls } = fakeApi();
-  await assert.rejects(runJob(api, { eventName: "pull_request" }), /must run on pull_request_target/);
-  assert.equal(calls.length, 0);
+test("a v1 list reads as every glob at L1 and default L3", () => {
+  const value = validList();
+  assert.deepEqual(levelOfFile(value, "shared/bootc-secure/a.sh"), {
+    path: "shared/bootc-secure/a.sh",
+    level: "L1",
+    source: "glob",
+    glob: "shared/bootc-secure/**",
+    why: "boot chain",
+  });
+  assert.deepEqual(levelOfFile(value, ".github/workflows/ci.yml").level, "L1");
 });
 
-test("job fails on a base SHA that is not 40 hex characters", async () => {
-  const { api } = fakeApi();
-  const ev = event();
-  ev.pull_request.base.sha = "main";
-  await assert.rejects(runJob(api, { ev }), /base\.sha/);
+test("a v1 list with no match gives L3", () => {
+  assert.deepEqual(levelOfFile(validList(), "docs/a.md"), {
+    path: "docs/a.md",
+    level: "L3",
+    source: "default",
+    glob: null,
+    why: null,
+  });
+  assert.equal(levelOfPullRequest(validList(), [{ filename: "docs/a.md" }]).level, "L3");
 });
 
-test("job never calls a method that removes a label", async () => {
-  const scenarios = [
-    fakeApi(),
-    fakeApi({ lists: { [BASE_SHA]: JSON.stringify(validList()) } }),
-    fakeApi({ lists: { [BASE_SHA]: JSON.stringify(validList()) }, files: [{ filename: ".github/risk-paths.json", status: "removed" }] }),
-  ];
-  for (const { api, calls } of scenarios) {
-    await runJob(api);
-    for (const method of methods(calls)) assert.ok(ALLOWED_METHODS.has(method), method);
+test("the strictest matching glob wins", () => {
+  const value = list2([e2("src/**", "L3", "src"), e2("src/auth/**", "L2", "auth"), e2("**/*.go", "L4", "go")]);
+  const result = levelOfFile(value, "src/auth/login.go");
+  assert.equal(result.level, "L2");
+  assert.equal(result.glob, "src/auth/**");
+  assert.equal(result.why, "auth");
+  assert.equal(result.source, "glob");
+});
+
+test("with equal levels the first glob in list order wins", () => {
+  const value = list2([e2("src/**", "L2", "first"), e2("**/*.go", "L2", "second")]);
+  assert.equal(levelOfFile(value, "src/a.go").glob, "src/**");
+  const reversed = list2([e2("**/*.go", "L2", "second"), e2("src/**", "L2", "first")]);
+  assert.equal(levelOfFile(reversed, "src/a.go").glob, "**/*.go");
+});
+
+test("an L4 glob under an L3 default gives L4", () => {
+  const value = list2([e2("docs/**", "L4", "docs")]);
+  assert.deepEqual(levelOfFile(value, "docs/a.md"), { path: "docs/a.md", level: "L4", source: "glob", glob: "docs/**", why: "docs" });
+});
+
+test("an L4 glob under a floor gives the floor's level", () => {
+  const value = list2([e2("**", "L4", "everything")]);
+  assert.deepEqual(levelOfFile(value, "docs/keys/a.md"), {
+    path: "docs/keys/a.md",
+    level: "L1",
+    source: "floor",
+    glob: null,
+    why: 'org floor: path word "keys"',
+  });
+  assert.equal(levelOfFile(value, ".github/workflows/ci.yml").level, "L2");
+  assert.equal(levelOfFile(value, ".github/workflows/ci.yml").source, "floor");
+  assert.equal(levelOfFile(value, "docs/a.md").level, "L4");
+});
+
+test("a glob at the floor's level keeps the glob as the source", () => {
+  const value = list2([e2(".github/workflows/**", "L2", "workflows")]);
+  assert.equal(levelOfFile(value, ".github/workflows/ci.yml").source, "glob");
+  // A stricter glob beats a looser floor.
+  const strict = list2([e2(".github/workflows/**", "L1", "workflows")]);
+  assert.equal(levelOfFile(strict, ".github/workflows/ci.yml").level, "L1");
+  assert.equal(levelOfFile(strict, ".github/workflows/ci.yml").source, "glob");
+  // A default stricter than the floor wins over the floor.
+  assert.equal(levelOfFile(list2([e2("a", "L1")], "L1"), ".github/workflows/ci.yml").level, "L1");
+});
+
+const FLOOR_WORDS = ["secret", "secrets", "credential", "credentials", "password", "passwords", "passwd", "signing", "keyring", "keyrings", "keys", "gpg", "pgp"];
+
+for (const word of FLOOR_WORDS) {
+  test(`floor word ${word} is L1`, () => {
+    const value = list2([e2("zzz", "L4")]);
+    for (const p of [`${word}/a.txt`, `src/${word}`, `src/a-${word}.txt`, `src/a_${word}_b.txt`, `src/${word}.json`, `src/x.${word}`]) {
+      const result = levelOfFile(value, p);
+      assert.equal(result.level, "L1", p);
+      assert.equal(result.source, "floor", p);
+      assert.equal(result.why, `org floor: path word ${JSON.stringify(word)}`, p);
+    }
+  });
+}
+
+test("floor words are case-insensitive", () => {
+  const value = list2([e2("zzz", "L4")]);
+  assert.equal(levelOfFile(value, "src/Secrets/A.txt").level, "L1");
+  assert.equal(levelOfFile(value, "SRC/KEYS/a").level, "L1");
+  assert.equal(levelOfFile(value, "src/My-Password.txt").level, "L1");
+});
+
+test("a floor word is a whole word: keyboard.go, monkeys and secretary are not L1", () => {
+  const value = list2([e2("zzz", "L4")]);
+  for (const p of ["keyboard.go", "src/keyboard.go", "monkeys/a.txt", "secretary.md", "keystone/a", "src/mykeys.txt", "passwords2/a"]) {
+    assert.equal(levelOfFile(value, p).level, "L3", p);
   }
+});
+
+test("src/keys/a.go and debian/keyrings/frostyard.asc are L1", () => {
+  const value = validList2();
+  assert.equal(levelOfFile(value, "src/keys/a.go").level, "L1");
+  assert.equal(levelOfFile(value, "debian/keyrings/frostyard.asc").level, "L1");
+});
+
+for (const extension of ["pem", "key", "p12", "pfx", "gpg", "asc"]) {
+  test(`floor extension ${extension} is L1`, () => {
+    const value = list2([e2("zzz", "L4")]);
+    for (const p of [`a/b.${extension}`, `a/b.${extension.toUpperCase()}`, `x.y.${extension}`]) {
+      const result = levelOfFile(value, p);
+      if (extension === "gpg") {
+        // gpg is also a floor word; the word wins.
+        assert.equal(result.level, "L1", p);
+        continue;
+      }
+      assert.equal(result.level, "L1", p);
+      assert.equal(result.source, "floor", p);
+      assert.equal(result.why, `org floor: extension ${JSON.stringify(extension)}`, p);
+    }
+  });
+}
+
+test("cert.PEM is L1; a leading dot and a trailing dot are not an extension", () => {
+  const value = list2([e2("zzz", "L4")]);
+  assert.equal(levelOfFile(value, "cert.PEM").level, "L1");
+  assert.equal(levelOfFile(value, ".key").level, "L3");
+  assert.equal(levelOfFile(value, "a/.asc").level, "L3");
+  assert.equal(levelOfFile(value, "a/b.pem.").level, "L3");
+  assert.equal(levelOfFile(value, "a.pem/b").level, "L3");
+  assert.equal(levelOfFile(value, "a/b.pemx").level, "L3");
+  assert.equal(levelOfFile(value, "a/key").level, "L3");
+  assert.equal(levelOfFile(value, "a/.env").level, "L3");
+});
+
+for (const glob of [".github/workflows/**", ".github/actions/**", ".github/risk-paths.json", "policies/**", ".github/policies/**"]) {
+  test(`floor glob ${glob} is L2`, () => {
+    const value = list2([e2("zzz", "L4")]);
+    const p = glob.endsWith("/**") ? `${glob.slice(0, -2)}x/y.yml` : glob;
+    assert.deepEqual(levelOfFile(value, p), { path: p, level: "L2", source: "floor", glob: null, why: `org floor: ${glob}` });
+  });
+}
+
+test("a path near the floor globs is not L2", () => {
+  const value = list2([e2("zzz", "L4")]);
+  for (const p of [".github/CODEOWNERS", "docs/policies/a.md", ".github/risk-paths.jsonc", "policies2/a"]) {
+    assert.equal(levelOfFile(value, p).level, "L3", p);
+  }
+});
+
+test("0 files gives default_level", () => {
+  assert.deepEqual(levelOfPullRequest(list2([e2("a", "L1")], "L4"), []), { level: "L4", truncated: false, files: [] });
+  assert.equal(levelOfPullRequest(validList(), []).level, "L3");
+});
+
+test("the level of a pull request is the strictest file level", () => {
+  const result = levelOfPullRequest(validList2(), [{ filename: "docs/a.md" }, { filename: "src/a.go" }, ".github/workflows/ci.yml"]);
+  assert.equal(result.level, "L2");
+  assert.equal(result.truncated, false);
+  assert.deepEqual(result.files.map((file) => [file.path, file.level]), [
+    ["docs/a.md", "L4"],
+    ["src/a.go", "L3"],
+    [".github/workflows/ci.yml", "L2"],
+  ]);
+});
+
+test("3000 files give L1 and truncated", () => {
+  assert.equal(FILE_LIST_LIMIT, 3000);
+  const files = Array.from({ length: 3000 }, (_, i) => ({ filename: `docs/f${i}.md` }));
+  const result = levelOfPullRequest(validList2(), files);
+  assert.equal(result.level, "L1");
+  assert.equal(result.truncated, true);
+  assert.equal(levelOfPullRequest(validList2(), files.slice(0, 2999)).truncated, false);
+  assert.equal(levelOfPullRequest(validList2(), files.slice(0, 2999)).level, "L4");
+});
+
+test("a rename counts both names, each path once", () => {
+  const result = levelOfPullRequest(validList2(), [
+    { filename: "docs/new.md", previous_filename: ".github/workflows/old.yml", status: "renamed" },
+    { filename: "docs/new.md" },
+  ]);
+  assert.equal(result.level, "L2");
+  assert.deepEqual(result.files.map((file) => file.path), ["docs/new.md", ".github/workflows/old.yml"]);
+});
+
+// ---- Required paths -------------------------------------------------------
+
+const CALLER = ".github/workflows/risk-paths-caller.yml";
+
+test("checkRequiredPaths: a v1 list that matches passes, a missing match keeps the old text", () => {
+  assert.deepEqual(checkRequiredPaths(list([e(".github/risk-paths.json"), e(".github/workflows/**")]), [".github/risk-paths.json", CALLER]), []);
+  assert.deepEqual(checkRequiredPaths(list([e(".github/workflows/**")]), [".github/risk-paths.json", CALLER]), [
+    "no glob matches the required path .github/risk-paths.json",
+  ]);
+});
+
+test("checkRequiredPaths: a v2 list at L1 or L2 passes", () => {
+  assert.deepEqual(checkRequiredPaths(list2([e2(".github/risk-paths.json", "L1"), e2(".github/workflows/**", "L2")]), [".github/risk-paths.json", CALLER]), []);
+});
+
+test("checkRequiredPaths: a v2 glob at L3 or L4 on a required path fails", () => {
+  const value = list2([e2(".github/risk-paths.json", "L2"), e2(".github/workflows/**", "L3"), e2("**/*.yml", "L4")]);
+  assert.deepEqual(checkRequiredPaths(value, [".github/risk-paths.json", CALLER]), [
+    `the glob .github/workflows/** matches the required path ${CALLER} at level L3; it must be L1 or L2`,
+    `the glob **/*.yml matches the required path ${CALLER} at level L4; it must be L1 or L2`,
+  ]);
+  assert.deepEqual(checkRequiredPaths(list2([e2("zzz", "L1")]), [CALLER]), [`no glob matches the required path ${CALLER}`]);
 });
 
 // ---- GitHub API client ----------------------------------------------------
@@ -541,6 +688,23 @@ test("check-risk-paths passes on a valid fixture list", async () => {
   const root = await gateFixture(validList());
   const { stdout } = await runGate(root);
   assert.match(stdout, /ok {3}risk_paths: 3 entries/);
+});
+
+test("check-risk-paths passes on a v2 fixture list", async () => {
+  const root = await gateFixture(validList2());
+  const { stdout } = await runGate(root);
+  assert.match(stdout, /ok {3}risk_paths: 3 entries/);
+});
+
+test("check-risk-paths fails on a v2 list with the caller at L3", async () => {
+  const root = await gateFixture(
+    list2([e2(".github/risk-paths.json", "L2"), e2(".github/workflows/**", "L3", "workflows")]),
+  );
+  await assert.rejects(runGate(root), (error) =>
+    error.stderr.includes(
+      `the glob .github/workflows/** matches the required path .github/workflows/risk-paths-caller.yml at level L3; it must be L1 or L2`,
+    ),
+  );
 });
 
 test("check-risk-paths fails on an invalid list", async () => {

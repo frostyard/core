@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 // Risk-path list gate (ADR-0068, docs/specs/risk-paths.md): strict JSON and
-// the field table of .github/risk-paths.json, the required entries (rule C),
-// and, where the library lives, the embedded copy in the reusable workflow.
+// the field table of .github/risk-paths.json (versions 1 and 2, ADR-0078), the
+// required entries (rule C), and, where the library lives, the embedded copy in
+// the reusable workflow.
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { LIST_PATH, matchGlob, parseStrictJson, validateRiskPaths } from "./lib/risk-paths.mjs";
+import { LIST_PATH, checkRequiredPaths, parseStrictJson, validateRiskPaths } from "./lib/risk-paths.mjs";
 import { LIBRARY_PATH, checkSync } from "./sync-risk-paths-workflow.mjs";
 
 const scriptRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -51,12 +52,8 @@ if (!existsSync(absoluteFile)) {
     for (const error of validation.errors) failures.push(`${file}: ${error}`);
     if (validation.ok) {
       entries = list.paths.length;
-      // Rule C: the list and the caller workflow are always high risk.
-      for (const required of [LIST_PATH, caller]) {
-        if (!list.paths.some((entry) => matchGlob(entry.glob, required))) {
-          failures.push(`${file}: no glob matches the required path ${required}`);
-        }
-      }
+      // Rule C: the list and the caller workflow are always L1 or L2.
+      for (const error of checkRequiredPaths(list, [LIST_PATH, caller])) failures.push(`${file}: ${error}`);
     }
   }
 }

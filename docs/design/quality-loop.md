@@ -27,10 +27,14 @@ PR template ──► review rubric ──► CI gates ──► corrections ─
 - **Declare** — [.github/pull_request_template.md](../../.github/pull_request_template.md)
   makes every PR state its risk tier (highest applicable, never lower —
   ADR-0019) and walk the docs-housekeeping checklist.
-- **Flag risk paths** — each repository lists its high-risk paths in
-  `.github/risk-paths.json`; core's reusable workflow labels a PR that
-  touches 1 path with `risk:high`; the label routes the PR to the owner's
-  review or the accountable owner's read ([ADR-0068](../adr/0068-label-pull-requests-that-touch-high-risk-paths.md),
+- **Flag risk paths** — each repository gives its paths a level from L1
+  to L4 in `.github/risk-paths.json`; core's reusable workflow labels each
+  PR `level:L1` to `level:L4` (the strictest changed path, with org floors
+  for keys, secrets and workflows) and adds `risk:high` at L1 and L2; the
+  level tells the accountable owner how much of the diff to read, and
+  `risk:high` routes the PR to the owner's review
+  ([ADR-0068](../adr/0068-label-pull-requests-that-touch-high-risk-paths.md),
+  [ADR-0078](../adr/0078-sort-pull-requests-by-levels-l1-to-l4.md),
   [risk paths spec](../specs/risk-paths.md)). The same workflow removes
   `ready-for-human` when the head moves after the label or CI is not green
   ([ADR-0077](../adr/0077-bind-ready-for-human-to-the-head-commit.md),
@@ -150,7 +154,8 @@ copy it as-is.
   [ADR-0070](../adr/0070-build-tool-docs-sites-with-materialx-on-github-pages.md),
   [ADR-0071](../adr/0071-hold-every-code-repository-to-one-baseline.md),
   [ADR-0072](../adr/0072-write-every-readme-to-one-standard.md),
-  [ADR-0077](../adr/0077-bind-ready-for-human-to-the-head-commit.md)
+  [ADR-0077](../adr/0077-bind-ready-for-human-to-the-head-commit.md),
+  [ADR-0078](../adr/0078-sort-pull-requests-by-levels-l1-to-l4.md)
 - Contracts: [specs/pr-review-rubric.md](../specs/pr-review-rubric.md),
   [specs/pr-acceptance-metric.md](../specs/pr-acceptance-metric.md),
   [specs/risk-paths.md](../specs/risk-paths.md),

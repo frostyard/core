@@ -1,6 +1,7 @@
-# PR triage caller (ADR-0068, ADR-0077, docs/specs/pr-triage.md): runs core's
-# reusable PR triage workflow on every pull request. It adds the label
-# risk:high and removes ready-for-human when the head moved or CI is not green.
+# PR triage caller (ADR-0068, ADR-0077, ADR-0078, docs/specs/pr-triage.md): runs
+# core's reusable PR triage workflow on every pull request. It adds the level
+# labels and risk:high, and removes ready-for-human when the head moved or CI is
+# not green.
 #
 # In core the caller uses the local path. Under pull_request_target a local
 # reusable workflow resolves to the base branch commit, not the pull request
