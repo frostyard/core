@@ -1,8 +1,9 @@
-// PR triage (ADR-0077, docs/specs/pr-triage.md): the readiness step that
+// PR triage (ADR-0077, ADR-0078, docs/specs/pr-triage.md): the levels step that
+// adds the level label level:L1 to level:L4 and, for L1 and L2, the label
+// risk:high (ADR-0068, docs/specs/risk-paths.md), and the readiness step that
 // removes the label ready-for-human when the pull request head moves after the
 // label, or when the label comes while CI at the head is not green. `main`
-// picks the step from PR_TRIAGE_STEP: `levels` runs the risk-paths job
-// (ADR-0068, scripts/lib/risk-paths.mjs) and `readiness` runs this step.
+// picks the step from PR_TRIAGE_STEP: `levels` or `readiness`.
 //
 // The reusable workflow .github/workflows/pr-triage.yml embeds this file
 // verbatim, plus 1 trailer line, and scripts/lib/risk-paths.mjs beside it. It
@@ -11,11 +12,16 @@
 // `npm run check:risk-paths` fails when the embedded copy drifts. Never edit
 // the embedded copy by hand.
 import {
+  LABEL,
+  LEVELS,
+  LIST_PATH,
   NAME_PATTERN,
   commandValue,
   createGitHubApi,
   escapeCell,
-  runRiskPathsJob,
+  levelOfPullRequest,
+  parseStrictJson,
+  validateRiskPaths,
 } from "./risk-paths.mjs";
 
 export const READY_LABEL = "ready-for-human";
@@ -24,8 +30,10 @@ const OWN_CHECK_PREFIX = "pr-triage";
 const GREEN_CONCLUSIONS = new Set(["success", "neutral", "skipped"]);
 const BAD_STATUS_STATES = new Set(["pending", "failure", "error"]);
 const SUMMARY_ROW_LIMIT = 50;
+const LEVELS_ROW_LIMIT = 500;
 const READINESS_PREFIX = "pr-triage: readiness: ";
 const LEVELS_PREFIX = "risk-paths: ";
+export const LEVEL_LABELS = Object.freeze({ L1: "level:L1", L2: "level:L2", L3: "level:L3", L4: "level:L4" });
 const SHA_PATTERN = /^[0-9a-f]{40}$/;
 
 // ---- Comments -------------------------------------------------------------
@@ -180,6 +188,146 @@ export async function runReadinessStep({ api, eventName, event, summary, log }) 
   return { outcome: "revoked", reason: revocation.reason, commented: !hasMarker, removed };
 }
 
+// ---- Levels step ----------------------------------------------------------
+
+const levelRank = (level) => LEVELS.indexOf(level);
+
+// Adds the level label of the pull request and, for L1 and L2, risk:high. A
+// level label only gets stricter: a looser computed level keeps the stricter
+// label that the pull request has. Never removes risk:high. Never creates a
+// label: the add-labels API creates a missing one, so the step checks first.
+export async function runLevelsStep({ api, eventName, event, summary, log }) {
+  const say = (message, value) =>
+    log(value === undefined ? `${LEVELS_PREFIX}${message}` : `${LEVELS_PREFIX}${message} ${JSON.stringify(value)}`);
+
+  if (eventName !== "pull_request_target") {
+    throw new Error(`the caller must run on pull_request_target, not ${JSON.stringify(eventName)}`);
+  }
+  const pr = event?.pull_request;
+  const owner = event?.repository?.owner?.login;
+  const repo = event?.repository?.name;
+  const number = pr?.number;
+  const baseSha = pr?.base?.sha;
+  if (typeof owner !== "string" || !NAME_PATTERN.test(owner) || typeof repo !== "string" || !NAME_PATTERN.test(repo)) {
+    throw new Error("the event has no valid repository owner and name");
+  }
+  if (!Number.isSafeInteger(number) || number < 1) throw new Error("the event has no valid pull request number");
+  if (typeof baseSha !== "string" || !SHA_PATTERN.test(baseSha)) {
+    throw new Error("the event has no valid pull_request.base.sha (40 hex characters)");
+  }
+  const fullName = `${owner}/${repo}`;
+  say("repository", fullName);
+  say("pull request", number);
+  say("base sha", baseSha);
+
+  const text = await api.getFileAtRef(owner, repo, LIST_PATH, baseSha);
+  if (text === null) {
+    say(`no list on base: ${LIST_PATH} does not exist at`, baseSha);
+    await summary(`## Levels\n\nno list on base: \`${LIST_PATH}\` does not exist at \`${baseSha}\`. No label change.\n`);
+    return { outcome: "no-list" };
+  }
+
+  let list;
+  try {
+    list = parseStrictJson(text);
+  } catch (error) {
+    throw new Error(`${LIST_PATH} at ${baseSha} is not valid: ${error.message}`);
+  }
+  const validation = validateRiskPaths(list);
+  if (!validation.ok) {
+    throw new Error(`${LIST_PATH} at ${baseSha} is not valid: ${validation.errors.join("; ")}`);
+  }
+  say("list entries", list.paths.length);
+
+  if (!(await api.labelExists(owner, repo, LABEL))) {
+    throw new Error(
+      `label ${LABEL} does not exist in ${fullName}; the accountable owner must create it ` +
+        `(gh label create ${LABEL} --repo ${fullName} --color B60205 --description "Touches a high-risk path (ADR-0068)")`,
+    );
+  }
+  const missingLabels = [];
+  for (const level of LEVELS) {
+    if (!(await api.labelExists(owner, repo, LEVEL_LABELS[level]))) missingLabels.push(LEVEL_LABELS[level]);
+  }
+
+  const files = await api.listPullFiles(owner, repo, number);
+  say("changed files", files.length);
+  const computed = levelOfPullRequest(list, files);
+  const level = computed.level;
+  say("computed level", level);
+  const strict = computed.files.filter((result) => result.level === "L1" || result.level === "L2");
+  for (const result of strict) say("path", result);
+
+  const alias = level === "L1" || level === "L2" ? [LABEL] : [];
+  const added = [];
+  const removed = [];
+  let outcome;
+  let kept = null;
+  if (missingLabels.length > 0) {
+    outcome = "labels-missing";
+    if (alias.length > 0) {
+      await api.addLabels(owner, repo, number, alias);
+      added.push(...alias);
+    }
+  } else {
+    const current = (await api.listIssueLabels(owner, repo, number)).map((label) => label?.name);
+    const currentLevels = LEVELS.filter((candidate) => current.includes(LEVEL_LABELS[candidate]));
+    const strictest = currentLevels[0];
+    const raise = strictest === undefined || levelRank(level) < levelRank(strictest);
+    const toAdd = raise ? [LEVEL_LABELS[level], ...alias] : alias;
+    if (!raise) kept = strictest;
+    if (toAdd.length > 0) {
+      await api.addLabels(owner, repo, number, toAdd);
+      added.push(...toAdd);
+    }
+    if (raise) {
+      for (const candidate of currentLevels) {
+        if (levelRank(candidate) <= levelRank(level)) continue;
+        await api.removeIssueLabel(owner, repo, number, LEVEL_LABELS[candidate]);
+        removed.push(LEVEL_LABELS[candidate]);
+      }
+    }
+    outcome = raise ? "labeled" : "kept";
+  }
+  for (const name of added) say("added label", name);
+  for (const name of removed) say("removed label", name);
+
+  const lines = ["## Levels", ""];
+  if (kept !== null) {
+    lines.push(`Level: computed ${level}, kept ${kept}. A level label only gets stricter.`);
+  } else {
+    lines.push(`Level: computed ${level}.`);
+  }
+  if (added.length > 0) lines.push("", `Added ${added.map((name) => `\`${name}\``).join(", ")}.`);
+  if (removed.length > 0) lines.push("", `Removed ${removed.map((name) => `\`${name}\``).join(", ")}.`);
+  if (missingLabels.length > 0) {
+    const warning =
+      `warning: the label ${missingLabels.join(", ")} does not exist in ${fullName}; no level label changed. ` +
+      `Fix: frostyard/core scripts/apply-triage-settings.sh ${fullName} --apply`;
+    say(warning);
+    lines.push("", `**${escapeCell(warning)}**`);
+  }
+  if (computed.truncated) {
+    say("file list truncated at", files.length);
+    lines.push(
+      "",
+      `The file list is truncated: the GitHub API returned ${files.length} files, its limit is 3000. The level is L1 (fail safe).`,
+    );
+  }
+  if (strict.length > 0) {
+    lines.push("", "| Path | Glob or floor | Level | Why |", "| --- | --- | --- | --- |");
+    for (const result of strict.slice(0, LEVELS_ROW_LIMIT)) {
+      const where = result.source === "glob" ? result.glob : result.source === "floor" ? "org floor" : "default_level";
+      lines.push(`| ${escapeCell(result.path)} | ${escapeCell(where)} | ${result.level} | ${escapeCell(result.why ?? "")} |`);
+    }
+    if (strict.length > LEVELS_ROW_LIMIT) {
+      lines.push("", `${strict.length - LEVELS_ROW_LIMIT} more paths are not shown here; the job log lists every path.`);
+    }
+  }
+  await summary(`${lines.join("\n")}\n`);
+  return { outcome, level, truncated: computed.truncated, added, removed, missingLabels };
+}
+
 // ---- Entry ----------------------------------------------------------------
 
 export async function main(env) {
@@ -207,7 +355,7 @@ export async function main(env) {
       const text = String(line).replace(/[\r\n\u2028\u2029]/g, " ");
       process.stdout.write(`${text.startsWith(prefix) ? text : prefix + JSON.stringify(text)}\n`);
     };
-    const run = step === "levels" ? runRiskPathsJob : runReadinessStep;
+    const run = step === "levels" ? runLevelsStep : runReadinessStep;
     return await run({ api, eventName: env.GITHUB_EVENT_NAME, event, summary, log });
   } catch (error) {
     let message = String(error?.message ?? error);

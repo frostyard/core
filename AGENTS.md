@@ -180,9 +180,14 @@ removed. -->
   itself; rotate it in repository settings and update `expires_on` in the same
   PR.
 - Risk paths follow
-  [ADR-0068](docs/adr/0068-label-pull-requests-that-touch-high-risk-paths.md)
+  [ADR-0068](docs/adr/0068-label-pull-requests-that-touch-high-risk-paths.md),
+  [ADR-0078](docs/adr/0078-sort-pull-requests-by-levels-l1-to-l4.md)
   and the [risk-paths spec](docs/specs/risk-paths.md): `.github/risk-paths.json`
-  lists the high-risk globs, and `.github/workflows/pr-triage.yml` embeds
+  (schema version 2) gives each glob a level from L1 to L4; the floors live
+  in `ORG_FLOORS` in `scripts/lib/risk-paths.mjs`. Keep the exports
+  `validateRiskPaths`, `matchGlob`, `parseStrictJson` and `matchFiles` and
+  their version 1 results: other repositories vendor the library with a
+  `sha256` pin. `.github/workflows/pr-triage.yml` embeds
   `scripts/lib/risk-paths.mjs` and `scripts/lib/pr-triage.mjs` verbatim. Edit
   those libraries, then run `npm run sync:risk-paths-workflow`; never edit an
   embedded copy by hand. `npm run check:risk-paths` (in `verify`) fails when a

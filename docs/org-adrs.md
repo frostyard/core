@@ -74,6 +74,10 @@ names what the decision binds in core and where it lives here.
   — core's caller [risk-paths-caller.yml](../.github/workflows/risk-paths-caller.yml)
   runs the local [pr-triage.yml](../.github/workflows/pr-triage.yml), which
   also removes `ready-for-human` when the head moves or CI is not green.
+- [ADR-0078 — Sort pull requests by levels L1 to L4](adr/0078-sort-pull-requests-by-levels-l1-to-l4.md)
+  — core's [.github/risk-paths.json](../.github/risk-paths.json) is schema
+  version 2, with a level for each glob and the default L3; the `levels`
+  step adds `level:L1` to `level:L4` and `risk:high` at L1 and L2.
 
 ## Rows that do not apply to core
 

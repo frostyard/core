@@ -5,11 +5,13 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { createGitHubApi } from "../scripts/lib/risk-paths.mjs";
 import {
+  LEVEL_LABELS,
   MARKER_PREFIX,
   READY_LABEL,
   main,
   readinessComment,
   readinessMarker,
+  runLevelsStep,
   runReadinessStep,
 } from "../scripts/lib/pr-triage.mjs";
 import { PR_TRIAGE_BLOCK, RISK_PATHS_BLOCK, renderBlock, syncWorkflow } from "../scripts/sync-risk-paths-workflow.mjs";
@@ -299,6 +301,330 @@ test("an invalid before, after or head SHA throws", async () => {
   assert.equal(calls.length, 0);
 });
 
+// ---- Levels step ----------------------------------------------------------
+
+const BASE_SHA = "d".repeat(40);
+
+function levelsEvent(overrides = {}) {
+  return {
+    pull_request: { number: 7, base: { sha: BASE_SHA }, head: { sha: HEAD, ref: "feature" } },
+    repository: { name: "core", owner: { login: "frostyard" } },
+    ...overrides,
+  };
+}
+
+const levelsList = (defaultLevel = "L3") =>
+  JSON.stringify({
+    schema_version: 2,
+    default_level: defaultLevel,
+    paths: [
+      { glob: "secure/**", level: "L1", why: "boot chain" },
+      { glob: ".github/workflows/**", level: "L2", why: "workflows" },
+      { glob: "docs/**", level: "L4", why: "docs" },
+    ],
+  });
+
+const v1List = JSON.stringify({ schema_version: 1, paths: [{ glob: "secure/**", why: "boot chain" }] });
+
+// A fake API. `existing` lists the labels that exist in the repository, `current` the labels on the pull request.
+function levelsApi({
+  lists = { [BASE_SHA]: levelsList() },
+  files = [],
+  existing = ["risk:high", ...Object.values(LEVEL_LABELS)],
+  current = [],
+  removed = true,
+} = {}) {
+  const calls = [];
+  const api = {
+    async getFileAtRef(owner, repo, filePath, ref) {
+      calls.push({ method: "getFileAtRef", args: [owner, repo, filePath, ref] });
+      return Object.hasOwn(lists, ref) ? lists[ref] : null;
+    },
+    async listPullFiles(owner, repo, number) {
+      calls.push({ method: "listPullFiles", args: [owner, repo, number] });
+      return files;
+    },
+    async labelExists(owner, repo, name) {
+      calls.push({ method: "labelExists", args: [owner, repo, name] });
+      return existing.includes(name);
+    },
+    async listIssueLabels(owner, repo, number) {
+      calls.push({ method: "listIssueLabels", args: [owner, repo, number] });
+      return labels(...current);
+    },
+    async addLabels(owner, repo, number, names) {
+      calls.push({ method: "addLabels", args: [owner, repo, number, names] });
+    },
+    async removeIssueLabel(owner, repo, number, name) {
+      calls.push({ method: "removeIssueLabel", args: [owner, repo, number, name] });
+      return removed;
+    },
+  };
+  return { api, calls };
+}
+
+async function levels(api, { eventName = "pull_request_target", ev = levelsEvent() } = {}) {
+  const summaries = [];
+  const logs = [];
+  const result = await runLevelsStep({
+    api,
+    eventName,
+    event: ev,
+    summary: (markdown) => summaries.push(markdown),
+    log: (line) => logs.push(line),
+  });
+  return { result, summary: summaries.join(""), logs };
+}
+
+const file = (filename) => ({ filename, status: "modified" });
+const callsOf = (calls, method) => calls.filter((call) => call.method === method);
+const addedLabels = (calls) => callsOf(calls, "addLabels").flatMap((call) => call.args[3]);
+const removedLabels = (calls) => callsOf(calls, "removeIssueLabel").map((call) => call.args[3]);
+
+test("LEVEL_LABELS names the 4 level labels", () => {
+  assert.deepEqual(LEVEL_LABELS, { L1: "level:L1", L2: "level:L2", L3: "level:L3", L4: "level:L4" });
+});
+
+test("levels with no list on base makes no label call", async () => {
+  const { api, calls } = levelsApi({ lists: {} });
+  const { result, summary } = await levels(api);
+  assert.deepEqual(result, { outcome: "no-list" });
+  assert.match(summary, /no list on base/);
+  assert.deepEqual(calls.map((call) => call.method), ["getFileAtRef"]);
+});
+
+test("levels reads the list at the base SHA, never at the head SHA", async () => {
+  const { api, calls } = levelsApi({
+    lists: { [HEAD]: levelsList("L1"), [BASE_SHA]: levelsList("L3") },
+    files: [file("src/a.go")],
+  });
+  const { result } = await levels(api);
+  assert.equal(result.level, "L3");
+  assert.deepEqual(callsOf(calls, "getFileAtRef"), [
+    { method: "getFileAtRef", args: ["frostyard", "core", ".github/risk-paths.json", BASE_SHA] },
+  ]);
+  assert.ok(!JSON.stringify(calls).includes(HEAD));
+});
+
+test("levels ratchets up: L3 present, computed L1 adds level:L1 and risk:high, removes level:L3", async () => {
+  const { api, calls } = levelsApi({ files: [file("secure/a.sh")], current: ["level:L3"] });
+  const { result, summary } = await levels(api);
+  assert.equal(result.outcome, "labeled");
+  assert.equal(result.level, "L1");
+  assert.deepEqual(callsOf(calls, "addLabels"), [
+    { method: "addLabels", args: ["frostyard", "core", 7, ["level:L1", "risk:high"]] },
+  ]);
+  assert.deepEqual(removedLabels(calls), ["level:L3"]);
+  assert.deepEqual(result.added, ["level:L1", "risk:high"]);
+  assert.deepEqual(result.removed, ["level:L3"]);
+  assert.match(summary, /^## Levels/);
+  assert.match(summary, /computed L1/);
+});
+
+test("levels removes every level label looser than the computed level", async () => {
+  const { api, calls } = levelsApi({ files: [file(".github/workflows/ci.yml")], current: ["level:L3", "level:L4", "bug"] });
+  const { result } = await levels(api);
+  assert.equal(result.level, "L2");
+  assert.deepEqual(addedLabels(calls), ["level:L2", "risk:high"]);
+  assert.deepEqual(removedLabels(calls).sort(), ["level:L3", "level:L4"]);
+});
+
+test("levels does not loosen: L1 present, computed L3 changes no level label", async () => {
+  const { api, calls } = levelsApi({ files: [file("src/a.go")], current: ["level:L1", "risk:high"] });
+  const { result, summary } = await levels(api);
+  assert.equal(result.outcome, "kept");
+  assert.equal(result.level, "L3");
+  assert.deepEqual(addedLabels(calls), []);
+  assert.deepEqual(removedLabels(calls), []);
+  assert.match(summary, /computed L3, kept L1/);
+});
+
+test("levels with the same level label already present changes nothing", async () => {
+  const { api, calls } = levelsApi({ files: [file("src/a.go")], current: ["level:L3"] });
+  const { result, summary } = await levels(api);
+  assert.equal(result.outcome, "kept");
+  assert.equal(callsOf(calls, "addLabels").length, 0);
+  assert.match(summary, /computed L3, kept L3/);
+});
+
+test("levels adds the level label when the pull request has none", async () => {
+  const { api, calls } = levelsApi({ files: [file("src/a.go")], current: ["bug"] });
+  const { result } = await levels(api);
+  assert.equal(result.outcome, "labeled");
+  assert.deepEqual(callsOf(calls, "addLabels"), [{ method: "addLabels", args: ["frostyard", "core", 7, ["level:L3"]] }]);
+  assert.deepEqual(removedLabels(calls), []);
+});
+
+for (const [name, filename, level, alias] of [
+  ["L1", "secure/a.sh", "L1", true],
+  ["L2", ".github/workflows/ci.yml", "L2", true],
+  ["L3", "src/a.go", "L3", false],
+  ["L4", "docs/a.md", "L4", false],
+]) {
+  test(`levels ${alias ? "adds" : "does not add"} risk:high for ${name}`, async () => {
+    const { api, calls } = levelsApi({ files: [file(filename)] });
+    const { result } = await levels(api);
+    assert.equal(result.level, level);
+    assert.equal(addedLabels(calls).includes("risk:high"), alias);
+    assert.ok(addedLabels(calls).includes(`level:${level}`));
+  });
+}
+
+test("levels never removes risk:high", async () => {
+  const scenarios = [
+    levelsApi({ files: [file("src/a.go")], current: ["risk:high", "level:L1"] }),
+    levelsApi({ files: [file("docs/a.md")], current: ["risk:high", "level:L2"] }),
+    levelsApi({ files: [file("docs/a.md")], current: ["risk:high", "level:L4"] }),
+    levelsApi({ files: [file("src/a.go")], current: ["risk:high"] }),
+    levelsApi({ files: [file("src/a.go")], current: ["risk:high"], existing: ["risk:high"] }),
+  ];
+  for (const { api, calls } of scenarios) {
+    await levels(api);
+    assert.ok(!removedLabels(calls).includes("risk:high"));
+  }
+});
+
+test("levels with a missing level label adds only risk:high, warns and does not fail", async () => {
+  const { api, calls } = levelsApi({
+    files: [file("secure/a.sh")],
+    existing: ["risk:high", "level:L1", "level:L2"],
+    current: ["level:L3"],
+  });
+  const { result, summary, logs } = await levels(api);
+  assert.equal(result.outcome, "labels-missing");
+  assert.deepEqual(result.missingLabels, ["level:L3", "level:L4"]);
+  assert.deepEqual(addedLabels(calls), ["risk:high"]);
+  assert.equal(callsOf(calls, "listIssueLabels").length, 0);
+  assert.equal(callsOf(calls, "removeIssueLabel").length, 0);
+  assert.match(summary, /level:L3, level:L4/);
+  assert.ok(summary.includes("frostyard/core scripts/apply-triage-settings.sh frostyard/core --apply"));
+  assert.ok(logs.some((line) => line.includes("warning") && line.includes("apply-triage-settings.sh frostyard/core --apply")));
+});
+
+test("levels with a missing level label and a computed L3 changes no label", async () => {
+  const { api, calls } = levelsApi({ files: [file("src/a.go")], existing: ["risk:high"] });
+  const { result } = await levels(api);
+  assert.equal(result.outcome, "labels-missing");
+  assert.equal(callsOf(calls, "addLabels").length, 0);
+});
+
+test("levels never adds a label that does not exist", async () => {
+  const existing = ["risk:high", "level:L1", "level:L2", "level:L4"];
+  const { api, calls } = levelsApi({ files: [file("src/a.go")], existing });
+  await levels(api);
+  for (const name of addedLabels(calls)) assert.ok(existing.includes(name), name);
+});
+
+test("levels with no risk:high label fails before it reads the file list", async () => {
+  const { api, calls } = levelsApi({ files: [file("secure/a.sh")], existing: ["level:L1"] });
+  await assert.rejects(levels(api), (error) => {
+    assert.match(error.message, /label risk:high does not exist in frostyard\/core/);
+    assert.match(error.message, /accountable owner must create it/);
+    return true;
+  });
+  assert.equal(callsOf(calls, "listPullFiles").length, 0);
+  assert.equal(callsOf(calls, "addLabels").length, 0);
+});
+
+test("levels fails on an invalid list and makes no label call", async () => {
+  const { api, calls } = levelsApi({
+    lists: { [BASE_SHA]: '{"schema_version":3,"paths":[{"glob":"/a","why":""}]}' },
+    files: [file("a")],
+  });
+  await assert.rejects(levels(api), (error) => {
+    assert.match(error.message, /schema_version/);
+    assert.match(error.message, /paths\[0\]\.glob/);
+    assert.match(error.message, /paths\[0\]\.why/);
+    return true;
+  });
+  assert.deepEqual(calls.map((call) => call.method), ["getFileAtRef"]);
+});
+
+test("levels fails on a duplicate JSON key in the list", async () => {
+  const { api, calls } = levelsApi({ lists: { [BASE_SHA]: '{"schema_version":1,"schema_version":1,"paths":[]}' } });
+  await assert.rejects(levels(api), /duplicate key/);
+  assert.deepEqual(calls.map((call) => call.method), ["getFileAtRef"]);
+});
+
+test("levels reads a v1 list: every glob is L1, the default is L3", async () => {
+  const hit = levelsApi({ lists: { [BASE_SHA]: v1List }, files: [file("secure/a.sh")] });
+  assert.equal((await levels(hit.api)).result.level, "L1");
+  const miss = levelsApi({ lists: { [BASE_SHA]: v1List }, files: [file("src/a.go")] });
+  assert.equal((await levels(miss.api)).result.level, "L3");
+});
+
+test("levels with a truncated file list gives L1", async () => {
+  const files = Array.from({ length: 3000 }, (_, i) => file(`docs/f${i}.md`));
+  const { api, calls } = levelsApi({ files });
+  const { result, summary } = await levels(api);
+  assert.equal(result.level, "L1");
+  assert.equal(result.truncated, true);
+  assert.deepEqual(addedLabels(calls), ["level:L1", "risk:high"]);
+  assert.match(summary, /truncated/);
+});
+
+test("levels with 0 files gives the default level", async () => {
+  const { api } = levelsApi({ lists: { [BASE_SHA]: levelsList("L4") }, files: [] });
+  assert.equal((await levels(api)).result.level, "L4");
+});
+
+test("levels counts both names of a rename", async () => {
+  const { api } = levelsApi({
+    files: [{ filename: "docs/a.md", previous_filename: "secure/a.sh", status: "renamed" }],
+  });
+  assert.equal((await levels(api)).result.level, "L1");
+});
+
+test("levels summary has a row for each L1 or L2 path, with the floor named, and escapes cells", async () => {
+  const { api } = levelsApi({
+    files: [file("secure/a|b`<c>.sh"), file("src/keys/a.go"), file("docs/a.md"), file("src/a.go")],
+  });
+  const { summary, logs } = await levels(api);
+  assert.match(summary, /\| Path \| Glob or floor \| Level \| Why \|/);
+  assert.match(summary, /secure\/a\\\|b\\`&lt;c&gt;\.sh/);
+  assert.match(summary, /\| src\/keys\/a\.go \| org floor \| L1 \| org floor: path word "keys" \|/);
+  assert.ok(!summary.includes("docs/a.md"));
+  assert.ok(!summary.includes("src/a.go"));
+  for (const line of logs) assert.ok(line.startsWith("risk-paths: "), line);
+});
+
+test("levels summary shows 500 rows and the count of the rest; the log lists every path", async () => {
+  const files = Array.from({ length: 503 }, (_, i) => file(`secure/f${i}.sh`));
+  const { api } = levelsApi({ files });
+  const { summary, logs } = await levels(api);
+  assert.equal(summary.split("\n").filter((line) => line.startsWith("| secure/")).length, 500);
+  assert.match(summary, /3 more paths are not shown/);
+  assert.equal(logs.filter((line) => line.startsWith("risk-paths: path ")).length, 503);
+  assert.ok(logs.some((line) => line.includes("secure/f502.sh")));
+});
+
+test("levels fails on a wrong event name, a base SHA that is not 40 hex characters and a bad number", async () => {
+  const { api, calls } = levelsApi();
+  await assert.rejects(levels(api, { eventName: "pull_request" }), /must run on pull_request_target/);
+  const badSha = levelsEvent();
+  badSha.pull_request.base.sha = "main";
+  await assert.rejects(levels(api, { ev: badSha }), /base\.sha/);
+  const badNumber = levelsEvent();
+  badNumber.pull_request.number = 0;
+  await assert.rejects(levels(api, { ev: badNumber }), /pull request number/);
+  await assert.rejects(levels(api, { ev: levelsEvent({ repository: { name: "a b", owner: { login: "x" } } }) }), /owner and name/);
+  assert.equal(calls.length, 0);
+});
+
+test("levels only calls the methods it may call", async () => {
+  const allowed = new Set(["getFileAtRef", "listPullFiles", "labelExists", "listIssueLabels", "addLabels", "removeIssueLabel"]);
+  const scenarios = [
+    levelsApi({ lists: {} }),
+    levelsApi({ files: [file("secure/a.sh")], current: ["level:L3"] }),
+    levelsApi({ files: [file("src/a.go")], current: ["level:L1"] }),
+    levelsApi({ files: [file("src/a.go")], existing: ["risk:high"] }),
+  ];
+  for (const { api, calls } of scenarios) {
+    await levels(api);
+    for (const call of calls) assert.ok(allowed.has(call.method), call.method);
+  }
+});
+
 // ---- main -----------------------------------------------------------------
 
 test("main fails on an unknown PR_TRIAGE_STEP and redacts the token", async () => {
@@ -446,6 +772,21 @@ test("removeIssueLabel gives true on 200, false on 404 and throws on 500", async
   });
 });
 
+test("listIssueLabels reads 2 pages of labels", async () => {
+  const urls = [];
+  const api = client(async (url) => {
+    urls.push(url);
+    return url.includes("page=2")
+      ? response(200, [{ name: "level:L1" }])
+      : response(200, [{ name: "bug" }], {
+          link: '<https://api.example.test/repositories/1/issues/9/labels?per_page=100&page=2>; rel="next"',
+        });
+  });
+  assert.deepEqual((await api.listIssueLabels("o", "r", 9)).map((label) => label.name), ["bug", "level:L1"]);
+  assert.equal(urls[0], "https://api.example.test/repos/o/r/issues/9/labels?per_page=100");
+  assert.equal(urls.length, 2);
+});
+
 test("a network error never carries the token", async () => {
   const api = client(async () => {
     throw new Error("connect failed");
@@ -568,6 +909,7 @@ test("the workflow writes the scripts, then runs the 2 steps with exact conditio
   assert.ok(text.includes('mkdir -p "$RUNNER_TEMP/pr-triage"'));
   assert.ok(text.includes("      - name: Write the triage scripts\n        run: |\n"));
   assert.ok(text.indexOf("risk-paths.mjs") < text.indexOf("pr-triage/pr-triage.mjs\" <<"));
+  assert.ok(text.includes("      - name: Add level labels and risk:high\n        id: levels\n"));
   assert.ok(
     text.includes(
       "        id: levels\n" +

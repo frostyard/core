@@ -44,3 +44,4 @@ A workflow on `pull_request` runs the PR's own workflow file and its own copy of
 - Shapes: [spec: risk paths](../specs/risk-paths.md), [quality loop](../design/quality-loop.md)
 - Builds on: [ADR-0019](0019-governance-as-code-and-risk-tiers.md), [ADR-0020](0020-ai-automation-trust-boundaries.md), [ADR-0021](0021-sha-pinned-actions-and-least-privilege-ci.md), [ADR-0035](0035-author-organization-authority-as-strict-json.md)
 - Related: [PR review rubric](../specs/pr-review-rubric.md)
+- Amended in part by: [ADR-0078](0078-sort-pull-requests-by-levels-l1-to-l4.md)

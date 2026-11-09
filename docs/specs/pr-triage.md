@@ -1,6 +1,6 @@
 # Spec: PR triage
 
-This contract governs core's reusable workflow `.github/workflows/pr-triage.yml`, its caller, and its steps. The `levels` step adds `risk:high`. The `readiness` step removes `ready-for-human` when the PR head moved after the label, or when CI at the head was not green when the label came. Consumers include the caller in each repository, the embedded libraries (`scripts/lib/risk-paths.mjs`, `scripts/lib/pr-triage.mjs`), the gate `npm run check:risk-paths`, agents that track PRs, cross-reviewers and the accountable owner.
+This contract governs core's reusable workflow `.github/workflows/pr-triage.yml`, its caller, and its steps. The `levels` step adds 1 label `level:L1` to `level:L4`, and `risk:high` at L1 and L2. The `readiness` step removes `ready-for-human` when the PR head moved after the label, or when CI at the head was not green when the label came. Consumers include the caller in each repository, the embedded libraries (`scripts/lib/risk-paths.mjs`, `scripts/lib/pr-triage.mjs`), the gate `npm run check:risk-paths`, agents that track PRs, cross-reviewers and the accountable owner.
 
 ## Interface
 
@@ -48,7 +48,7 @@ A step after `levels` uses `!cancelled()` in its `if:`, so that it runs after an
 
 ### B. The `levels` step
 
-The step runs the risk-paths job. Its behavior is the behavior of [risk-paths rule E](risk-paths.md#e-workflow-contract), with no change. It does not run on the type `labeled`: a label change moves no file.
+The step computes the level of the PR and sets the level label by the ratchet, with `risk:high` as the alias of L1 and L2 ([ADR-0078](../adr/0078-sort-pull-requests-by-levels-l1-to-l4.md)). Its behavior is the behavior of [risk-paths rules D and E](risk-paths.md#e-workflow-contract). It does not run on the type `labeled`: a label change moves no file.
 
 ### C. The `readiness` step: triggers
 
@@ -121,5 +121,5 @@ Tests: `test/pr-triage.test.mjs`, `test/risk-paths.test.mjs`. These artifacts MU
 
 ## References
 
-- Rationale: [ADR-0077](../adr/0077-bind-ready-for-human-to-the-head-commit.md), [ADR-0068](../adr/0068-label-pull-requests-that-touch-high-risk-paths.md), [ADR-0021](../adr/0021-sha-pinned-actions-and-least-privilege-ci.md)
+- Rationale: [ADR-0077](../adr/0077-bind-ready-for-human-to-the-head-commit.md), [ADR-0068](../adr/0068-label-pull-requests-that-touch-high-risk-paths.md), [ADR-0078](../adr/0078-sort-pull-requests-by-levels-l1-to-l4.md), [ADR-0021](../adr/0021-sha-pinned-actions-and-least-privilege-ci.md)
 - Context: [risk-paths spec](risk-paths.md), [quality loop](../design/quality-loop.md), [autonomy gate](https://airlock.lunareng.com/docs/autonomy-gate.md)
