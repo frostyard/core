@@ -106,6 +106,69 @@ the report issue (given to the script with `--issue <n>`).
 **Missed** (for value only): a Dependabot pull request that merged with only
 Dependabot commits and green recorded checks, and that has no call.
 
+**No metadata** (counted apart): a Dependabot pull request whose `pr-triage`
+job had a failed `Fetch the Dependabot metadata` step. That step has
+`continue-on-error: true`, so S1 fails and no call is written. Such a pull
+request is never a false call, and the report does not count it as missed.
+
+### The report script
+
+`node scripts/dependabot-shadow-report.mjs --since YYYY-MM-DD --until
+YYYY-MM-DD [--issue N] OWNER/REPO...` makes the report. It is read only: it
+makes only `gh api` GET calls. The rules live in
+`scripts/lib/dependabot-shadow-report.mjs` as pure functions, and
+`test/dependabot-shadow-report.test.mjs` holds them to recorded fixtures.
+
+- **Window.** `--since` and `--until` are UTC dates; both days are in the
+  window. A call is in the window by the instant of its `created_at`.
+- **Check results.** The script reads every check run at a SHA with
+  `filter=all` and applies the rule above itself: a run of another app does
+  not count when the marker records an `integration_id`, and a rerun replaces
+  an earlier run of the same name.
+- **A commit's move.** A later call and a `head_ref_force_pushed` event
+  carry a server time. A pushed commit carries none: the committer sets its
+  `committer.date`, and a check run at its SHA (also a `pr-triage` run) can
+  belong to another branch or another pull request. So the report places a
+  pushed commit only by history: a commit that follows the call head in the
+  pull request's commit list was pushed after the call. Such a move makes the
+  call `superseded` when the recorded checks never all passed, and `unknown`
+  when they all passed, with the reason in Detail. The verdict names the count
+  of unknown calls, because an unknown call is not classed and can hide a
+  safety failure.
+- **A call from before the window.** The repository comment read filters by
+  `updated_at`, so a call comment written before the window is not in it. A
+  Dependabot pull request of the window with no call in that read gets all
+  its own comments read, so such a call still counts as a call: the pull
+  request is neither missed nor "no metadata".
+- **F4.** `--issue N` reads the comments of `frostyard/core#N`;
+  `--issue OWNER/REPO#N` names another repository. A line
+  `false: #<n> <reason>` or `false: OWNER/REPO#<n> <reason>` counts when its
+  author is in `--f4-author` (default: `bketelsen` and `frostyard-machines`,
+  the account that owner agents write with). A bare `#<n>` that matches a
+  classed pull request in 2 repositories is listed as ambiguous and not
+  applied. F4 overrides only "agreed".
+- **Missed.** A missed pull request has no marker, so the script judges it
+  against the required checks of its base branch on the report day. The
+  script does not judge S1 to S3 again, so the list is an upper bound: it also
+  holds major updates and risk paths that the shadow rightly skipped.
+- **No metadata.** The script reads the steps of each `pr-triage` job at the
+  head of the pull request (`GET actions/jobs/{id}`; the id of an Actions check
+  run is its job id).
+- **Too few.** The verdict says "too few" when fewer than 10 calls would have
+  merged.
+- **Revert window.** F2 looks 7 days past the merge. A merge less than 7 days
+  before the report day gets the note "revert window still open".
+
+### Levels table
+
+The same report holds 1 row for each repository: the pull requests opened in
+the window, counted by their strictest level label (`level:L1` to
+`level:L4`, or none), and the count whose level an author lowered. A level is
+lowered when a person or an agent, not `github-actions[bot]`, removed a level
+label that is stricter than the level the pull request has now
+([ADR-0078](../adr/0078-sort-pull-requests-by-levels-l1-to-l4.md): only the
+author lowers a level, with the reason in the pull request).
+
 ## What a go-live decision needs
 
 Go-live (a workflow that enables auto-merge for this class) is not built. A
