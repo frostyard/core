@@ -69,13 +69,16 @@ PR template ──► review rubric ──► CI gates ──► corrections ─
   `fleet-conventions` job.
 - **Sweep (every code repository)** — the
   [repository baseline](../specs/repository-baseline.md) lists, as rows
-  `B1` to `B17`, what every frostyard code repository carries
+  `B1` to `B18`, what every frostyard code repository carries
   ([ADR-0071](../adr/0071-hold-every-code-repository-to-one-baseline.md)),
   including the tool docs site
   ([ADR-0070](../adr/0070-build-tool-docs-sites-with-materialx-on-github-pages.md)),
   the fleet Go and golangci-lint versions, and the README
   ([ADR-0072](../adr/0072-write-every-readme-to-one-standard.md),
-  [README spec](../specs/readme.md)). The weekly conformance sweep
+  [README spec](../specs/readme.md)), and the required status checks on
+  the default branch
+  ([ADR-0076](../adr/0076-require-status-checks-on-every-default-branch.md)).
+  The weekly conformance sweep
   reads it at core's `origin/main` and files one `sweep` issue for each
   failed row; owners fix the gaps in normal work. The organization gate
   stays the presence check above.

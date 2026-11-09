@@ -23,7 +23,7 @@ test("bash syntax gate passes on the repository's current tracked scripts", asyn
   await track(root);
 
   const { stdout } = await runScriptsGate(root);
-  assert.match(stdout, /ok {3}bash_syntax: 3\/3/);
+  assert.match(stdout, /ok {3}bash_syntax: 4\/4/);
 });
 
 test("bash syntax gate fails a tracked script with invalid Bash syntax", async () => {

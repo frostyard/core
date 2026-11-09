@@ -1,0 +1,31 @@
+{
+  "repo": "frostyard/repogen",
+  "default_branch": "main",
+  "rules": [
+    {
+      "type": "deletion"
+    },
+    {
+      "type": "non_fast_forward"
+    },
+    {
+      "type": "pull_request"
+    }
+  ],
+  "workflows": {
+    "ci.yml": "# CI (core ADR-0071 row B12): 1 job runs `make ci`, the gate that the\n# Makefile defines (verify, govulncheck, race tests with coverage, the\n# Docker-built test packages, the integration suite, the release builds).\nname: CI\n\non:\n  pull_request:\n    branches: [main]\n  push:\n    branches: [main]\n\npermissions:\n  contents: read\n\njobs:\n  # (job bodies trimmed; only the uses: lines are kept)\n        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0\n        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0\n        uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5.2.6\n        uses: codecov/codecov-action@b9fd7d16f6d7d1b5d2bec1a2887e65ceed900238 # v4.6.0\n",
+    "release.yml": "name: Release\n\non:\n  push:\n    tags:\n      - 'v*.*.*'\n\npermissions: {}\n\njobs:\n  # (job bodies trimmed; only the uses: lines are kept)\n        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0\n        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0\n        uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6.4.0\n",
+    "risk-paths.yml": "# Risk paths (frostyard/core ADR-0068, docs/specs/risk-paths.md): this caller\n# runs on pull_request_target, so the base branch's risk list and caller run.\n# It does not run a pull-request branch and checks out nothing. A pull request\n# that touches a glob in .github/risk-paths.json gets the label risk:high.\n# It is not a required check. The label risk:high must exist, or the job fails.\nname: Risk paths caller\n\non:\n  pull_request_target:\n    types: [opened, synchronize, reopened, edited]\n\npermissions: {}\n\njobs:\n  # (job bodies trimmed; only the uses: lines are kept)\n    uses: frostyard/core/.github/workflows/risk-paths.yml@1b02a129026329cef2b46d1fbd0465a863c1cd81 # frostyard/core main, 2026-11-04 (core has no release tags)\n"
+  },
+  "labels": [
+    {
+      "name": "bug"
+    },
+    {
+      "name": "ready-for-human"
+    },
+    {
+      "name": "risk:high"
+    }
+  ]
+}

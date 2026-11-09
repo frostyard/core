@@ -112,12 +112,17 @@ Start from .agents/skills/TEMPLATE/SKILL.md. -->
   ([ADR-0019](docs/adr/0019-governance-as-code-and-risk-tiers.md)).
 - Every frostyard code repository carries the
   [repository baseline](docs/specs/repository-baseline.md) (rows `B1` to
-  `B17`: instruction surface, corrections inbox, docs shape, make gate,
+  `B18`: instruction surface, corrections inbox, docs shape, make gate,
   pinned actions, risk paths, PR template, svu, tool docs site, license,
   fleet Go toolchain, `ci.yml`, Dependabot, `SECURITY.md`, no `CODEOWNERS`,
-  no leftover agent-framework trees, README), with its named exemptions
+  no leftover agent-framework trees, README, required status checks), with
+  its named exemptions
   ([ADR-0071](docs/adr/0071-hold-every-code-repository-to-one-baseline.md),
-  [ADR-0072](docs/adr/0072-write-every-readme-to-one-standard.md)).
+  [ADR-0072](docs/adr/0072-write-every-readme-to-one-standard.md),
+  [ADR-0076](docs/adr/0076-require-status-checks-on-every-default-branch.md)).
+  `scripts/apply-triage-settings.sh` drafts the required-checks ruleset
+  (dry run by default; an admin runs `--apply`), and
+  `scripts/required-checks-survey.mjs` reads the live state, read only.
   The weekly conformance sweep files the gaps; a new row needs a new ADR.
   A row that restates an existing ADR keeps that ADR's full scope and every
   file it requires (B4 names `mise.toml` and `mise.lock` because ADR-0043

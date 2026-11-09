@@ -94,6 +94,7 @@ which baseline rows do not apply here.
 - [0073 — Let CI run the `make ci` targets as separate jobs](adr/0073-let-ci-run-the-make-ci-targets-as-separate-jobs.md)
 - [0074 — Publish verified fault records as public issues in the owner repository](adr/0074-publish-verified-fault-records-as-public-issues.md)
 - [0075 — Group Dependabot updates and sync skills once a day](adr/0075-batch-routine-pull-requests.md)
+- [0076 — Require status checks on every default branch](adr/0076-require-status-checks-on-every-default-branch.md)
 - [0077 — Bind `ready-for-human` to the head commit](adr/0077-bind-ready-for-human-to-the-head-commit.md)
 - [0078 — Sort pull requests by levels L1 to L4](adr/0078-sort-pull-requests-by-levels-l1-to-l4.md)
 

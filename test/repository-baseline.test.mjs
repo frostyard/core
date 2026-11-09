@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 // core itself, 1 test per row. B2 lives in scripts/check-corrections.mjs; B6 in
 // test/risk-paths.test.mjs and scripts/check-risk-paths.mjs; B16 in
 // test/no-leftover-agent-trees.test.mjs; B17 in test/readme-check.test.mjs. B8, B9 and B11 do not apply to core
-// (docs/org-adrs.md says why); B10 is checked by the sweep with gh api.
+// (docs/org-adrs.md says why); B10 and B18 are checked by the sweep with gh api.
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 function lsFiles() {
