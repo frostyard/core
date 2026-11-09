@@ -86,9 +86,12 @@ example `.github/workflows/risk-paths-caller.yml` in
 The policy decision is on the run of the caller file. The reusable workflow
 `pr-triage.yml` is a job of that run (`jobs.pr-triage.uses`), not a run of
 its own. So a policy that targets the caller path covers the pinned
-reusable workflow too. The test below confirms this; if a run is still
-blocked with an error that names the event `workflow_call`, add
-`workflow_call` to the allowed events of the same policy.
+reusable workflow too. The test below confirms this. If a caller run is
+still blocked, read both names in its error (the event and the workflow
+file). Only when the error names the event `workflow_call` and a caller
+path, add `workflow_call` to the allowed events of the same policy. For any
+other event or workflow file, do not change the policy: stop and report
+(step 3).
 
 Two caller paths exist: `.github/workflows/risk-paths.yml` in 32
 repositories, and `.github/workflows/risk-paths-caller.yml` in
