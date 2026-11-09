@@ -684,9 +684,10 @@ test("check-risk-paths passes on the repository", async () => {
   assert.match(stdout, /ok {3}risk_paths: \d+ entries, workflow in sync/);
 });
 
-test("core's list puts each script that applies rulesets, settings or labels at L1", async () => {
+test("core's list puts each administrative script (rulesets, settings, cross-repository writes) at L1", async () => {
   // A merge can drop a list entry without a conflict; this test names the
-  // scripts that change GitHub settings so that a dropped entry fails.
+  // administrative scripts so that a dropped entry fails. The PR-label
+  // libraries (risk-paths.mjs, pr-triage.mjs) have their own L2 entries.
   const list = parseStrictJson(await readFile(path.join(repoRoot, ".github/risk-paths.json"), "utf8"));
   assert.equal(validateRiskPaths(list).ok, true);
   for (const script of [
