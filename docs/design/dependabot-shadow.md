@@ -35,11 +35,19 @@ its input from `updated-dependencies-json`; that step has
 `continue-on-error: true`, so a failure there makes S1 fail and does not fail
 the job.
 
-The step reads 4 things through the GitHub API: the changed files of the pull
-request, the risk-paths list at the base SHA, the branch rules of the base ref,
-and, only when all 4 criteria pass, the issue comments. It writes at most 1
-comment for each head SHA, and it finds an earlier comment by the marker line
-`<!-- frostyard:dependabot-shadow v1 head=<sha> ...`.
+The step reads the pull request twice through the GitHub API: once before the
+criteria, and once more before it writes. When the live head is not the head of
+its event, it writes nothing and returns `stale`, so a delayed or re-run job
+never judges the files of a newer head. Between the 2 reads it reads the changed
+files, the risk-paths list at the base SHA, and the branch rules of the base ref.
+
+It writes at most 1 comment for each head SHA, and it finds an earlier comment by
+the marker line `<!-- frostyard:dependabot-shadow v1 head=<sha> ...`. Two runs
+for the same head can both find no marker and both write. After a write, the step
+reads the comments again: when another comment for the same head has a lower
+comment id, the step deletes its own comment, so the comment with the lowest id
+stays and 2 runs converge on 1 comment. It deletes only the comment that it
+wrote.
 
 The exact contract, the criteria S1 to S4, the API reads and the comment bodies
 are in [PR triage, section G](../specs/pr-triage.md#g-the-shadow-step). The

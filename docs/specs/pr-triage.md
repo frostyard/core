@@ -116,13 +116,15 @@ The step is a measurement. It writes 1 comment that says what a narrow auto-merg
 
 **Event validation.** The event name is `pull_request_target`. The owner and the repository name match the name pattern, the PR number is a positive integer, `pull_request.head.sha` and `pull_request.base.sha` are 40 lowercase hex characters, and `pull_request.base.ref` is a non-empty string. A bad value fails the step.
 
+**Live head.** The step reads the pull request with `GET /repos/{owner}/{repo}/pulls/{number}` after the event validation. When its head is not the event head, the step returns `stale` and makes no other API call: the summary says that the head moved from `<event head 12>` to `<live head 12>`, or to a head that is unknown, and no comment is written. The step reads the pull request once more after all 4 criteria pass, before it reads the comments. When the head moved again, it returns `stale` with the level and the checks, and writes no comment. A delayed or re-run job therefore never judges the files of a newer head.
+
 The step evaluates 4 criteria.
 
 **S1: patch or minor only.** The input is the `updated-dependencies-json` output of `dependabot/fetch-metadata`, in `DEPENDABOT_UPDATES`.
 
 - The text parses with `JSON.parse` to a non-empty array.
 - Every entry is an object whose `updateType` is exactly `version-update:semver-patch` or `version-update:semver-minor`.
-- `prevVersion` and `newVersion` both parse as a version: an optional leading `v`, then 2 or more dot-separated decimal numbers (`[0-9]+`), and nothing else.
+- `prevVersion` and `newVersion` both parse as a version: an optional leading `v`, then 2 or more dot-separated decimal numbers (`[0-9]+`), and nothing else. The numbers compare exactly, with no size limit: the step uses `BigInt`, so 2 versions that differ only above 2^53 are not equal.
 - The first number of the 2 versions is equal. When the first number is 0, the second number is equal too. A change from `0.3` to `0.4` is therefore major.
 - A grouped PR passes only when every entry passes.
 
@@ -138,7 +140,9 @@ An empty or missing string, invalid JSON, a non-array, an empty array, or any fa
 
 **S4: required checks exist.** The step reads all pages of `GET /repos/{owner}/{repo}/rules/branches/{ref}?per_page=100`, with each part of the ref encoded. It collects each entry of `parameters.required_status_checks` of each rule whose `type` is `required_status_checks` as `{ context, integration_id }`; a missing `integration_id` is `null`. It drops exact duplicates (the same context and the same integration_id) and keeps first-seen order. 1 or more entries pass. 0 entries fail.
 
-**Comment.** When all 4 criteria pass, the step reads all pages of `GET /repos/{owner}/{repo}/issues/{number}/comments?per_page=100`. When a line of a comment body, trimmed, starts with `<!-- frostyard:dependabot-shadow v1 head=<head> `, the step writes nothing. Else it writes 1 comment with `POST /repos/{owner}/{repo}/issues/{number}/comments`. So each head SHA gets at most 1 comment.
+**Comment.** When all 4 criteria pass and the live head is the event head, the step reads all pages of `GET /repos/{owner}/{repo}/issues/{number}/comments?per_page=100`. When a line of a comment body, trimmed, starts with `<!-- frostyard:dependabot-shadow v1 head=<head> `, the step writes nothing. Else it writes 1 comment with `POST /repos/{owner}/{repo}/issues/{number}/comments`, which returns the comment with its id.
+
+Each head keeps at most 1 comment. The write follows a read, so 2 runs for the same head can both write. After the write, the step reads the comments again. When a comment for the same head has a lower comment id, the step deletes its own comment with `DELETE /repos/{owner}/{repo}/issues/comments/{id}` and reports `exists`. The comment with the lowest id stays. The step deletes only the comment that it wrote.
 
 The marker is the first line of the comment:
 
@@ -156,9 +160,9 @@ Shadow call: auto-merge would be enabled at `<head 12>` (patch or minor; manifes
 
 `<sha>` is the full SHA, `<head 12>` its first 12 characters, and `<n>` the number of required checks.
 
-**Errors.** An error from the file list or the rule list fails the step, and then no comment is written. An error while reading the risk list fails S3 only.
+**Errors.** An error from the pull request read, the file list or the rule list fails the step, and then no comment is written. An error while reading the risk list fails S3 only. A comment POST that returns no positive integer id fails the step.
 
-**Summary.** The step writes a `## Dependabot shadow` section: a table `| Criterion | Result | Detail |` with 1 row for each criterion S1 to S4 (`pass` or `fail`, the detail through `escapeCell`), then 1 line: the comment was written, a call for this head exists, or no call.
+**Summary.** The step writes a `## Dependabot shadow` section: a table `| Criterion | Result | Detail |` with 1 row for each criterion S1 to S4 (`pass` or `fail`, the detail through `escapeCell`), then 1 line: the comment was written, a call for this head exists, the head moved so no comment was written, or no call.
 
 ## Derived artifacts
 

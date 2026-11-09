@@ -592,6 +592,13 @@ export function createGitHubApi({ token, apiUrl = "https://api.github.com", fetc
       return response === null ? null : await response.text();
     },
 
+    // The pull request as it is now: a delayed or re-run job compares its head
+    // with the head of its event.
+    async getPullRequest(owner, repo, number) {
+      const response = await request("GET", `/repos/${enc(owner)}/${enc(repo)}/pulls/${enc(String(number))}`);
+      return await response.json();
+    },
+
     async listPullFiles(owner, repo, number) {
       return paginate(`/repos/${enc(owner)}/${enc(repo)}/pulls/${enc(String(number))}/files?per_page=100`, {
         what: "pull request file list",
@@ -610,10 +617,23 @@ export function createGitHubApi({ token, apiUrl = "https://api.github.com", fetc
       });
     },
 
+    // The comment GitHub created, so that a caller can compare its id with another
+    // run's comment for the same head.
     async createIssueComment(owner, repo, number, body) {
-      await request("POST", `/repos/${enc(owner)}/${enc(repo)}/issues/${enc(String(number))}/comments`, {
+      const response = await request("POST", `/repos/${enc(owner)}/${enc(repo)}/issues/${enc(String(number))}/comments`, {
         body: { body },
       });
+      return await response.json();
+    },
+
+    // Returns true when the comment went away, false when it was already gone (HTTP 404).
+    async deleteIssueComment(owner, repo, commentId) {
+      const response = await request(
+        "DELETE",
+        `/repos/${enc(owner)}/${enc(repo)}/issues/comments/${enc(String(commentId))}`,
+        { allow404: true },
+      );
+      return response !== null;
     },
 
     // Returns true when the label came off, false when the issue did not have it (HTTP 404).

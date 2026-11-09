@@ -367,12 +367,13 @@ export async function runLevelsStep({ api, eventName, event, summary, log }) {
 // ---- Shadow checks -------------------------------------------------------
 
 // A version: an optional leading "v", then 2 or more dot-separated decimal
-// numbers, and nothing else. Returns an array of numbers, or null.
+// numbers, and nothing else. Returns an array of BigInt, or null. BigInt keeps
+// every digit: Number would make 2 versions different only above 2^53 equal.
 export function parseVersion(text) {
   if (typeof text !== "string") return null;
   const match = /^v?([0-9]+(?:[.][0-9]+)+)$/.exec(text);
   if (match === null) return null;
-  return match[1].split(".").map((part) => Number(part));
+  return match[1].split(".").map((part) => BigInt(part));
 }
 
 // S1: patch or minor only. `updatesText` is the updated-dependencies-json output
@@ -405,7 +406,7 @@ export function checkS1(updatesText) {
     const after = parseVersion(update.newVersion);
     if (after === null) return fail(`${name}: newVersion ${JSON.stringify(update.newVersion)} is not a version`);
     if (before[0] !== after[0]) return fail(`${name}: ${update.prevVersion} to ${update.newVersion} is a major update`);
-    if (before[0] === 0 && before[1] !== after[1]) {
+    if (before[0] === 0n && before[1] !== after[1]) {
       return fail(`${name}: ${update.prevVersion} to ${update.newVersion} is a major update of a 0.x version`);
     }
   }
@@ -498,6 +499,12 @@ export function shadowComment({ head, level, checks }) {
   );
 }
 
+// The summary line of a run whose event head is not the live head.
+const staleLine = (eventHead, liveHead) =>
+  typeof liveHead === "string" && SHA_PATTERN.test(liveHead)
+    ? `The head moved from \`${short(eventHead)}\` to \`${short(liveHead)}\`. No comment.`
+    : `The head moved from \`${short(eventHead)}\` to a head that is unknown. No comment.`;
+
 // ---- Shadow step ----------------------------------------------------------
 
 // Reads, and writes at most 1 comment. It never enables auto-merge, approves,
@@ -549,6 +556,16 @@ export async function runShadowStep({ api, eventName, event, updates, summary, l
   say("head", head);
   say("base", { sha: baseSha, ref: baseRef });
 
+  // A delayed or re-run job must not judge the files of a newer head.
+  const first = await api.getPullRequest(owner, repo, number);
+  const firstHead = headShaOf(first);
+  if (firstHead !== head) {
+    say("the live head is not the event head", { event: head, live: firstHead });
+    const line = staleLine(head, firstHead);
+    await summary(`## Dependabot shadow\n\n${line}\n`);
+    return { outcome: "stale" };
+  }
+
   const s1 = checkS1(updates);
   say("S1 patch or minor", s1);
   const files = await api.listPullFiles(owner, repo, number);
@@ -587,21 +604,48 @@ export async function runShadowStep({ api, eventName, event, updates, summary, l
     return { outcome: "no-call", level, checks, failed };
   }
 
+  // The files and the metadata were read live, so the head can move again while
+  // the criteria run: read it once more, and write nothing for an older head.
+  const second = await api.getPullRequest(owner, repo, number);
+  const secondHead = headShaOf(second);
+  if (secondHead !== head) {
+    say("the live head moved during the evaluation", { event: head, live: secondHead });
+    lines.push("", staleLine(head, secondHead));
+    await summary(`${lines.join("\n")}\n`);
+    return { outcome: "stale", level, checks };
+  }
+
   const markerPrefix = `${SHADOW_MARKER_PREFIX} head=${head} `;
+  const holdsMarker = (comment) =>
+    typeof comment?.body === "string" && comment.body.split(/\r?\n/).some((line) => line.trim().startsWith(markerPrefix));
   const comments = await api.listIssueComments(owner, repo, number);
-  const exists = comments.some(
-    (comment) =>
-      typeof comment?.body === "string" &&
-      comment.body.split(/\r?\n/).some((line) => line.trim().startsWith(markerPrefix)),
-  );
-  if (exists) {
+  if (comments.some(holdsMarker)) {
     say("a call for this head exists", head);
     lines.push("", "A shadow call for this head exists. No second comment.");
     await summary(`${lines.join("\n")}\n`);
     return { outcome: "exists", level, checks };
   }
-  await api.createIssueComment(owner, repo, number, shadowComment({ head, level, checks }));
-  say("wrote the shadow call", head);
+  const written = await api.createIssueComment(owner, repo, number, shadowComment({ head, level, checks }));
+  const ownId = written?.id;
+  if (!Number.isSafeInteger(ownId) || ownId < 1) throw new Error("the comment API returned no comment id");
+  say("wrote the shadow call", { head, id: ownId });
+
+  // Check-then-write is not atomic: another run for the same head can have
+  // written between the list and the write. The lowest comment id stays.
+  const after = await api.listIssueComments(owner, repo, number);
+  const earlier = after.some(
+    (comment) => Number.isSafeInteger(comment?.id) && comment.id < ownId && holdsMarker(comment),
+  );
+  if (earlier) {
+    await api.deleteIssueComment(owner, repo, ownId);
+    say("removed this run's duplicate comment", ownId);
+    lines.push(
+      "",
+      "Another run wrote a comment for this head first. This run removed its own comment. Nothing is enabled. A person still merges.",
+    );
+    await summary(`${lines.join("\n")}\n`);
+    return { outcome: "exists", level, checks, deduplicated: true };
+  }
   lines.push("", "Wrote the shadow call. Nothing is enabled. A person still merges.");
   await summary(`${lines.join("\n")}\n`);
   return { outcome: "called", level, checks };

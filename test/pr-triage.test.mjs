@@ -685,14 +685,36 @@ function shadowEvent(pr = {}, overrides = {}) {
 }
 
 // A fake API for the shadow step. It carries no label and no merge method.
-function shadowApi({ files = GO_FILES, list = shadowList(), rules = shadowRules(), comments = [], fail = {} } = {}) {
+// `liveHeads` lists the head that getPullRequest returns, in order, and the last
+// one repeats. `commentLists` lists what listIssueComments returns, in order, and
+// the last one repeats. `created` is what createIssueComment returns; without it,
+// a comment with the id `ownId`.
+function shadowApi({
+  files = GO_FILES,
+  list = shadowList(),
+  rules = shadowRules(),
+  comments = [],
+  commentLists,
+  liveHeads = [HEAD],
+  created,
+  ownId = 500,
+  fail = {},
+} = {}) {
   const calls = [];
+  let liveReads = 0;
+  let commentReads = 0;
   const record = (method, args, value) => {
     calls.push({ method, args });
     if (fail[method]) throw fail[method];
     return value;
   };
   const api = {
+    async getPullRequest(...args) {
+      const heads = liveHeads.length > 0 ? liveHeads : [HEAD];
+      const sha = heads[Math.min(liveReads, heads.length - 1)];
+      liveReads++;
+      return record("getPullRequest", args, { number: 12, head: { sha } });
+    },
     async listPullFiles(...args) {
       return record("listPullFiles", args, files);
     },
@@ -703,10 +725,16 @@ function shadowApi({ files = GO_FILES, list = shadowList(), rules = shadowRules(
       return record("listBranchRules", args, rules);
     },
     async listIssueComments(...args) {
-      return record("listIssueComments", args, comments);
+      const lists = Array.isArray(commentLists) ? commentLists : [comments];
+      const value = lists[Math.min(commentReads, lists.length - 1)];
+      commentReads++;
+      return record("listIssueComments", args, value);
     },
     async createIssueComment(...args) {
-      return record("createIssueComment", args);
+      return record("createIssueComment", args, created === undefined ? { id: ownId } : created);
+    },
+    async deleteIssueComment(...args) {
+      return record("deleteIssueComment", args, true);
     },
   };
   return { api, calls };
@@ -755,12 +783,24 @@ test("the shadow step writes 1 comment when S1 to S4 all pass", async () => {
   const { api, calls } = shadowApi({ comments: [{ body: "unrelated" }] });
   const { result, summary } = await shadow(api);
   assert.deepEqual(result, { outcome: "called", level: "L3", checks: CI_CHECKS });
-  assert.deepEqual(names(calls), ["listPullFiles", "getFileAtRef", "listBranchRules", "listIssueComments", "createIssueComment"]);
+  assert.deepEqual(names(calls), [
+    "getPullRequest",
+    "listPullFiles",
+    "getFileAtRef",
+    "listBranchRules",
+    "getPullRequest",
+    "listIssueComments",
+    "createIssueComment",
+    "listIssueComments",
+  ]);
   assert.deepEqual(calls[0].args, ["frostyard", "core", 12]);
-  assert.deepEqual(calls[1].args, ["frostyard", "core", ".github/risk-paths.json", BASE_SHA]);
-  assert.deepEqual(calls[2].args, ["frostyard", "core", "main"]);
-  assert.deepEqual(calls[3].args, ["frostyard", "core", 12]);
-  assert.deepEqual(calls[4].args, ["frostyard", "core", 12, shadowComment({ head: HEAD, level: "L3", checks: CI_CHECKS })]);
+  assert.deepEqual(calls[1].args, ["frostyard", "core", 12]);
+  assert.deepEqual(calls[2].args, ["frostyard", "core", ".github/risk-paths.json", BASE_SHA]);
+  assert.deepEqual(calls[3].args, ["frostyard", "core", "main"]);
+  assert.deepEqual(calls[4].args, ["frostyard", "core", 12]);
+  assert.deepEqual(calls[5].args, ["frostyard", "core", 12]);
+  assert.deepEqual(calls[6].args, ["frostyard", "core", 12, shadowComment({ head: HEAD, level: "L3", checks: CI_CHECKS })]);
+  assert.deepEqual(calls[7].args, ["frostyard", "core", 12]);
   assert.match(summary, /^## Dependabot shadow/);
   assert.match(summary, /\| Criterion \| Result \| Detail \|/);
   assert.match(summary, /\| S1 patch or minor \| pass \|/);
@@ -808,10 +848,10 @@ for (const scenario of ONE_FAILURE) {
 }
 
 test("parseVersion reads a v prefix and 2 or more dot-separated numbers", () => {
-  assert.deepEqual(parseVersion("1.2.3"), [1, 2, 3]);
-  assert.deepEqual(parseVersion("v1.2"), [1, 2]);
-  assert.deepEqual(parseVersion("1.2.3.4"), [1, 2, 3, 4]);
-  assert.deepEqual(parseVersion("0.0.1"), [0, 0, 1]);
+  assert.deepEqual(parseVersion("1.2.3"), [1n, 2n, 3n]);
+  assert.deepEqual(parseVersion("v1.2"), [1n, 2n]);
+  assert.deepEqual(parseVersion("1.2.3.4"), [1n, 2n, 3n, 4n]);
+  assert.deepEqual(parseVersion("0.0.1"), [0n, 0n, 1n]);
   for (const bad of ["1", "1.2.3-rc1", "1.2.3+build", "2024-01-02", "abc123def", "", "v", "1.", ".1.2", "1..2", undefined, null, 1.2]) {
     assert.equal(parseVersion(bad), null, String(bad));
   }
@@ -862,6 +902,19 @@ test("checkS1 fails a version it cannot parse, and names the entry", () => {
   assert.ok(!grouped.detail.includes("later"));
 });
 
+test("checkS1 compares version numbers exactly, with no size limit", () => {
+  const pass = (before, after, updateType = "version-update:semver-minor") =>
+    checkS1(updatesOf([shadowUpdate({ prevVersion: before, newVersion: after, updateType })])).pass;
+  // Number would make these 2 versions equal.
+  assert.equal(pass("0.9007199254740992.1", "0.9007199254740993.0"), false);
+  assert.equal(pass("99999999999999999999.0.0", "100000000000000000000.0.0"), false);
+  assert.equal(pass("1.2.3", "1.99999999999999999999999.0"), true);
+  const long = "9".repeat(400);
+  assert.deepEqual(parseVersion(`${long}.0`), [BigInt(long), 0n]);
+  assert.equal(pass(`${long}.0.0`, `${long}.1.0`), true);
+  assert.equal(pass(`${long}.0.0`, `${long}0.0.0`), false);
+});
+
 test("checkS1 fails on empty or malformed update metadata", () => {
   for (const text of ["", "   ", "[]", "{", '{"a":1}', "null", '"x"', "[1]"]) {
     assert.equal(checkS1(text).pass, false, text);
@@ -901,6 +954,12 @@ test("checkS3 wants the computed level at L3 or L4 and fails on any error", () =
   const strict = checkS3(shadowList("L3"), [file("secure/a.sh")]);
   assert.equal(strict.pass, false);
   assert.equal(strict.level, "L1");
+  const l2 = checkS3(shadowList("L2"), GO_FILES);
+  assert.equal(l2.pass, false);
+  assert.equal(l2.level, "L2");
+  const l1 = checkS3(shadowList("L1"), GO_FILES);
+  assert.equal(l1.pass, false);
+  assert.equal(l1.level, "L1");
 });
 
 test("checkS4 collects the required checks of every rule and drops exact duplicates", () => {
@@ -952,7 +1011,14 @@ test("the shadow step writes 1 comment for each head", async () => {
   const { api, calls } = shadowApi({ comments: [{ body: "unrelated" }, { body: `older\n  ${existing}  \nmore` }] });
   const { result, summary } = await shadow(api);
   assert.deepEqual(result, { outcome: "exists", level: "L3", checks: CI_CHECKS });
-  assert.deepEqual(names(calls), ["listPullFiles", "getFileAtRef", "listBranchRules", "listIssueComments"]);
+  assert.deepEqual(names(calls), [
+    "getPullRequest",
+    "listPullFiles",
+    "getFileAtRef",
+    "listBranchRules",
+    "getPullRequest",
+    "listIssueComments",
+  ]);
   assert.match(summary, /A shadow call for this head exists/);
   const other = shadowMarker({ head: BASE_SHA, level: "L3", checks: CI_CHECKS });
   const again = shadowApi({ comments: [{ body: other }] });
@@ -1012,7 +1078,15 @@ test("an error while reading the list fails S3 only, and the step does not throw
 });
 
 test("the shadow step calls only the 5 methods it may call and has no label or merge method", async () => {
-  const allowed = new Set(["listPullFiles", "getFileAtRef", "listBranchRules", "listIssueComments", "createIssueComment"]);
+  const allowed = new Set([
+    "getPullRequest",
+    "listPullFiles",
+    "getFileAtRef",
+    "listBranchRules",
+    "listIssueComments",
+    "createIssueComment",
+    "deleteIssueComment",
+  ]);
   const existing = shadowMarker({ head: HEAD, level: "L3", checks: CI_CHECKS });
   const scenarios = [
     shadowApi(),
@@ -1033,8 +1107,83 @@ test("the shadow step calls only the 5 methods it may call and has no label or m
     "approvePullRequest",
     "enableAutoMerge",
     "mergePullRequest",
+    "updatePullRequest",
   ]) {
     assert.equal(api[name], undefined, name);
+  }
+});
+
+test("the shadow step writes nothing when the live head is not the event head", async () => {
+  const { api, calls } = shadowApi({ liveHeads: [BASE_SHA] });
+  const { result, summary } = await shadow(api);
+  assert.deepEqual(result, { outcome: "stale" });
+  assert.deepEqual(names(calls), ["getPullRequest"]);
+  assert.match(summary, /^## Dependabot shadow/);
+  assert.ok(summary.includes("c".repeat(12)), summary);
+  assert.ok(summary.includes("d".repeat(12)), summary);
+});
+
+test("the shadow step names a live head it cannot read and writes nothing", async () => {
+  const { api, calls } = shadowApi({ liveHeads: [null] });
+  const { result, summary } = await shadow(api);
+  assert.deepEqual(result, { outcome: "stale" });
+  assert.deepEqual(names(calls), ["getPullRequest"]);
+  assert.match(summary, /to a head that is unknown/);
+});
+
+test("the shadow step writes nothing when the head moves during the evaluation", async () => {
+  const { api, calls } = shadowApi({ liveHeads: [HEAD, BASE_SHA] });
+  const { result, summary } = await shadow(api);
+  assert.deepEqual(result, { outcome: "stale", level: "L3", checks: CI_CHECKS });
+  assert.equal(callsOf(calls, "getPullRequest").length, 2);
+  assert.ok(!names(calls).includes("listIssueComments"));
+  assert.ok(!names(calls).includes("createIssueComment"));
+  assert.match(summary, /No comment\./);
+});
+
+test("an error from the pull request read fails the shadow step, with no comment", async () => {
+  const { api, calls } = shadowApi({ fail: { getPullRequest: httpError("GitHub API GET p failed: HTTP 500") } });
+  await assert.rejects(shadow(api), /HTTP 500/);
+  assert.deepEqual(names(calls), ["getPullRequest"]);
+});
+
+test("the shadow step removes its own comment when an earlier one exists for this head", async () => {
+  const marker = shadowMarker({ head: HEAD, level: "L3", checks: CI_CHECKS });
+  const { api, calls } = shadowApi({
+    ownId: 900,
+    commentLists: [[], [{ id: 700, body: `${marker}\nanother run` }, { id: 900, body: "own" }]],
+  });
+  const { result, summary } = await shadow(api);
+  assert.deepEqual(result, { outcome: "exists", level: "L3", checks: CI_CHECKS, deduplicated: true });
+  assert.deepEqual(
+    callsOf(calls, "deleteIssueComment").map((call) => call.args),
+    [["frostyard", "core", 900]],
+  );
+  assert.equal(callsOf(calls, "createIssueComment").length, 1);
+  assert.deepEqual(names(calls).slice(-3), ["createIssueComment", "listIssueComments", "deleteIssueComment"]);
+  assert.match(summary, /removed its own comment/);
+});
+
+test("the shadow step keeps its comment when only its own is in the second list", async () => {
+  const { api, calls } = shadowApi({ ownId: 900, commentLists: [[], [{ id: 900, body: "own" }]] });
+  const { result } = await shadow(api);
+  assert.deepEqual(result, { outcome: "called", level: "L3", checks: CI_CHECKS });
+  assert.equal(callsOf(calls, "deleteIssueComment").length, 0);
+});
+
+test("the shadow step keeps its comment when a marker for another head has a lower id", async () => {
+  const other = shadowMarker({ head: BASE_SHA, level: "L3", checks: CI_CHECKS });
+  const { api, calls } = shadowApi({ ownId: 900, commentLists: [[], [{ id: 700, body: other }]] });
+  const { result } = await shadow(api);
+  assert.equal(result.outcome, "called");
+  assert.equal(callsOf(calls, "deleteIssueComment").length, 0);
+});
+
+test("the shadow step fails when the comment API returns no usable id", async () => {
+  for (const created of [{}, null, { id: 0 }, { id: "900" }, { id: 1.5 }]) {
+    const { api, calls } = shadowApi({ created });
+    await assert.rejects(shadow(api), /no comment id/);
+    assert.equal(callsOf(calls, "deleteIssueComment").length, 0);
   }
 });
 
@@ -1177,14 +1326,14 @@ test("listIssueComments reads 2 pages of comments", async () => {
   assert.equal(urls[0], "https://api.example.test/repos/o/r/issues/5/comments?per_page=100");
 });
 
-test("createIssueComment posts the body; an error throws without the token", async () => {
+test("createIssueComment posts the body, returns the comment; an error throws without the token", async () => {
   const requests = [];
   let status = 201;
   const api = client(async (url, init) => {
     requests.push({ url, init });
-    return response(status, {});
+    return response(status, { id: 42 });
   });
-  await api.createIssueComment("o", "r", 9, "hello");
+  assert.deepEqual(await api.createIssueComment("o", "r", 9, "hello"), { id: 42 });
   assert.equal(requests[0].url, "https://api.example.test/repos/o/r/issues/9/comments");
   assert.equal(requests[0].init.method, "POST");
   assert.deepEqual(JSON.parse(requests[0].init.body), { body: "hello" });
@@ -1253,6 +1402,33 @@ test("listBranchRules reads 2 pages and encodes each part of the branch", async 
   assert.deepEqual(await other.listBranchRules("o", "r", "a b/c#d"), []);
   assert.equal(encoded[0], "https://api.example.test/repos/o/r/rules/branches/a%20b/c%23d?per_page=100");
   await assert.rejects(client(async () => response(200, {})).listBranchRules("o", "r", "main"), /not an array/);
+});
+
+test("getPullRequest reads the pull request body", async () => {
+  const urls = [];
+  const api = client(async (url) => {
+    urls.push(url);
+    return response(200, { number: 9, head: { sha: HEAD } });
+  });
+  const pr = await api.getPullRequest("o", "r", 9);
+  assert.equal(pr.head.sha, HEAD);
+  assert.equal(urls[0], "https://api.example.test/repos/o/r/pulls/9");
+});
+
+test("deleteIssueComment gives true on 204, false on 404 and throws on 500", async () => {
+  const requests = [];
+  let status = 204;
+  const api = client(async (url, init) => {
+    requests.push({ url, init });
+    return response(status, {});
+  });
+  assert.equal(await api.deleteIssueComment("o", "r", 700), true);
+  assert.equal(requests[0].url, "https://api.example.test/repos/o/r/issues/comments/700");
+  assert.equal(requests[0].init.method, "DELETE");
+  status = 404;
+  assert.equal(await api.deleteIssueComment("o", "r", 700), false);
+  status = 500;
+  await assert.rejects(api.deleteIssueComment("o", "r", 700), /HTTP 500/);
 });
 
 test("a network error never carries the token", async () => {
