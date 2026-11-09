@@ -77,7 +77,9 @@ PR template ──► review rubric ──► CI gates ──► corrections ─
   ([ADR-0072](../adr/0072-write-every-readme-to-one-standard.md),
   [README spec](../specs/readme.md)), and the required status checks on
   the default branch
-  ([ADR-0076](../adr/0076-require-status-checks-on-every-default-branch.md)).
+  ([ADR-0076](../adr/0076-require-status-checks-on-every-default-branch.md);
+  the settings step for each repository is in the
+  [PR triage rollout runbook](pr-triage-rollout.md)).
   The weekly conformance sweep
   reads it at core's `origin/main` and files one `sweep` issue for each
   failed row; owners fix the gaps in normal work. The organization gate
