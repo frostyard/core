@@ -13,6 +13,7 @@ import {
   buildReport,
   checkResult,
   classifyCall,
+  classifyCallWithReason,
   classifyPull,
   formatReport,
   levelOfPull,
@@ -233,9 +234,13 @@ test("superseded by a later call, by a force push, by a commit, and not when the
   });
   assert.equal(classifyCall(forcePush, call, [call]), "superseded");
 
-  // The call head has its committed event, and another commit follows it.
+  // The call head has its committed event, and another commit follows it. Its
+  // push time is the first check run at its SHA.
   const committed = record({
-    checkRuns: { [A]: [run({ started_at: `${SINCE}T09:00:00Z`, completed_at: `${SINCE}T12:00:00Z` })] },
+    checkRuns: {
+      [A]: [run({ started_at: `${SINCE}T09:00:00Z`, completed_at: `${SINCE}T12:00:00Z` })],
+      [B]: [run({ id: 7, started_at: `${SINCE}T11:00:00Z`, completed_at: `${SINCE}T11:04:00Z` })],
+    },
     timelines: {
       "12": [
         { event: "committed", created_at: `${SINCE}T09:00:00Z`, actor: { login: DEPENDABOT }, sha: A, committer: { date: `${SINCE}T09:00:00Z` } },
@@ -245,9 +250,13 @@ test("superseded by a later call, by a force push, by a commit, and not when the
   });
   assert.equal(classifyCall(committed, call, [call]), "superseded");
 
-  // No committed event for the call head: a later commit date is the move.
+  // No committed event for the call head: a later commit names the move, and
+  // the check run at its SHA gives the push time.
   const commitAfter = record({
-    checkRuns: { [A]: [run({ started_at: `${SINCE}T09:00:00Z`, completed_at: `${SINCE}T12:00:00Z` })] },
+    checkRuns: {
+      [A]: [run({ started_at: `${SINCE}T09:00:00Z`, completed_at: `${SINCE}T12:00:00Z` })],
+      [B]: [run({ id: 7, started_at: `${SINCE}T11:00:00Z`, completed_at: `${SINCE}T11:04:00Z` })],
+    },
     timelines: { "12": [{ event: "committed", created_at: `${SINCE}T11:00:00Z`, actor: { login: DEPENDABOT }, sha: B, committer: { date: `${SINCE}T11:00:00Z` } }] },
   });
   assert.equal(classifyCall(commitAfter, call, [call]), "superseded");
@@ -633,4 +642,311 @@ test("the level label events keep the label name of the API's label object", asy
   assert.deepEqual(levelLabelEvents(events), [
     { event: "unlabeled", number: 7, label: "level:L1", actor: "frostyard-machines", created_at: `${SINCE}T11:00:00Z` },
   ]);
+});
+
+// ---- The push time of a committed move ------------------------------------
+
+// A timeline where the call head has its own committed event and a later
+// committed event follows it: the selection of a move that test C4 of the
+// measurement describes.
+const committedEvent = ({ sha: commit, date }) => ({
+  event: "committed",
+  created_at: date,
+  actor: { login: DEPENDABOT },
+  sha: commit,
+  committer: { date },
+});
+
+function committedMoveRecord({ pushStart = null, callRun = run({ started_at: `${SINCE}T09:00:00Z`, completed_at: `${SINCE}T10:05:00Z` }) } = {}) {
+  const checkRuns = { [A]: [callRun] };
+  if (pushStart !== null) {
+    checkRuns[B] = [run({ id: 7, started_at: pushStart, completed_at: `${SINCE}T11:04:00Z` })];
+  }
+  return record({
+    checkRuns,
+    timelines: {
+      "12": [committedEvent({ sha: A, date: `${SINCE}T09:00:00Z` }), committedEvent({ sha: B, date: `${SINCE}T09:00:00Z` })],
+    },
+  });
+}
+
+test("a commit's date is not the push time: the first check run at the new SHA is", () => {
+  const call = callOf();
+  // The commit is dated 09:00 but its CI starts at 11:00, after the checks
+  // passed at 10:05: the head did not move before they passed.
+  assert.equal(classifyCall(committedMoveRecord({ pushStart: `${SINCE}T11:00:00Z` }), call, [call]), "would-have-merged");
+  // CI starts at 10:02, before the pass at 10:05: superseded.
+  assert.equal(classifyCall(committedMoveRecord({ pushStart: `${SINCE}T10:02:00Z` }), call, [call]), "superseded");
+});
+
+test("a moved head with no known push time is unknown when every check had passed", () => {
+  const call = callOf();
+  const outcome = classifyCallWithReason(committedMoveRecord({ pushStart: null }), call, [call]);
+  assert.equal(outcome.class, "unknown");
+  assert.equal(outcome.reason, `unknown: the head moved to ${B.slice(0, 12)}, and its push time is not known`);
+  // The Detail section of the report carries the reason.
+  const unproven = committedMoveRecord({ pushStart: null });
+  const report = reportOf([record({ ...unproven, pulls: [pull()], comments: [comment()] })]);
+  assert.match(formatReport(report), /push time is not known/);
+});
+
+test("a moved head with no known push time is superseded when a recorded check failed", () => {
+  const call = callOf();
+  const failing = committedMoveRecord({
+    pushStart: null,
+    callRun: run({ started_at: `${SINCE}T09:00:00Z`, completed_at: `${SINCE}T10:05:00Z`, conclusion: "failure" }),
+  });
+  assert.equal(classifyCall(failing, call, [call]), "superseded");
+});
+
+// ---- A call written before the window -------------------------------------
+
+test("mergeCallComments keeps 1 comment for each id and orders the calls by created_at", async () => {
+  const { mergeCallComments } = await import("../scripts/dependabot-shadow-report.mjs");
+  const existing = [{ id: 2, created_at: `${SINCE}T12:00:00Z` }, { id: 1, created_at: `${SINCE}T10:00:00Z` }];
+  const extra = [{ id: 1, created_at: `${SINCE}T10:00:00Z` }, { id: 3, created_at: `${SINCE}T09:00:00Z` }];
+  assert.deepEqual(mergeCallComments(existing, extra).map((item) => item.id), [3, 1, 2]);
+  // A comment without an id cannot be a duplicate: it is kept.
+  assert.equal(mergeCallComments([{ created_at: CALL_AT }], [{ created_at: CALL_AT }]).length, 2);
+  assert.deepEqual(mergeCallComments([], []), []);
+});
+
+test("a call from before the window keeps its pull request out of missed and out of the calls table", () => {
+  const before = record({
+    pulls: [pull({ number: 30, state: "closed", created_at: "2026-10-25T09:00:00Z", merged_at: `${SINCE}T12:00:00Z`, closed_at: `${SINCE}T12:00:00Z`, merge_commit_sha: MERGE, head: A })],
+    comments: [comment({ id: 9, number: 30, created_at: "2026-10-26T10:00:00Z" })],
+    commits: { "30": [dependabotCommit(A)] },
+    checkRuns: { [A]: [run()] },
+    requiredChecks: { main: [{ context: "docs-gate", integration_id: 15368 }] },
+  });
+  const report = reportOf([before]);
+  assert.deepEqual(report.missed, []);
+  assert.deepEqual(report.noMetadata, []);
+  assert.equal(report.repos[0].calls.total, 0);
+});
+
+// A reader for collectRepo with no network: each route answers 1 endpoint.
+function fakeReader(routes) {
+  const seen = [];
+  const look = (endpoint) => {
+    seen.push(endpoint);
+    const route = routes.find((entry) => entry.match.test(endpoint));
+    if (route === undefined) throw new Error(`no route for ${endpoint}`);
+    return route.value;
+  };
+  return {
+    seen,
+    async ghGet(endpoint) {
+      return JSON.stringify(look(endpoint));
+    },
+    async pages(endpoint, { key = null } = {}) {
+      const value = look(endpoint);
+      const list = key === null ? value : value?.[key];
+      if (!Array.isArray(list)) throw new Error(`${endpoint} is not a list`);
+      return list;
+    },
+  };
+}
+
+test("the collector reads the own comments of a Dependabot pull request that holds no call in the window", async () => {
+  const { collectRepo } = await import("../scripts/dependabot-shadow-report.mjs");
+  const preWindowCall = { id: 777, user: { login: SHADOW_AUTHOR }, created_at: "2026-10-25T10:00:00Z", body: callBody() };
+  const rawPull = {
+    number: 20,
+    title: "chore(deps): bump jq from 1.8.1 to 1.8.2",
+    user: { login: DEPENDABOT },
+    state: "closed",
+    draft: false,
+    created_at: "2026-10-25T09:00:00Z",
+    closed_at: `${SINCE}T12:00:00Z`,
+    merged_at: `${SINCE}T12:00:00Z`,
+    merge_commit_sha: MERGE,
+    head: { sha: A },
+    base: { ref: "main" },
+    labels: [],
+    updated_at: `${SINCE}T12:00:00Z`,
+  };
+  const reader = fakeReader([
+    { match: /\/issues\/comments\?since=/, value: [] },
+    { match: /\/issues\/20\/comments$/, value: [preWindowCall] },
+    { match: /\/issues\/20\/timeline$/, value: [] },
+    { match: /\/pulls\/20\/commits$/, value: [{ sha: A, author: null, commit: { author: { name: DEPENDABOT } } }] },
+    { match: /\/pulls\?state=all/, value: [rawPull] },
+    { match: /\/check-runs\?filter=all$/, value: { total_count: 0, check_runs: [] } },
+    { match: /\/status$/, value: { state: "success", statuses: [] } },
+    { match: /\/issues\/events$/, value: [] },
+    { match: /\/rules\/branches\/main$/, value: [] },
+  ]);
+  const collected = await collectRepo(REPO, RANGE, reader);
+  assert.deepEqual(collected.errors, []);
+  assert.deepEqual(collected.comments.map((item) => [item.id, item.number]), [[777, 20]]);
+  assert.ok(reader.seen.includes(`repos/${REPO}/issues/20/comments`), "the pull request's own comments were read");
+});
+
+// ---- Class precedence -----------------------------------------------------
+
+const mergedPull = (overrides = {}) => pull({
+  number: 12,
+  state: "closed",
+  created_at: `${SINCE}T09:00:00Z`,
+  merged_at: `${SINCE}T12:00:00Z`,
+  closed_at: `${SINCE}T12:00:00Z`,
+  merge_commit_sha: MERGE,
+  head: A,
+  ...overrides,
+});
+
+test("F2 wins over F3 when a revert and a person's commit both hold", () => {
+  const revert = pull({
+    number: 40,
+    title: 'Revert "chore(deps): bump ajv (#12)"',
+    state: "closed",
+    created_at: `${SINCE}T13:00:00Z`,
+    merged_at: "2026-11-03T12:00:00Z",
+    closed_at: "2026-11-03T12:00:00Z",
+    merge_commit_sha: sha("f"),
+  });
+  const one = record({
+    pulls: [mergedPull(), revert],
+    comments: [comment({ id: 1, number: 12 })],
+    commits: { "12": [dependabotCommit(A), personCommit(B)] },
+    checkRuns: { [A]: [run()], [MERGE]: [run()] },
+  });
+  const report = reportOf([one]);
+  assert.equal(report.repos[0].pulls.F2, 1);
+  assert.equal(report.repos[0].pulls.F3, 0);
+  assert.equal(report.repos[0].pulls.agreed, 0);
+});
+
+test("F3 stays and the F4 line for the same pull request is not applied", () => {
+  const one = record({
+    pulls: [mergedPull()],
+    comments: [comment({ id: 1, number: 12 })],
+    commits: { "12": [dependabotCommit(A), personCommit(B)] },
+    checkRuns: { [A]: [run()], [MERGE]: [run()] },
+  });
+  const report = reportOf([one], {
+    issueComments: [{ user: { login: "bketelsen" }, created_at: `${SINCE}T13:00:00Z`, body: "false: #12 the CI was green" }],
+  });
+  assert.equal(report.repos[0].pulls.F3, 1);
+  assert.equal(report.repos[0].pulls.F4, 0);
+  assert.equal(report.f4.applied.length, 0);
+  assert.equal(report.f4.notApplied.length, 1);
+  assert.match(report.f4.notApplied[0].why, /classed F3/);
+});
+
+test("F1 stays and the F4 line for the same pull request is not applied", () => {
+  const closed = pull({ number: 12, state: "closed", created_at: `${SINCE}T09:00:00Z`, closed_at: `${SINCE}T12:00:00Z` });
+  const one = record({
+    pulls: [closed],
+    comments: [comment({ id: 1, number: 12 })],
+    timelines: { "12": [{ event: "closed", created_at: `${SINCE}T12:00:00Z`, actor: { login: "bketelsen" }, sha: "", committer: { date: null } }] },
+    checkRuns: { [A]: [run()] },
+  });
+  const report = reportOf([one], {
+    issueComments: [{ user: { login: "bketelsen" }, created_at: `${SINCE}T13:00:00Z`, body: "false: #12 the CI was green" }],
+  });
+  assert.equal(report.repos[0].pulls.F1, 1);
+  assert.equal(report.repos[0].pulls.F4, 0);
+  assert.equal(report.f4.applied.length, 0);
+  assert.match(report.f4.notApplied[0].why, /classed F1/);
+});
+
+test("the pull request class comes from the last would-have-merged call, not the first", () => {
+  const one = record({
+    pulls: [mergedPull({ head: B })],
+    comments: [
+      comment({ id: 1, number: 12, created_at: `${SINCE}T10:00:00Z`, body: callBody({ head: A }) }),
+      comment({
+        id: 2,
+        number: 12,
+        created_at: `${SINCE}T11:00:00Z`,
+        body: callBody({ head: B, checks: [{ context: "docs-gate", integration_id: 15368 }, { context: "scaffold-e2e", integration_id: 15368 }] }),
+      }),
+    ],
+    commits: { "12": [dependabotCommit(B)] },
+    checkRuns: {
+      [A]: [run({ started_at: `${SINCE}T10:00:00Z`, completed_at: `${SINCE}T10:05:00Z` })],
+      [B]: [
+        run({ id: 2, started_at: `${SINCE}T11:00:00Z`, completed_at: `${SINCE}T11:05:00Z` }),
+        run({ id: 3, name: "scaffold-e2e", started_at: `${SINCE}T11:00:00Z`, completed_at: `${SINCE}T11:10:00Z` }),
+      ],
+      [MERGE]: [
+        run({ id: 4, started_at: `${SINCE}T12:00:00Z`, completed_at: `${SINCE}T12:03:00Z` }),
+        run({ id: 5, name: "scaffold-e2e", started_at: `${SINCE}T12:00:00Z`, completed_at: `${SINCE}T12:04:00Z`, conclusion: "failure" }),
+      ],
+    },
+  });
+  const report = reportOf([one]);
+  assert.equal(report.repos[0].calls.wouldHaveMerged, 2);
+  assert.equal(report.repos[0].pulls.F2, 1);
+  assert.equal(report.repos[0].pulls.agreed, 0);
+});
+
+test("the later call by created_at is chosen even when its comment id is lower", () => {
+  const one = record({
+    pulls: [mergedPull({ head: B })],
+    comments: [
+      // The later call, with the lower id.
+      comment({ id: 2, number: 12, created_at: `${SINCE}T11:00:00Z`, body: callBody({ head: B, checks: [{ context: "scaffold-e2e", integration_id: 15368 }] }) }),
+      comment({ id: 9, number: 12, created_at: `${SINCE}T10:00:00Z`, body: callBody({ head: A }) }),
+    ],
+    commits: { "12": [dependabotCommit(B)] },
+    checkRuns: {
+      [A]: [run({ started_at: `${SINCE}T10:00:00Z`, completed_at: `${SINCE}T10:05:00Z` })],
+      [B]: [run({ id: 2, name: "scaffold-e2e", started_at: `${SINCE}T11:00:00Z`, completed_at: `${SINCE}T11:05:00Z` })],
+      [MERGE]: [
+        run({ id: 3, started_at: `${SINCE}T12:00:00Z`, completed_at: `${SINCE}T12:03:00Z` }),
+        run({ id: 4, name: "scaffold-e2e", started_at: `${SINCE}T12:00:00Z`, completed_at: `${SINCE}T12:04:00Z`, conclusion: "failure" }),
+      ],
+    },
+  });
+  const report = reportOf([one]);
+  assert.equal(report.repos[0].calls.wouldHaveMerged, 2);
+  assert.equal(report.repos[0].pulls.F2, 1);
+  assert.equal(report.repos[0].pulls.agreed, 0);
+});
+
+test("the collector reads the check runs of a commit that a call's timeline shows after the call head", async () => {
+  const { collectRepo } = await import("../scripts/dependabot-shadow-report.mjs");
+  const rawPull = {
+    number: 21,
+    title: "chore(deps): bump node from 22.22 to 22.23",
+    user: { login: DEPENDABOT },
+    state: "open",
+    draft: false,
+    created_at: `${SINCE}T09:00:00Z`,
+    closed_at: null,
+    merged_at: null,
+    merge_commit_sha: null,
+    head: { sha: A },
+    base: { ref: "main" },
+    labels: [],
+    updated_at: `${SINCE}T12:00:00Z`,
+  };
+  const callComment = {
+    id: 900,
+    issue_url: `https://api.github.com/repos/${REPO}/issues/21`,
+    user: { login: SHADOW_AUTHOR },
+    created_at: CALL_AT,
+    body: callBody({ head: A }),
+  };
+  const reader = fakeReader([
+    { match: /\/issues\/comments\?since=/, value: [callComment] },
+    { match: /\/issues\/21\/timeline$/, value: [committedEvent({ sha: A, date: `${SINCE}T09:00:00Z` }), committedEvent({ sha: B, date: `${SINCE}T09:00:00Z` })] },
+    { match: /\/pulls\/21\/commits$/, value: [] },
+    { match: /\/pulls\?state=all/, value: [rawPull] },
+    { match: new RegExp(`/commits/${A}/check-runs\\?filter=all$`), value: { total_count: 1, check_runs: [{ id: 1, name: "docs-gate", app: { id: 15368 }, status: "completed", conclusion: "success", started_at: `${SINCE}T09:30:00Z`, completed_at: `${SINCE}T10:05:00Z` }] } },
+    { match: new RegExp(`/commits/${B}/check-runs\\?filter=all$`), value: { total_count: 0, check_runs: [] } },
+    { match: /\/status$/, value: { state: "success", statuses: [] } },
+    { match: /\/issues\/events$/, value: [] },
+    { match: /\/rules\/branches\/main$/, value: [] },
+  ]);
+  const collected = await collectRepo(REPO, RANGE, reader);
+  assert.deepEqual(collected.errors, []);
+  assert.deepEqual(collected.checkRuns[B], []);
+  assert.ok(
+    reader.seen.some((endpoint) => endpoint.startsWith(`repos/${REPO}/commits/${B}/check-runs`)),
+    "the check runs of the moved head were read",
+  );
 });

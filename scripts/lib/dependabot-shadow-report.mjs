@@ -212,10 +212,23 @@ export function checkResultsFor(record, call) {
 
 // ---- Class of 1 call ------------------------------------------------------
 
-// The instant the head moved away from the call head, or Infinity.
-function movedAtOf(record, call, allCalls) {
+// The earliest check run start at 1 commit SHA: CI starts when a push lands,
+// so that is the push time. Infinity when the record holds no such run.
+function pushTimeOf(record, sha) {
+  let best = Number.POSITIVE_INFINITY;
+  for (const run of record?.checkRuns?.[String(sha ?? "")] ?? []) {
+    const ms = timeOf(run?.started_at);
+    if (Number.isFinite(ms) && ms < best) best = ms;
+  }
+  return best;
+}
+
+// The times the head moved away from the call head: known move times, and the
+// commits that moved it whose push time the record does not hold.
+function movesOf(record, call, allCalls) {
   const createdMs = timeOf(call.created_at);
   const moves = [];
+  const unproven = [];
   for (const other of allCalls ?? []) {
     if (other === call) continue;
     // 1 comment is 1 call: a known id names it, and an unknown id cannot.
@@ -232,25 +245,28 @@ function movedAtOf(record, call, allCalls) {
     if (Number.isFinite(at) && at > createdMs) moves.push(at);
   }
   // A commit that another commit follows in timeline order moved the head; with
-  // no committed event for the call head, a later commit date did.
+  // no committed event for the call head, a later commit date did. The commit
+  // date is not the push time: the first check run at the new SHA is.
   const callIndex = timeline.findIndex((event) => event?.event === "committed" && event?.sha === call.head);
   timeline.forEach((event, index) => {
     if (event?.event !== "committed") return;
     if (event?.sha === call.head) return;
     const committedAt = timeOf(event?.committer?.date);
-    if (!Number.isFinite(committedAt)) return;
     if (callIndex >= 0) {
-      if (index > callIndex) moves.push(Math.max(committedAt, createdMs));
-    } else if (committedAt > createdMs) {
-      moves.push(Math.max(committedAt, createdMs));
+      if (index <= callIndex) return;
+    } else if (!(Number.isFinite(committedAt) && committedAt > createdMs)) {
+      return;
     }
+    const pushedAt = pushTimeOf(record, event?.sha);
+    if (Number.isFinite(pushedAt)) moves.push(pushedAt);
+    else unproven.push({ sha: String(event?.sha ?? ""), committedAt });
   });
-  return moves.length === 0 ? Number.POSITIVE_INFINITY : Math.min(...moves);
+  return { moves, unproven };
 }
 
-// The class of 1 call: superseded, waited, unknown, or would-have-merged.
-// allCalls is every call of the same repository.
-export function classifyCall(record, call, allCalls = []) {
+// The class of 1 call and, when the class needs it, the reason why. allCalls is
+// every call of the same repository.
+export function classifyCallWithReason(record, call, allCalls = []) {
   const results = checkResultsFor(record, call);
   let passedAt;
   if (results.length === 0) {
@@ -265,10 +281,37 @@ export function classifyCall(record, call, allCalls = []) {
   } else {
     passedAt = Number.POSITIVE_INFINITY;
   }
-  if (movedAtOf(record, call, allCalls) < passedAt) return "superseded";
-  if (results.some((result) => result.result === "fail")) return "waited";
-  if (results.length === 0 || results.some((result) => result.result === "unknown")) return "unknown";
-  return "would-have-merged";
+  const { moves, unproven } = movesOf(record, call, allCalls);
+  const movedAt = moves.length === 0 ? Number.POSITIVE_INFINITY : Math.min(...moves);
+  if (movedAt < passedAt) return { class: "superseded", reason: null };
+  if (unproven.length > 0) {
+    const first = unproven[0];
+    // The checks never all passed: the head moved after the call, so it moved
+    // before they passed, and no time is needed.
+    if (passedAt === Number.POSITIVE_INFINITY) {
+      return {
+        class: "superseded",
+        reason: `superseded: the head moved to ${short(first.sha)} after the call, before every recorded check passed`,
+      };
+    }
+    // Every recorded check passed. A commit dated at or after the pass came
+    // after it; with no push time, a commit dated earlier cannot be placed.
+    const earlier = unproven.find((move) => !(Number.isFinite(move.committedAt) && move.committedAt >= passedAt));
+    if (earlier !== undefined) {
+      return {
+        class: "unknown",
+        reason: `unknown: the head moved to ${short(earlier.sha)}, and its push time is not known`,
+      };
+    }
+  }
+  if (results.some((result) => result.result === "fail")) return { class: "waited", reason: null };
+  if (results.length === 0 || results.some((result) => result.result === "unknown")) return { class: "unknown", reason: null };
+  return { class: "would-have-merged", reason: null };
+}
+
+// The class of 1 call: superseded, waited, unknown, or would-have-merged.
+export function classifyCall(record, call, allCalls = []) {
+  return classifyCallWithReason(record, call, allCalls).class;
 }
 
 // ---- Class of 1 pull request ----------------------------------------------
@@ -577,7 +620,8 @@ export function buildReport({ since, until, records = [], issueComments = null, 
     const pullCounts = emptyPulls();
     const callsByNumber = new Map();
     for (const call of windowedCalls) {
-      const classOf = classifyCall(record, call, calls);
+      const outcome = classifyCallWithReason(record, call, calls);
+      const classOf = outcome.class;
       counts.total += 1;
       if (classOf === "would-have-merged") counts.wouldHaveMerged += 1;
       else if (classOf === "superseded") counts.superseded += 1;
@@ -588,6 +632,7 @@ export function buildReport({ since, until, records = [], issueComments = null, 
         head: call.head,
         created_at: call.created_at,
         class: classOf,
+        reason: outcome.reason,
         checks: checkResultsFor(record, call),
       });
     }
@@ -793,6 +838,7 @@ export function formatReport(report) {
     lines.push(`### ${detail.repo}#${detail.number}${title}`, "");
     for (const call of detail.calls) {
       lines.push(`- call \`${short(call.head)}\` at ${clean(call.created_at)}: ${call.class}`);
+      if (call.reason) lines.push(`  - ${clean(call.reason)}`);
       for (const check of call.checks) {
         const at = check.at === null ? "" : ` at ${clean(check.at)}`;
         lines.push(`  - \`${clean(check.context)}\`: ${check.result}${at} (${clean(check.source)})`);

@@ -240,14 +240,42 @@ const trimStatus = (status) => ({
 
 const trimStep = (step) => ({ name: step?.name ?? "", conclusion: step?.conclusion ?? null });
 
+// The real reader: `gh api` GET calls. A test passes its own reader to
+// collectRepo, so no test reads the network.
+export const liveReader = { ghGet, pages };
+
+// A call comment that was written before the window is not in the repository
+// read, and its pull request's own comment list is where it still is. The merge
+// keeps 1 comment for each id and orders the calls by created_at.
+export function mergeCallComments(existing, extra) {
+  const seen = new Set();
+  const merged = [];
+  for (const comment of [...(existing ?? []), ...(extra ?? [])]) {
+    const id = comment?.id ?? null;
+    if (id !== null) {
+      if (seen.has(id)) continue;
+      seen.add(id);
+    }
+    merged.push(comment);
+  }
+  return merged.sort((a, b) => {
+    const at = timeOf(a?.created_at);
+    const bt = timeOf(b?.created_at);
+    if (Number.isFinite(at) && Number.isFinite(bt) && at !== bt) return at - bt;
+    if (Number.isFinite(at) && !Number.isFinite(bt)) return -1;
+    if (!Number.isFinite(at) && Number.isFinite(bt)) return 1;
+    return 0;
+  });
+}
+
 // The check runs and the commit statuses of 1 sha each, read once.
-async function readChecks(record, shas) {
+async function readChecks(record, shas, reader = liveReader) {
   for (const sha of shas) {
     if (typeof sha !== "string" || sha === "" || record.checkRuns[sha] !== undefined) continue;
-    const runs = await attempt(() => pages(`repos/${record.repo}/commits/${sha}/check-runs?filter=all`, { key: "check_runs" }));
+    const runs = await attempt(() => reader.pages(`repos/${record.repo}/commits/${sha}/check-runs?filter=all`, { key: "check_runs" }));
     if (runs.error) record.errors.push(`check runs of ${sha}: ${shortReason(runs.error)}`);
     record.checkRuns[sha] = runs.error ? [] : runs.value.map(trimCheckRun);
-    const statuses = await attempt(() => pages(`repos/${record.repo}/commits/${sha}/status`, { key: "statuses" }));
+    const statuses = await attempt(() => reader.pages(`repos/${record.repo}/commits/${sha}/status`, { key: "statuses" }));
     if (statuses.error) record.errors.push(`commit statuses of ${sha}: ${shortReason(statuses.error)}`);
     record.statuses[sha] = statuses.error ? [] : statuses.value.map(trimStatus);
   }
@@ -255,13 +283,13 @@ async function readChecks(record, shas) {
 
 // The steps of each pr-triage check run of a Dependabot head: an Actions check
 // run id is its job id.
-async function readJobs(record, shas) {
+async function readJobs(record, shas, reader = liveReader) {
   for (const sha of shas) {
     for (const run of record.checkRuns[sha] ?? []) {
       if (!String(run.name).startsWith(PR_TRIAGE_JOB_PREFIX)) continue;
       const key = String(run.id);
       if (record.jobs[key] !== undefined) continue;
-      const job = await attempt(async () => JSON.parse(await ghGet(`repos/${record.repo}/actions/jobs/${run.id}`)));
+      const job = await attempt(async () => JSON.parse(await reader.ghGet(`repos/${record.repo}/actions/jobs/${run.id}`)));
       if (job.error) {
         record.errors.push(`job ${key}: ${shortReason(job.error)}`);
         record.jobs[key] = { steps: [] };
@@ -272,9 +300,9 @@ async function readJobs(record, shas) {
   }
 }
 
-async function readLabelEvents(record, range) {
+async function readLabelEvents(record, range, reader = liveReader) {
   const events = await attempt(() =>
-    pages(`repos/${record.repo}/issues/events`, {
+    reader.pages(`repos/${record.repo}/issues/events`, {
       stop: (batch) =>
         batch.some((event) => {
           const ms = timeOf(event?.created_at);
@@ -303,8 +331,9 @@ export function levelLabelEvents(events) {
     }));
 }
 
-// 1 record for 1 repository. A failed read is recorded, never thrown.
-async function collectRepo(repo, range) {
+// 1 record for 1 repository. A failed read is recorded, never thrown. The
+// reader is injected so that a test drives the collector with no network.
+export async function collectRepo(repo, range, reader = liveReader) {
   const record = {
     repo,
     pulls: [],
@@ -321,7 +350,7 @@ async function collectRepo(repo, range) {
   const sinceIso = new Date(range.start).toISOString().replace(/\.\d{3}Z$/, "Z");
 
   const pulls = await attempt(() =>
-    pages(`repos/${repo}/pulls?state=all&sort=updated&direction=desc`, {
+    reader.pages(`repos/${repo}/pulls?state=all&sort=updated&direction=desc`, {
       stop: (batch) => {
         const ms = timeOf(batch.at(-1)?.updated_at);
         return Number.isFinite(ms) && ms < range.start;
@@ -332,10 +361,33 @@ async function collectRepo(repo, range) {
   else record.pulls = pulls.value.filter((pull) => notBefore(range, pull?.updated_at)).map(trimPull);
 
   const comments = await attempt(() =>
-    pages(`repos/${repo}/issues/comments?since=${encodeURIComponent(sinceIso)}&sort=created&direction=asc`),
+    reader.pages(`repos/${repo}/issues/comments?since=${encodeURIComponent(sinceIso)}&sort=created&direction=asc`),
   );
   if (comments.error) record.errors.push(`call comments: ${shortReason(comments.error)}`);
   else record.comments = comments.value.filter(isCallComment).map(trimComment);
+
+  // A call written before the window is not in that read (the endpoint filters
+  // by updated_at). A Dependabot pull request of the window that holds no call
+  // yet gets its own comments read, so a call from before the window still
+  // counts as a call, never as missed and never as no metadata.
+  const callNumbers = new Set(parseCalls(record).map((call) => call.number));
+  const noCallPulls = record.pulls.filter(
+    (pull) =>
+      pull.user.login === DEPENDABOT &&
+      (inRange(range, pull.created_at) || inRange(range, pull.merged_at)) &&
+      !callNumbers.has(pull.number),
+  );
+  for (const pull of noCallPulls) {
+    const own = await attempt(() => reader.pages(`repos/${repo}/issues/${pull.number}/comments`));
+    if (own.error) {
+      record.errors.push(`comments of #${pull.number}: ${shortReason(own.error)}`);
+      continue;
+    }
+    const extra = own.value
+      .filter(isCallComment)
+      .map((comment) => ({ ...trimComment(comment), number: pull.number }));
+    record.comments = mergeCallComments(record.comments, extra);
+  }
 
   const calls = parseCalls(record);
   const dependabotPulls = record.pulls.filter(
@@ -344,17 +396,41 @@ async function collectRepo(repo, range) {
   const numbers = new Set([...calls.map((call) => call.number), ...dependabotPulls.map((pull) => pull.number)]);
 
   for (const number of [...numbers].sort((a, b) => a - b)) {
-    const timeline = await attempt(() => pages(`repos/${repo}/issues/${number}/timeline`));
+    const timeline = await attempt(() => reader.pages(`repos/${repo}/issues/${number}/timeline`));
     if (timeline.error) record.errors.push(`timeline of #${number}: ${shortReason(timeline.error)}`);
     else record.timelines[String(number)] = timeline.value.map(trimTimelineEvent);
-    const commits = await attempt(() => pages(`repos/${repo}/pulls/${number}/commits`));
+    const commits = await attempt(() => reader.pages(`repos/${repo}/pulls/${number}/commits`));
     if (commits.error) record.errors.push(`commits of #${number}: ${shortReason(commits.error)}`);
     else record.commits[String(number)] = commits.value.map(trimCommit);
   }
 
   const dependabotHeads = dependabotPulls.map((pull) => pull.head.sha).filter((sha) => sha !== "");
-  await readChecks(record, [...new Set([...calls.map((call) => call.head), ...dependabotHeads])]);
-  await readJobs(record, [...new Set(dependabotHeads)]);
+  await readChecks(record, [...new Set([...calls.map((call) => call.head), ...dependabotHeads])], reader);
+  await readJobs(record, [...new Set(dependabotHeads)], reader);
+
+  // A commit that a call's timeline shows after the call head moved the head.
+  // Its push time is the first check run at that SHA, so those runs are read
+  // before the class of a call is decided.
+  const moveShas = [];
+  for (const call of calls) {
+    const timeline = record.timelines[String(call.number)] ?? [];
+    const heads = new Set(calls.filter((other) => other.number === call.number).map((other) => other.head));
+    const callIndex = timeline.findIndex((event) => event?.event === "committed" && event?.sha === call.head);
+    timeline.forEach((event, index) => {
+      if (event?.event !== "committed") return;
+      if (event?.sha === "" || heads.has(event.sha)) return;
+      if (callIndex >= 0) {
+        if (index <= callIndex) return;
+      } else {
+        // With no committed event for the call head, the commit date must be
+        // after the call (the same selection the library applies).
+        const date = timeOf(event?.committer?.date);
+        if (!(Number.isFinite(date) && date > timeOf(call.created_at))) return;
+      }
+      moveShas.push(event.sha);
+    });
+  }
+  await readChecks(record, [...new Set(moveShas)], reader);
 
   // A merged pull request with a would-have-merged call needs the checks of its
   // merge commit (F2), and those calls are known only after the call heads.
@@ -372,13 +448,13 @@ async function collectRepo(repo, range) {
     if (pull === undefined || pull.merged_at === null) continue;
     if (typeof pull.merge_commit_sha === "string" && pull.merge_commit_sha !== "") mergeShas.push(pull.merge_commit_sha);
   }
-  await readChecks(record, [...new Set(mergeShas)]);
+  await readChecks(record, [...new Set(mergeShas)], reader);
 
-  await readLabelEvents(record, range);
+  await readLabelEvents(record, range, reader);
 
   const bases = [...new Set(dependabotPulls.map((pull) => pull.base.ref).filter((ref) => ref !== ""))];
   for (const base of bases) {
-    const rules = await attempt(async () => JSON.parse(await ghGet(`repos/${repo}/rules/branches/${encodeURIComponent(base)}`)));
+    const rules = await attempt(async () => JSON.parse(await reader.ghGet(`repos/${repo}/rules/branches/${encodeURIComponent(base)}`)));
     if (rules.error) record.errors.push(`branch rules of ${base}: ${shortReason(rules.error)}`);
     else record.requiredChecks[base] = requiredChecksOf(rules.value);
   }
@@ -386,8 +462,8 @@ async function collectRepo(repo, range) {
   return record;
 }
 
-async function collectIssueComments(issue) {
-  const items = await pages(`repos/${issue.repo}/issues/${issue.number}/comments`);
+async function collectIssueComments(issue, reader = liveReader) {
+  const items = await reader.pages(`repos/${issue.repo}/issues/${issue.number}/comments`);
   return items.map((comment) => ({
     user: { login: comment?.user?.login ?? "" },
     body: typeof comment?.body === "string" ? comment.body : "",

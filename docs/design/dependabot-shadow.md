@@ -125,6 +125,17 @@ makes only `gh api` GET calls. The rules live in
   `filter=all` and applies the rule above itself: a run of another app does
   not count when the marker records an `integration_id`, and a rerun replaces
   an earlier run of the same name.
+- **A commit's move.** A `committed` event that moved the head takes its
+  push time from the first check run at the new commit's SHA, never from the
+  commit's own date. When the read holds no check run at that SHA and every
+  recorded check had passed, the call is `unknown` and the report names the
+  missing push time. A failed recorded check needs no time then: the move
+  alone makes the call `superseded`.
+- **A call from before the window.** The repository comment read filters by
+  `updated_at`, so a call comment written before the window is not in it. A
+  Dependabot pull request of the window with no call in that read gets all
+  its own comments read, so such a call still counts as a call: the pull
+  request is neither missed nor "no metadata".
 - **F4.** `--issue N` reads the comments of `frostyard/core#N`;
   `--issue OWNER/REPO#N` names another repository. A line
   `false: #<n> <reason>` or `false: OWNER/REPO#<n> <reason>` counts when its
