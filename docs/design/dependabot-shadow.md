@@ -125,16 +125,16 @@ makes only `gh api` GET calls. The rules live in
   `filter=all` and applies the rule above itself: a run of another app does
   not count when the marker records an `integration_id`, and a rerun replaces
   an earlier run of the same name.
-- **A commit's move.** No timestamp the report reads is the push time of a
-  commit that moved the head, so the report uses 2 bounds. The commit's
-  `committer.date` is the earliest push time, and the first `pr-triage` run at
-  that SHA is the latest: that workflow runs only on `pull_request_target`,
-  so its run came after the SHA became a pull request head. A run of another
-  name does not count, because it can come from another branch. A push at or
-  before the pass of the recorded checks makes the call `superseded`. Bounds
-  that cross the pass time make it `unknown`, and the report names both
-  bounds. A failed recorded check needs no time then: the move alone makes the
-  call `superseded`.
+- **A commit's move.** A later call and a `head_ref_force_pushed` event
+  carry a server time. A pushed commit carries none: the committer sets its
+  `committer.date`, and a check run at its SHA (also a `pr-triage` run) can
+  belong to another branch or another pull request. So the report places a
+  pushed commit only by history: a commit that follows the call head in the
+  pull request's commit list was pushed after the call. Such a move makes the
+  call `superseded` when the recorded checks never all passed, and `unknown`
+  when they all passed, with the reason in Detail. The verdict names the count
+  of unknown calls, because an unknown call is not classed and can hide a
+  safety failure.
 - **A call from before the window.** The repository comment read filters by
   `updated_at`, so a call comment written before the window is not in it. A
   Dependabot pull request of the window with no call in that read gets all

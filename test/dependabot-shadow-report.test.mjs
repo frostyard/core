@@ -234,32 +234,13 @@ test("superseded by a later call, by a force push, by a commit, and not when the
   });
   assert.equal(classifyCall(forcePush, call, [call]), "superseded");
 
-  // The call head has its committed event, and another commit follows it. The
-  // pr-triage run at its SHA is the latest push time, before the pass at 12:00.
+  // A commit after the call head in the pull request's commit list moved the
+  // head after the call. The recorded check never passed: superseded.
   const committed = record({
-    checkRuns: {
-      [A]: [run({ started_at: `${SINCE}T09:00:00Z`, completed_at: `${SINCE}T12:00:00Z` })],
-      [B]: [run({ id: 7, name: "pr-triage / shadow", started_at: `${SINCE}T11:00:00Z`, completed_at: `${SINCE}T11:04:00Z` })],
-    },
-    timelines: {
-      "12": [
-        { event: "committed", created_at: `${SINCE}T09:00:00Z`, actor: { login: DEPENDABOT }, sha: A, committer: { date: `${SINCE}T09:00:00Z` } },
-        { event: "committed", created_at: `${SINCE}T11:00:00Z`, actor: { login: DEPENDABOT }, sha: B, committer: { date: `${SINCE}T11:00:00Z` } },
-      ],
-    },
+    checkRuns: { [A]: [run({ started_at: `${SINCE}T09:00:00Z`, status: "in_progress", conclusion: null, completed_at: null })] },
+    commits: { "12": [dependabotCommit(A), dependabotCommit(B)] },
   });
   assert.equal(classifyCall(committed, call, [call]), "superseded");
-
-  // No committed event for the call head: a later commit names the move, and
-  // the pr-triage run at its SHA proves the push came before the pass.
-  const commitAfter = record({
-    checkRuns: {
-      [A]: [run({ started_at: `${SINCE}T09:00:00Z`, completed_at: `${SINCE}T12:00:00Z` })],
-      [B]: [run({ id: 7, name: "pr-triage / shadow", started_at: `${SINCE}T11:00:00Z`, completed_at: `${SINCE}T11:04:00Z` })],
-    },
-    timelines: { "12": [{ event: "committed", created_at: `${SINCE}T11:00:00Z`, actor: { login: DEPENDABOT }, sha: B, committer: { date: `${SINCE}T11:00:00Z` } }] },
-  });
-  assert.equal(classifyCall(commitAfter, call, [call]), "superseded");
 
   // The same moves, but every check passed first: not superseded.
   const early = record({
@@ -644,88 +625,69 @@ test("the level label events keep the label name of the API's label object", asy
   ]);
 });
 
-// ---- The push time of a committed move ------------------------------------
+// ---- The time of a pushed commit -----------------------------------------
 
-// A timeline where the call head has its own committed event and a later
-// committed event follows it: the selection of a move that test C4 of the
-// measurement describes. No timestamp in the record is the push itself, so the
-// rule uses 2 bounds: the commit date (earliest) and the first pr-triage run at
-// the new SHA (latest).
-const committedEvent = ({ sha: commit, date }) => ({
-  event: "committed",
-  created_at: date,
-  actor: { login: DEPENDABOT },
-  sha: commit,
-  committer: { date },
-});
-
+// A pushed commit has no server time: its committer.date is set by the
+// committer, and a check run at its SHA (pr-triage too) can belong to another
+// branch or another pull request. Only the commit list places it after the call.
+// Call at 10:00; the recorded check passes at 10:05 unless the test says else.
 const passingCallRun = () => run({ started_at: `${SINCE}T09:00:00Z`, completed_at: `${SINCE}T10:05:00Z` });
 
-function committedMoveRecord({ commitDate = null, newRuns = [], callRun = passingCallRun() } = {}) {
+function pushedCommitRecord({ newRuns = [], callRun = passingCallRun(), commitDate = `${SINCE}T10:30:00Z` } = {}) {
   const checkRuns = { [A]: [callRun] };
   if (newRuns.length > 0) checkRuns[B] = newRuns;
-  const timeline = [committedEvent({ sha: A, date: `${SINCE}T09:00:00Z` })];
-  if (commitDate !== null) timeline.push(committedEvent({ sha: B, date: commitDate }));
-  return record({ checkRuns, timelines: { "12": timeline } });
+  const moved = { sha: B, author: { login: "" }, commit: { author: { name: DEPENDABOT }, committer: { date: commitDate } } };
+  return record({ checkRuns, commits: { "12": [dependabotCommit(A), moved] } });
 }
 
-test("a queued pr-triage run and another branch's run do not give the push time", () => {
+test("a pushed commit after passed checks is unknown, with the reason", () => {
   const call = callOf();
-  // The commit is dated 10:01; its only run is docs-gate at 11:00, which may
-  // come from another branch. The bounds cross the pass at 10:05: unknown.
-  const queued = committedMoveRecord({
-    commitDate: `${SINCE}T10:01:00Z`,
-    newRuns: [run({ id: 7, started_at: `${SINCE}T11:00:00Z`, completed_at: `${SINCE}T11:04:00Z` })],
-  });
-  const outcome = classifyCallWithReason(queued, call, [call]);
+  const outcome = classifyCallWithReason(pushedCommitRecord(), call, [call]);
   assert.equal(outcome.class, "unknown");
   assert.equal(
     outcome.reason,
-    `unknown: the head moved to ${B.slice(0, 12)} between ${SINCE}T10:01:00Z and an unknown time, and the recorded checks passed at ${SINCE}T10:05:00Z`,
+    `unknown: the head moved to ${B.slice(0, 12)} by a pushed commit, and no server time places that push before or after the pass of the recorded checks at ${SINCE}T10:05:00Z`,
   );
-  // The Detail section of the report carries the reason.
-  const report = reportOf([record({ ...queued, pulls: [pull()], comments: [comment()] })]);
-  assert.match(formatReport(report), /and an unknown time, and the recorded checks passed at/);
+  const report = reportOf([record({ ...pushedCommitRecord(), pulls: [pull()], comments: [comment()] })]);
+  assert.match(formatReport(report), /by a pushed commit, and no server time places that push/);
+  assert.equal(report.verdict.unknown, 1);
+  assert.match(formatReport(report), /- Unknown calls: 1 \(not classed; read each reason in Detail before a decision\)/);
 });
 
-test("a pr-triage run at the new SHA proves the push came before the checks passed", () => {
+test("an early pr-triage run at the new SHA, maybe of another pull request, does not prove superseded", () => {
   const call = callOf();
-  const fast = committedMoveRecord({
-    commitDate: `${SINCE}T10:01:00Z`,
-    newRuns: [run({ id: 7, name: "pr-triage / pr-triage", started_at: `${SINCE}T10:03:00Z`, completed_at: `${SINCE}T10:09:00Z` })],
+  // Another pull request ran pr-triage at SHA B at 10:02; this one moved to B later.
+  const otherPull = pushedCommitRecord({
+    newRuns: [run({ id: 7, name: "pr-triage / pr-triage", started_at: `${SINCE}T10:02:00Z`, completed_at: `${SINCE}T10:03:00Z` })],
   });
-  assert.equal(classifyCall(fast, call, [call]), "superseded");
+  assert.equal(classifyCall(otherPull, call, [call]), "unknown");
+  // A queued CI run that starts late does not prove would-have-merged either.
+  const queued = pushedCommitRecord({ newRuns: [run({ id: 8, started_at: `${SINCE}T11:00:00Z`, completed_at: `${SINCE}T11:04:00Z` })] });
+  assert.equal(classifyCall(queued, call, [call]), "unknown");
 });
 
-test("a run at the new SHA from another branch does not prove the push time", () => {
+test("a commit dated after the pass does not prove that the push came after it", () => {
   const call = callOf();
-  // A docs-gate run at 09:05 ran before this SHA became the pull request's
-  // head; the pr-triage run at 11:00 is after the pass at 10:05: unknown.
-  const otherBranch = committedMoveRecord({
-    commitDate: `${SINCE}T09:00:00Z`,
-    newRuns: [
-      run({ id: 7, started_at: `${SINCE}T09:05:00Z`, completed_at: `${SINCE}T09:09:00Z` }),
-      run({ id: 8, name: "pr-triage / shadow", started_at: `${SINCE}T11:00:00Z`, completed_at: `${SINCE}T11:01:00Z` }),
-    ],
-  });
-  const outcome = classifyCallWithReason(otherBranch, call, [call]);
-  assert.equal(outcome.class, "unknown");
-  assert.match(outcome.reason, /between 2026-11-01T09:00:00Z and 2026-11-01T11:00:00Z/);
+  // The committer sets the date: 10:30 can be pushed at 10:02.
+  assert.equal(classifyCall(pushedCommitRecord({ commitDate: `${SINCE}T10:30:00Z` }), call, [call]), "unknown");
+  assert.equal(classifyCall(pushedCommitRecord({ commitDate: "2027-01-01T00:00:00Z" }), call, [call]), "unknown");
 });
 
-test("a commit made after the checks passed did not move the head before them", () => {
+test("a pushed commit is superseded when a recorded check failed, and a commit before the call head is no move", () => {
   const call = callOf();
-  const later = committedMoveRecord({ commitDate: `${SINCE}T10:30:00Z` });
-  assert.equal(classifyCall(later, call, [call]), "would-have-merged");
-});
-
-test("a move with no time at all is superseded when a recorded check failed", () => {
-  const call = callOf();
-  const failing = committedMoveRecord({
-    commitDate: `${SINCE}T10:01:00Z`,
+  const failing = pushedCommitRecord({
     callRun: run({ started_at: `${SINCE}T09:00:00Z`, completed_at: `${SINCE}T10:05:00Z`, conclusion: "failure" }),
   });
-  assert.equal(classifyCall(failing, call, [call]), "superseded");
+  const outcome = classifyCallWithReason(failing, call, [call]);
+  assert.equal(outcome.class, "superseded");
+  assert.match(outcome.reason, /never all passed/);
+  // B is before the call head A in the history (a future-dated parent): no move.
+  const parent = record({
+    checkRuns: { [A]: [passingCallRun()] },
+    commits: { "12": [{ sha: B, author: { login: "" }, commit: { author: { name: DEPENDABOT }, committer: { date: "2027-01-01T00:00:00Z" } } }, dependabotCommit(A)] },
+    timelines: { "12": [{ event: "committed", created_at: null, actor: { login: "" }, sha: B, committer: { date: "2027-01-01T00:00:00Z" } }] },
+  });
+  assert.equal(classifyCall(parent, call, [call]), "would-have-merged");
 });
 
 // ---- A call written before the window -------------------------------------
@@ -838,7 +800,7 @@ test("F2 wins over F3 when a revert and a person's commit both hold", () => {
   const one = record({
     pulls: [mergedPull(), revert],
     comments: [comment({ id: 1, number: 12 })],
-    commits: { "12": [dependabotCommit(A), personCommit(B)] },
+    commits: { "12": [personCommit(B), dependabotCommit(A)] },
     checkRuns: { [A]: [run()], [MERGE]: [run()] },
   });
   const report = reportOf([one]);
@@ -851,7 +813,7 @@ test("F3 stays and the F4 line for the same pull request is not applied", () => 
   const one = record({
     pulls: [mergedPull()],
     comments: [comment({ id: 1, number: 12 })],
-    commits: { "12": [dependabotCommit(A), personCommit(B)] },
+    commits: { "12": [personCommit(B), dependabotCommit(A)] },
     checkRuns: { [A]: [run()], [MERGE]: [run()] },
   });
   const report = reportOf([one], {
@@ -934,48 +896,4 @@ test("the later call by created_at is chosen even when its comment id is lower",
   assert.equal(report.repos[0].calls.wouldHaveMerged, 2);
   assert.equal(report.repos[0].pulls.F2, 1);
   assert.equal(report.repos[0].pulls.agreed, 0);
-});
-
-test("the collector reads the check runs of a commit that a call's timeline shows after the call head", async () => {
-  const { collectRepo } = await import("../scripts/dependabot-shadow-report.mjs");
-  const rawPull = {
-    number: 21,
-    title: "chore(deps): bump node from 22.22 to 22.23",
-    user: { login: DEPENDABOT },
-    state: "open",
-    draft: false,
-    created_at: `${SINCE}T09:00:00Z`,
-    closed_at: null,
-    merged_at: null,
-    merge_commit_sha: null,
-    head: { sha: A },
-    base: { ref: "main" },
-    labels: [],
-    updated_at: `${SINCE}T12:00:00Z`,
-  };
-  const callComment = {
-    id: 900,
-    issue_url: `https://api.github.com/repos/${REPO}/issues/21`,
-    user: { login: SHADOW_AUTHOR },
-    created_at: CALL_AT,
-    body: callBody({ head: A }),
-  };
-  const reader = fakeReader([
-    { match: /\/issues\/comments\?since=/, value: [callComment] },
-    { match: /\/issues\/21\/timeline$/, value: [committedEvent({ sha: A, date: `${SINCE}T09:00:00Z` }), committedEvent({ sha: B, date: `${SINCE}T09:00:00Z` })] },
-    { match: /\/pulls\/21\/commits$/, value: [] },
-    { match: /\/pulls\?state=all/, value: [rawPull] },
-    { match: new RegExp(`/commits/${A}/check-runs\\?filter=all$`), value: { total_count: 1, check_runs: [{ id: 1, name: "docs-gate", app: { id: 15368 }, status: "completed", conclusion: "success", started_at: `${SINCE}T09:30:00Z`, completed_at: `${SINCE}T10:05:00Z` }] } },
-    { match: new RegExp(`/commits/${B}/check-runs\\?filter=all$`), value: { total_count: 0, check_runs: [] } },
-    { match: /\/status$/, value: { state: "success", statuses: [] } },
-    { match: /\/issues\/events$/, value: [] },
-    { match: /\/rules\/branches\/main$/, value: [] },
-  ]);
-  const collected = await collectRepo(REPO, RANGE, reader);
-  assert.deepEqual(collected.errors, []);
-  assert.deepEqual(collected.checkRuns[B], []);
-  assert.ok(
-    reader.seen.some((endpoint) => endpoint.startsWith(`repos/${REPO}/commits/${B}/check-runs`)),
-    "the check runs of the moved head were read",
-  );
 });

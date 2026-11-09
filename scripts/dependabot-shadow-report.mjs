@@ -408,29 +408,6 @@ export async function collectRepo(repo, range, reader = liveReader) {
   await readChecks(record, [...new Set([...calls.map((call) => call.head), ...dependabotHeads])], reader);
   await readJobs(record, [...new Set(dependabotHeads)], reader);
 
-  // A commit that a call's timeline shows after the call head moved the head.
-  // Its push time is the first check run at that SHA, so those runs are read
-  // before the class of a call is decided.
-  const moveShas = [];
-  for (const call of calls) {
-    const timeline = record.timelines[String(call.number)] ?? [];
-    const heads = new Set(calls.filter((other) => other.number === call.number).map((other) => other.head));
-    const callIndex = timeline.findIndex((event) => event?.event === "committed" && event?.sha === call.head);
-    timeline.forEach((event, index) => {
-      if (event?.event !== "committed") return;
-      if (event?.sha === "" || heads.has(event.sha)) return;
-      if (callIndex >= 0) {
-        if (index <= callIndex) return;
-      } else {
-        // With no committed event for the call head, the commit date must be
-        // after the call (the same selection the library applies).
-        const date = timeOf(event?.committer?.date);
-        if (!(Number.isFinite(date) && date > timeOf(call.created_at))) return;
-      }
-      moveShas.push(event.sha);
-    });
-  }
-  await readChecks(record, [...new Set(moveShas)], reader);
 
   // A merged pull request with a would-have-merged call needs the checks of its
   // merge commit (F2), and those calls are known only after the call heads.

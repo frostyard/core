@@ -212,29 +212,17 @@ export function checkResultsFor(record, call) {
 
 // ---- Class of 1 call ------------------------------------------------------
 
-// The bounds of the push time of 1 commit SHA. No timestamp the record holds is
-// the push itself, so the record gives 2 bounds:
-// - the commit date is the earliest push time (a commit is pushed after it is
-//   made), NaN when the event holds no date;
-// - the first pr-triage run at that SHA is the latest push time, because that
-//   workflow runs only on pull_request_target events, so its run came after the
-//   SHA became a pull request head. A run of another name can come from another
-//   branch, so it does not count. Infinity when the record holds no such run.
-function pushBoundsOf(record, sha) {
-  let upper = Number.POSITIVE_INFINITY;
-  for (const run of record?.checkRuns?.[String(sha ?? "")] ?? []) {
-    if (!String(run?.name ?? "").startsWith(PR_TRIAGE_JOB_PREFIX)) continue;
-    const ms = timeOf(run?.started_at);
-    if (Number.isFinite(ms) && ms < upper) upper = ms;
-  }
-  return { upper };
-}
-
 // An instant as an ISO stamp, or null.
 const isoOf = (ms) => (Number.isFinite(ms) ? new Date(ms).toISOString().replace(/\.\d{3}Z$/, "Z") : null);
 
-// The times the head moved away from the call head: known move times, and the
-// commits that moved it with the bounds of their push time.
+// The times the head moved away from the call head, and the commits that moved
+// it. A later call and a head_ref_force_pushed event carry a server time. A
+// pushed commit carries none: its committer.date is set by the committer, and a
+// check run at its SHA can belong to another branch or another pull request.
+// So a commit move is placed only by history: a commit that follows the call
+// head in the pull request's commit list (GET pulls/{n}/commits, oldest first)
+// was pushed after the call head, so after the call. When the call head is not
+// in that list, a force push replaced it, and head_ref_force_pushed has a time.
 function movesOf(record, call, allCalls) {
   const createdMs = timeOf(call.created_at);
   const moves = [];
@@ -254,21 +242,11 @@ function movesOf(record, call, allCalls) {
     const at = timeOf(event?.created_at);
     if (Number.isFinite(at) && at > createdMs) moves.push(at);
   }
-  // A commit that another commit follows in timeline order moved the head; with
-  // no committed event for the call head, a later commit date did.
-  const callIndex = timeline.findIndex((event) => event?.event === "committed" && event?.sha === call.head);
-  timeline.forEach((event, index) => {
-    if (event?.event !== "committed") return;
-    if (event?.sha === call.head) return;
-    const committedAt = timeOf(event?.committer?.date);
-    if (callIndex >= 0) {
-      if (index <= callIndex) return;
-    } else if (!(Number.isFinite(committedAt) && committedAt > createdMs)) {
-      return;
-    }
-    const sha = String(event?.sha ?? "");
-    committed.push({ sha, lower: committedAt, ...pushBoundsOf(record, sha) });
-  });
+  const commits = record?.commits?.[String(call.number)] ?? [];
+  const callIndex = commits.findIndex((commit) => commit?.sha === call.head);
+  if (callIndex >= 0) {
+    for (const commit of commits.slice(callIndex + 1)) committed.push({ sha: String(commit?.sha ?? "") });
+  }
   return { moves, committed };
 }
 
@@ -294,34 +272,20 @@ export function classifyCallWithReason(record, call, allCalls = []) {
   // A known move time before the pass is proof.
   if (movedAt < passedAt) return { class: "superseded", reason: null };
 
-  // A committed move: the bounds of its push time decide.
-  const proven = [];
-  const uncertain = [];
-  for (const move of committed) {
+  // A pushed commit has no server time. When the recorded checks never all
+  // passed, a move after the call needs no time: it proves superseded. When they
+  // all passed, nothing places the push before or after the pass: unknown.
+  const move = committed[0];
+  if (results.length > 0 && move !== undefined) {
     if (passedAt === Number.POSITIVE_INFINITY) {
-      // The checks never all passed, and the head moved after the call: no time
-      // is needed, the move proves superseded.
-      proven.push(move);
-    } else if (move.upper < passedAt) {
-      proven.push(move);
-    } else if (Number.isFinite(move.lower) && move.lower >= passedAt) {
-      // The commit was made after the pass, so the push came after it too.
-      continue;
-    } else {
-      uncertain.push(move);
+      return {
+        class: "superseded",
+        reason: `superseded: the head moved to ${short(move.sha)} after the call, and the recorded checks never all passed`,
+      };
     }
-  }
-  if (proven.length > 0) {
-    return {
-      class: "superseded",
-      reason: `superseded: the head moved to ${short(proven[0].sha)}, at or before ${isoOf(proven[0].upper) ?? "an unknown time"}, before the recorded checks passed`,
-    };
-  }
-  if (uncertain.length > 0) {
-    const move = uncertain[0];
     return {
       class: "unknown",
-      reason: `unknown: the head moved to ${short(move.sha)} between ${isoOf(move.lower) ?? "an unknown time"} and ${isoOf(move.upper) ?? "an unknown time"}, and the recorded checks passed at ${isoOf(passedAt) ?? "an unknown time"}`,
+      reason: `unknown: the head moved to ${short(move.sha)} by a pushed commit, and no server time places that push before or after the pass of the recorded checks at ${isoOf(passedAt) ?? "an unknown time"}`,
     };
   }
   if (results.some((result) => result.result === "fail")) return { class: "waited", reason: null };
@@ -762,6 +726,7 @@ export function buildReport({ since, until, records = [], issueComments = null, 
     errors: allErrors,
     verdict: {
       wouldHaveMerged: totals.calls.wouldHaveMerged,
+      unknown: totals.calls.unknown,
       tooFew: totals.calls.wouldHaveMerged < MIN_CALLS,
       f2: totals.pulls.F2,
       f3: totals.pulls.F3,
@@ -809,6 +774,9 @@ export function formatReport(report) {
   lines.push("## Verdict", "");
   lines.push(bullet(`Would-have-merged calls: ${verdict.wouldHaveMerged}`));
   if (verdict.tooFew) lines.push(bullet(`too few (fewer than ${MIN_CALLS})`));
+  // An unknown call is not classed as a pull request, so a safety failure can
+  // hide behind it: the verdict names the count, and Detail gives each reason.
+  if (verdict.unknown > 0) lines.push(bullet(`Unknown calls: ${verdict.unknown} (not classed; read each reason in Detail before a decision)`));
   lines.push(bullet(`Safety: F2 = ${verdict.f2}, F3 = ${verdict.f3}`));
   lines.push(bullet(`Disagreement: F1 + F4 = ${verdict.f1PlusF4}`), "");
 
