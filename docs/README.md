@@ -94,6 +94,7 @@ which baseline rows do not apply here.
 - [0073 — Let CI run the `make ci` targets as separate jobs](adr/0073-let-ci-run-the-make-ci-targets-as-separate-jobs.md)
 - [0074 — Publish verified fault records as public issues in the owner repository](adr/0074-publish-verified-fault-records-as-public-issues.md)
 - [0075 — Group Dependabot updates and sync skills once a day](adr/0075-batch-routine-pull-requests.md)
+- [0077 — Bind `ready-for-human` to the head commit](adr/0077-bind-ready-for-human-to-the-head-commit.md)
 
 ### Design
 
@@ -114,6 +115,7 @@ which baseline rows do not apply here.
 - [Organization goals](specs/organization-goals.md)
 - [Stable repository drift alarm](specs/stable-repository-drift-alarm.md)
 - [Risk paths](specs/risk-paths.md)
+- [PR triage](specs/pr-triage.md)
 - [Flaky-test scan](specs/flaky-test-scan.md)
 - [Problem report `frostyard.problem/1`](specs/problem-report.md)
 - [Repository baseline](specs/repository-baseline.md)

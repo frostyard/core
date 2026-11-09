@@ -1,22 +1,25 @@
-# Risk paths caller (ADR-0068, docs/specs/risk-paths.md): runs core's reusable
-# risk-paths workflow on every pull request to add the label risk:high.
+# PR triage caller (ADR-0068, ADR-0077, docs/specs/pr-triage.md): runs core's
+# reusable PR triage workflow on every pull request. It adds the label
+# risk:high and removes ready-for-human when the head moved or CI is not green.
 #
 # In core the caller uses the local path. Under pull_request_target a local
 # reusable workflow resolves to the base branch commit, not the pull request
 # head, so it is pinned to trusted code. Other repositories pin
-# frostyard/core/.github/workflows/risk-paths.yml@<40-char SHA> (ADR-0021).
-# No merge_group trigger, and not a required check.
-name: Risk paths caller
+# frostyard/core/.github/workflows/pr-triage.yml@<40-char SHA> (ADR-0021).
+# The job id must stay pr-triage: the readiness step leaves out check runs
+# whose name starts with pr-triage. No merge_group trigger, and not a required
+# check.
+name: PR triage caller
 
 on:
   pull_request_target:
-    types: [opened, synchronize, reopened, edited]
+    types: [opened, synchronize, reopened, edited, labeled]
 
 permissions: {}
 
 jobs:
-  risk-paths:
+  pr-triage:
     permissions:
       contents: read
       pull-requests: write
-    uses: ./.github/workflows/risk-paths.yml
+    uses: ./.github/workflows/pr-triage.yml
