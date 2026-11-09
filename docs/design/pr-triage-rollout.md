@@ -193,7 +193,8 @@ core at `781c8b1`:
 Compared with the owners' names on core#222 (the newest comment for each
 repository):
 
-- 32 of 34 repositories require every name of their row. Every repository
+- 32 of 34 repositories match their row: they require each name of the
+  row and no name that the row removes. Every repository
   has 4 of 4 level labels and a caller of `pr-triage.yml` (frostyard/core: its
   local caller). frostyard/repogen has strict checks and the merge queue.
 - Open: frostyard/nsl still requires `release-config` (step 3, remove), and

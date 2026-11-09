@@ -89,17 +89,21 @@ export function recordingApi(api, { apply = false } = {}) {
         missing.push(name);
       }
       if (missing.length === 0) return;
+      // With apply, a change counts only after the real write worked: a
+      // rejected write throws before anything is recorded.
+      if (apply) await api.addLabels(owner, repo, number, missing);
       adds.push({ number, labels: missing });
       current.push(...missing);
-      if (apply) await api.addLabels(owner, repo, number, missing);
     },
 
     async removeIssueLabel(owner, repo, number, name) {
-      removes.push({ number, name });
       const current = await namesOf(owner, repo, number);
+      // The real client returns false when the label was already gone (HTTP 404):
+      // no change was made, so none is recorded.
+      const gone = apply ? await api.removeIssueLabel(owner, repo, number, name) : current.includes(name);
       const at = current.indexOf(name);
       if (at !== -1) current.splice(at, 1);
-      if (apply) await api.removeIssueLabel(owner, repo, number, name);
+      if (gone) removes.push({ number, name });
       return true;
     },
   };
@@ -132,6 +136,7 @@ export async function backfillRepository({ api, owner, repo, pulls = [], apply =
       level: null,
       added: [],
       removed: [],
+      missingLabels: [],
       error: null,
     };
     try {
@@ -147,6 +152,7 @@ export async function backfillRepository({ api, owner, repo, pulls = [], apply =
       });
       row.outcome = result.outcome;
       row.level = result.level ?? null;
+      row.missingLabels = Array.isArray(result.missingLabels) ? result.missingLabels : [];
     } catch (error) {
       row.outcome = "error";
       row.error = error?.message ?? String(error);
@@ -162,11 +168,14 @@ export async function backfillRepository({ api, owner, repo, pulls = [], apply =
 
 const tick = (labels) => labels.map((name) => `\`${name}\``).join(", ");
 
+// The changes of 1 row; an error row also shows the writes that worked before
+// the error.
 function changeText(row) {
-  if (row.error !== null && row.error !== undefined) return escapeCell(row.error);
   const parts = [];
   if (row.added.length > 0) parts.push(`add ${tick(row.added)}`);
   if (row.removed.length > 0) parts.push(`remove ${tick(row.removed)}`);
+  if (row.error !== null && row.error !== undefined) return [...parts, escapeCell(row.error)].join("; ");
+  if ((row.missingLabels ?? []).length > 0) parts.push(`no level label: the repository lacks ${tick(row.missingLabels)}`);
   return parts.length === 0 ? "no change" : parts.join("; ");
 }
 
@@ -180,6 +189,7 @@ export function formatReport(results = [], { apply = false } = {}) {
   let pullRequests = 0;
   let noList = 0;
   let errors = 0;
+  const lacking = new Map();
   for (const result of results) {
     const rows = result.rows ?? [];
     lines.push(`## ${result.repository}`, "");
@@ -201,6 +211,7 @@ export function formatReport(results = [], { apply = false } = {}) {
       if (count > 0) pullRequests += 1;
       if (row.outcome === "no-list") noList += 1;
       if (row.outcome === "error") errors += 1;
+      if ((row.missingLabels ?? []).length > 0) lacking.set(result.repository, row.missingLabels);
     }
     lines.push("");
   }
@@ -210,8 +221,14 @@ export function formatReport(results = [], { apply = false } = {}) {
         "each gets one at its next event.",
     );
   }
+  for (const [repository, missing] of lacking) {
+    lines.push(
+      `${repository} lacks the label(s) ${tick(missing)}: its pull requests get no level label. ` +
+        `Fix: frostyard/core scripts/apply-triage-settings.sh ${repository} --apply`,
+    );
+  }
   if (errors > 0) lines.push(`${errors} error(s): see the rows above.`);
-  if (changes === 0 && noList === 0 && errors === 0) {
+  if (changes === 0 && noList === 0 && errors === 0 && lacking.size === 0) {
     lines.push("No change: every open pull request has its level label.");
   } else if (changes === 0) {
     lines.push("No change.");

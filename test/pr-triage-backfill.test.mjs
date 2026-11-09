@@ -29,6 +29,8 @@ function fakeApi({
   labelsOn = {},
   filesOn = {},
   failFiles = [],
+  failAdd = [],
+  failRemove = [],
 } = {}) {
   const calls = [];
   const prLabels = new Map(Object.entries(labelsOn).map(([number, names]) => [Number(number), [...names]]));
@@ -55,12 +57,15 @@ function fakeApi({
     },
     async addLabels(owner, repo, number, names) {
       calls.push({ method: "addLabels", args: [owner, repo, number, names] });
+      if (failAdd.includes(number)) throw new Error(`HTTP 500 adding labels to ${number}`);
       prLabels.set(number, [...(prLabels.get(number) ?? []), ...names]);
     },
     async removeIssueLabel(owner, repo, number, name) {
       calls.push({ method: "removeIssueLabel", args: [owner, repo, number, name] });
+      if (failRemove.includes(number)) throw new Error(`HTTP 500 removing ${name} from ${number}`);
+      const had = (prLabels.get(number) ?? []).includes(name);
       prLabels.set(number, (prLabels.get(number) ?? []).filter((label) => label !== name));
-      return true;
+      return had;
     },
   };
   return { api: state, calls, labelsOf: (number) => prLabels.get(number) ?? [] };
@@ -79,7 +84,7 @@ test("dry run plans add level:L3 and writes nothing", async () => {
   const { api, calls, labelsOf } = fakeApi({ filesOn: { 12: ["README.md"] } });
   const rows = await backfill(api, [{ number: 12, baseSha: BASE }]);
   assert.deepEqual(rows, [
-    { number: 12, outcome: "labeled", level: "L3", added: ["level:L3"], removed: [], error: null },
+    { number: 12, outcome: "labeled", level: "L3", added: ["level:L3"], removed: [], missingLabels: [], error: null },
   ]);
   assert.deepEqual(callsOf(calls, "addLabels"), []);
   assert.deepEqual(callsOf(calls, "removeIssueLabel"), []);
@@ -143,7 +148,7 @@ test("a label the pull request already has is not added again", async () => {
 test("no list at the base SHA makes the row no-list with no change", async () => {
   const { api, calls } = fakeApi({ lists: new Map(), filesOn: { 12: ["README.md"] } });
   const rows = await backfill(api, [{ number: 12, baseSha: BASE }]);
-  assert.deepEqual(rows, [{ number: 12, outcome: "no-list", level: null, added: [], removed: [], error: null }]);
+  assert.deepEqual(rows, [{ number: 12, outcome: "no-list", level: null, added: [], removed: [], missingLabels: [], error: null }]);
   assert.deepEqual(callsOf(calls, "addLabels"), []);
   assert.deepEqual(callsOf(calls, "listPullFiles"), []);
 });
@@ -161,7 +166,50 @@ test("a repository without a level label is labels-missing, and an L1 pull reque
   assert.deepEqual(callsOf(calls, "addLabels"), []);
 });
 
+test("a labels-missing row keeps the missing names for the report", async () => {
+  const { api } = fakeApi({ repoLabels: ["risk:high", "level:L1", "level:L2", "level:L3"], filesOn: { 12: ["README.md"] } });
+  const rows = await backfill(api, [{ number: 12, baseSha: BASE }]);
+  assert.equal(rows[0].outcome, "labels-missing");
+  assert.deepEqual(rows[0].missingLabels, ["level:L4"]);
+  assert.deepEqual(rows[0].added, []);
+});
+
 // ---- Errors and order ----------------------------------------------------
+
+test("apply records no change when the real add fails", async () => {
+  const { api, labelsOf } = fakeApi({ filesOn: { 12: ["README.md"] }, failAdd: [12] });
+  const rows = await backfill(api, [{ number: 12, baseSha: BASE }], true);
+  assert.equal(rows[0].outcome, "error");
+  assert.match(rows[0].error, /HTTP 500 adding labels to 12/);
+  assert.deepEqual(rows[0].added, []);
+  assert.deepEqual(labelsOf(12), []);
+  const report = formatReport([{ repository: "frostyard/std", rows, error: null }], { apply: true });
+  assert.doesNotMatch(report, /change\(s\) made/);
+  assert.match(report, /^1 error\(s\): see the rows above\.$/m);
+});
+
+test("apply keeps the add that worked when the removal after it fails", async () => {
+  const { api, labelsOf } = fakeApi({
+    filesOn: { 12: ["signing/key.go"] },
+    labelsOn: { 12: ["level:L3"] },
+    failRemove: [12],
+  });
+  const rows = await backfill(api, [{ number: 12, baseSha: BASE }], true);
+  assert.equal(rows[0].outcome, "error");
+  assert.deepEqual(rows[0].added, ["level:L1", "risk:high"]);
+  assert.deepEqual(rows[0].removed, []);
+  assert.deepEqual(labelsOf(12).sort(), ["level:L1", "level:L3", "risk:high"]);
+  const report = formatReport([{ repository: "frostyard/std", rows, error: null }], { apply: true });
+  assert.match(report, /\| #12 \| — \| error \| add `level:L1`, `risk:high`; HTTP 500 removing level:L3 from 12 \|/);
+  assert.match(report, /^2 change\(s\) made on 1 pull request\(s\)\.$/m);
+});
+
+test("apply records no removal when the label was already gone", async () => {
+  const { api } = fakeApi({ labelsOn: { 12: [] } });
+  const wrapped = recordingApi(api, { apply: true });
+  await wrapped.removeIssueLabel(OWNER, REPO, 12, "level:L4");
+  assert.deepEqual(wrapped.removes, []);
+});
 
 test("a failing pull request makes 1 error row and the next one is still handled", async () => {
   const { api } = fakeApi({
@@ -192,7 +240,7 @@ test("the list is read at each pull request's base SHA", async () => {
 // ---- recordingApi --------------------------------------------------------
 
 test("recordingApi records a planned change and resets it", async () => {
-  const { api, calls } = fakeApi({ labelsOn: { 12: ["bug"] } });
+  const { api, calls } = fakeApi({ labelsOn: { 12: ["bug", "level:L4"] } });
   const wrapped = recordingApi(api, { apply: false });
   await wrapped.addLabels(OWNER, REPO, 12, ["level:L3", "level:L3", "bug"]);
   await wrapped.removeIssueLabel(OWNER, REPO, 12, "level:L4");
@@ -255,6 +303,26 @@ test("formatReport counts no-list rows and errors and does not claim every label
   );
   assert.match(report, /^1 pull request\(s\) have no list at their base SHA: no level label, as in the workflow; each gets one at its next event\.$/m);
   assert.match(report, /^1 error\(s\): see the rows above\.$/m);
+  assert.match(report, /No change\.\n$/);
+  assert.doesNotMatch(report, /every open pull request has its level label/);
+});
+
+test("formatReport names a repository that lacks level labels and does not claim every label", () => {
+  const report = formatReport(
+    [
+      {
+        repository: "frostyard/std",
+        rows: [row({ outcome: "labels-missing", level: "L3", missingLabels: ["level:L4"] })],
+        error: null,
+      },
+    ],
+    { apply: false },
+  );
+  assert.match(report, /\| #1 \| L3 \| labels-missing \| no level label: the repository lacks `level:L4` \|/);
+  assert.match(
+    report,
+    /^frostyard\/std lacks the label\(s\) `level:L4`: its pull requests get no level label\. Fix: frostyard\/core scripts\/apply-triage-settings\.sh frostyard\/std --apply$/m,
+  );
   assert.match(report, /No change\.\n$/);
   assert.doesNotMatch(report, /every open pull request has its level label/);
 });
