@@ -684,6 +684,23 @@ test("check-risk-paths passes on the repository", async () => {
   assert.match(stdout, /ok {3}risk_paths: \d+ entries, workflow in sync/);
 });
 
+test("core's list puts each script that applies rulesets, settings or labels at L1", async () => {
+  // A merge can drop a list entry without a conflict; this test names the
+  // scripts that change GitHub settings so that a dropped entry fails.
+  const list = parseStrictJson(await readFile(path.join(repoRoot, ".github/risk-paths.json"), "utf8"));
+  assert.equal(validateRiskPaths(list).ok, true);
+  for (const script of [
+    "scripts/apply-repo-settings.sh",
+    "scripts/apply-triage-settings.sh",
+    "scripts/rollout-merge-queue.sh",
+    "scripts/sync-skills.sh",
+  ]) {
+    const result = levelOfFile(list, script);
+    assert.equal(result.level, "L1", `${script} is ${result.level} (${result.source})`);
+    assert.equal(result.source, "glob", `${script} needs its own list entry`);
+  }
+});
+
 test("check-risk-paths passes on a valid fixture list", async () => {
   const root = await gateFixture(validList());
   const { stdout } = await runGate(root);
