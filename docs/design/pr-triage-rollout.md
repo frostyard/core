@@ -48,9 +48,9 @@ inactive), bketelsen/homewiki (no pull requests).
 - Every repository below has the label `risk:high`, which the `levels` step
   needs (read on 2026-11-09). frostyard/incus got it on 2026-11-09.
 - The owners' pull requests that add the `pr-triage` caller and the jobs
-  behind the names have merged, except in bootc-debian, apt-publisher and
-  omarchy-apps. Their 3 rows say "waiting for the comment": do them only when
-  the condition in the row holds.
+  behind the names have merged, except frostyard/bootc-debian#23 and
+  frostyard/omarchy-apps#16. Do those 2 rows only after their pull request
+  has merged (see the condition in the row).
 - A name that a ruleset requires must report on every pull request. An open
   pull request whose head is older than a newly required job shows that check
   as "Expected — Waiting for status". Push to it, or use "Update branch", to
@@ -153,7 +153,7 @@ it gets the level labels only. Group B has a hand-made ruleset with required
 checks; it keeps that ruleset, and the names of both rulesets add up. Group C
 had no required status check.
 
-| Repository | Owner | Group | Required names (core#222) | Queue | Hand step |
+| Repository | Owner | Group | Required names (core#222) | Queue | Hand step or condition |
 | --- | --- | --- | --- | --- | --- |
 | [frostyard/core](#frostyardcore) | Lucilla | A | none: labels only | yes (ADR-0042, kept) |  |
 | [frostyard/updex](#frostyardupdex) | Lucilla | A | none: labels only | yes (ADR-0042, kept) |  |
@@ -166,14 +166,14 @@ had no required status check.
 | [frostyard/frostread](#frostyardfrostread) | Irulan | B | `Verify (make verify)`, `Race detector and cross-builds (make race cross)`, `web bundle (make web-check)`, `Desktop app (make app-check app-build)`, `Snapshot .deb (make deb)`, `Flatpak sources (make flatpak-sources)`, `Flatpak (build and test)` | no |  |
 | [frostyard/lodge](#frostyardlodge) | Irulan | B | `Verify (make verify)`, `Race detector and cross-builds (make race cross)`, `lodge-client (make client-check)`, `lodge-ui (make ui-check)`, `the shell (make shell-check)`, `The kit off Linux (go test on Windows)`, `Snapshot .deb (make deb)` | no |  |
 | [frostyard/porter](#frostyardporter) | Irulan | B | `Verify (make verify)`, `Race detector (make race)`, `Web bundle (make web-check)`, `Snapshot .deb (make deb)` | no |  |
-| [frostyard/bootc-debian](#frostyardbootc-debian) | Lucilla | B | `ci` (waiting for the comment) | no |  |
+| [frostyard/bootc-debian](#frostyardbootc-debian) | Lucilla | B | `ci` | no | do it after bootc-debian#23 merges |
 | [frostyard/frostyard-org](#frostyardfrostyard-org) | Tamalane | B | `ci`, `Workers Builds: frostyard-org` (any app) | no |  |
 | [bketelsen/fleet](#bketelsenfleet) | Teg | B | `pytest`, `ansible-lint`, `tofu` | no |  |
 | [bketelsen/trimlights](#bketelsentrimlights) | Irulan | B | `check` | no |  |
 | [bketelsen/pi-pocket-team](#bketelsenpi-pocket-team) | Sheeana | B | `Test` | no |  |
 | [bketelsen/pi-pocket-dune](#bketelsenpi-pocket-dune) | Sheeana | B | `Check` | no |  |
 | [bketelsen/agentic-template](#bketelsenagentic-template) | Lucilla | B | `verify` | no |  |
-| [frostyard/apt-publisher](#frostyardapt-publisher) | Lucilla | C | `ci` (waiting for the comment) | no |  |
+| [frostyard/apt-publisher](#frostyardapt-publisher) | Lucilla | C | `ci` | no |  |
 | [frostyard/chairlift](#frostyardchairlift) | Duncan | C | `Lint`, `Unit Tests`, `Race Detection`, `E2E`, `Verify`, `Build (linux, amd64)`, `Build (linux, arm64)` | no |  |
 | [frostyard/flatpak-index](#frostyardflatpak-index) | Lucilla | C | `Test` | no |  |
 | [frostyard/homebrew-tap](#frostyardhomebrew-tap) | Lucilla | C | `Test` | no |  |
@@ -181,7 +181,7 @@ had no required status check.
 | [frostyard/incus](#frostyardincus) | Lucilla | C | `Build Incus (Debian Trixie)` | no |  |
 | [frostyard/intuneme](#frostyardintuneme) | Duncan | C | `Verify`, `Vulncheck`, `Build` | no |  |
 | [frostyard/lab](#frostyardlab) | Murbella | C | `CI result` | no |  |
-| [frostyard/omarchy-apps](#frostyardomarchy-apps) | Lucilla | C | `ci` (waiting for the comment) | no |  |
+| [frostyard/omarchy-apps](#frostyardomarchy-apps) | Lucilla | C | `ci` | no | do it after omarchy-apps#16 merges |
 | [frostyard/pilothouse](#frostyardpilothouse) | Duncan | C | `Lint`, `Security Scan`, `Unit Tests`, `Race Detection`, `Verify`, `Build (linux, amd64)`, `Build (linux, arm64)` | no |  |
 | [frostyard/problem-intake](#frostyardproblem-intake) | Murbella | C | `ci` | no |  |
 | [frostyard/repogen](#frostyardrepogen) | Lucilla | C | `make ci` | yes |  |
@@ -487,7 +487,8 @@ WOULD  POST repos/frostyard/porter/labels (create label level:L4)
 #### frostyard/bootc-debian
 
 - Owner: Lucilla. Group B. Merge queue: no.
-- Required names: `ci` expected. The owner's comment on core#222 is not there yet (read 2026-11-09 16:00 UTC). Its bot pull requests (branch `auto-update-checksums`, opened by `check-dependencies.yml` with `GITHUB_TOKEN`) start no `pull_request` workflow; only `build.yml` runs on them, by a `workflow_dispatch`. So `ci` does not report on them today. Do this row only after `check-dependencies.yml` also dispatches `ci.yml` on that branch, and the owner's comment is on core#222.
+- Required names, from [the owner's comment](https://github.com/frostyard/core/issues/222#issuecomment-6744294849): `ci`.
+- Condition: its bot pull requests (branch `auto-update-checksums`, opened by `check-dependencies.yml` with `GITHUB_TOKEN`) start no `pull_request` workflow, so `ci` reports on them only when `check-dependencies.yml` dispatches `ci.yml`. frostyard/bootc-debian#23 adds that dispatch. Do this row only after that pull request has merged.
 
 Command (with `--apply`; the dry run is the same command without it):
 
@@ -676,7 +677,7 @@ WOULD  POST repos/bketelsen/agentic-template/labels (create label level:L4)
 #### frostyard/apt-publisher
 
 - Owner: Lucilla. Group C. Merge queue: no.
-- Required names: `ci` expected. The owner's comment on core#222 is not there yet (read 2026-11-09 16:00 UTC). `ci` runs on every pull request today. Do this row only after the owner's comment is on core#222.
+- Required names, from [the owner's comment](https://github.com/frostyard/core/issues/222#issuecomment-6744431341): `ci`.
 
 Command (with `--apply`; the dry run is the same command without it):
 
@@ -892,7 +893,8 @@ WOULD  POST repos/frostyard/lab/labels (create label level:L4)
 #### frostyard/omarchy-apps
 
 - Owner: Lucilla. Group C. Merge queue: no.
-- Required names: `ci` expected. The owner's comment on core#222 is not there yet (read 2026-11-09 16:00 UTC). Its bot pull requests (branch `update-upstream-versions`, opened by `check-dependencies.yml` with `GITHUB_TOKEN`) start no `pull_request` workflow; only `build.yml` runs on them, by a `workflow_dispatch`. So `ci` does not report on them today. Do this row only after `check-dependencies.yml` also dispatches `ci.yml` on that branch, and the owner's comment is on core#222.
+- Required names, from [the owner's comment](https://github.com/frostyard/core/issues/222#issuecomment-6744299712): `ci`.
+- Condition: its bot pull requests (branch `update-upstream-versions`, opened by `check-dependencies.yml` with `GITHUB_TOKEN`) start no `pull_request` workflow, so `ci` reports on them only when `check-dependencies.yml` dispatches `ci.yml`. frostyard/omarchy-apps#16 adds that dispatch. Do this row only after that pull request has merged.
 
 Command (with `--apply`; the dry run is the same command without it):
 
