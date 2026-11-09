@@ -11,7 +11,7 @@ B4 (ADR-0043 and ADR-0044), and only for enabled repositories.
 
 ## Interface
 
-Each row has an ID (`B1` to `B17`), the rule, its source, and a read-only
+Each row has an ID (`B1` to `B18`), the rule, its source, and a read-only
 check. Run each check in a clone of the repository at the commit you read
 (`git ls-tree`, `git show <commit>:<path>`, or `gh api`); nothing writes.
 
@@ -34,6 +34,7 @@ check. Run each check in a clone of the repository at the commit you read
 | B15 | No CODEOWNERS | No `CODEOWNERS` file at the root, in `.github/` or in `docs/`. | ADR-0071 | `git ls-tree <commit> CODEOWNERS .github/CODEOWNERS docs/CODEOWNERS` prints nothing. |
 | B16 | No leftover agent-framework trees | None of `docs/superpowers/`, `.planning/`, `.cursor/rules/`, `.gaai/`, `yeti/` or `cairn/` at the root. `.claude/` holds only `settings.json`, `skills` and `session-summary.md`. | ADR-0071, [ADR-0025](../adr/0025-consolidate-repository-docs-into-docs.md), [ADR-0029](../adr/0029-acmm-conformance-via-canonical-aliases.md) | `git ls-tree --name-only <commit> docs/superpowers .planning .cursor/rules .gaai yeti cairn` prints nothing, and `git ls-tree --name-only <commit> .claude/` prints no other name. Skill payloads under `.agents/skills/` are not the root. |
 | B17 | README | The root `README.md` follows the [README spec](readme.md) for the kind that its marker declares: rules R1 to R12 (kind marker, title and lead, status line, documentation line, badges, the kind's sections, `Develop` and `Where to go next`, at most 1000 words, nothing that belongs in `docs/`). | [ADR-0072](../adr/0072-write-every-readme-to-one-standard.md) | From a core checkout at `origin/main`: `node .agents/skills/frostyard-readme/scripts/check-readme.mjs --ref <commit> <clone>` prints `ok`. Each `FAIL R<n>` line is 1 part of the finding. |
+| B18 | Required status checks | The default branch has at least 1 required status check. The names cover the repository's acceptance gate and meet rules N1 to N5 of ADR-0076; the row checks presence only. | [ADR-0076](../adr/0076-require-status-checks-on-every-default-branch.md) | `gh api repos/frostyard/<repo>/rules/branches/<default branch> --jq '[.[]\|select(.type=="required_status_checks")\|.parameters.required_status_checks[]]\|length'` prints a number greater than 0. It counts check entries from every ruleset that applies, not rules. `node scripts/required-checks-survey.mjs frostyard/<repo>` in a core checkout shows the names. |
 
 ## Rules
 
@@ -49,6 +50,21 @@ check. Run each check in a clone of the repository at the commit you read
   | homebrew-tap | B3, B8, B9, B11 | Homebrew formulae only |
   | clix, std, snowkit | B9 | libraries: pkg.go.dev documents them |
   | lab | B9 | its Astro site is a QA dashboard, not tool documentation |
+  | caddyscope, frostyard-ai | B18 | no owner; inactive |
+
+- Row B18 outside the baseline: ADR-0076 also holds the bketelsen
+  repositories fleet, trimlights, truenas-mcp, pi-pocket-team,
+  pi-pocket-dune and agentic-template, and incus, to required status
+  checks. The sweep does not read them; a survey with
+  `node scripts/required-checks-survey.mjs` every 30 days does. ADR-0076
+  exempts these repositories from required status checks:
+
+  | Repository | Why |
+  | --- | --- |
+  | frostyard/hotedge, frostyard/Logomenu | GNOME Shell extension forks; no CI job on pull requests, 2 and 3 merged pull requests |
+  | bketelsen/pi-pocket | a fork that tracks its upstream; no CI job on pull requests, 3 merged pull requests |
+  | frostyard/caddyscope, frostyard/frostyard-ai | no owner; inactive |
+  | bketelsen/homewiki | commits go straight to `main`; no pull requests to gate |
 
 - The release and deploy part of B6 applies only to a repository that
   releases or deploys; B8 and B11 only
@@ -69,6 +85,7 @@ check. Run each check in a clone of the repository at the commit you read
   [ADR-0070](../adr/0070-build-tool-docs-sites-with-materialx-on-github-pages.md),
   [ADR-0072](../adr/0072-write-every-readme-to-one-standard.md),
   [ADR-0073](../adr/0073-let-ci-run-the-make-ci-targets-as-separate-jobs.md) (row B12),
-  [ADR-0075](../adr/0075-batch-routine-pull-requests.md) (row B13)
+  [ADR-0075](../adr/0075-batch-routine-pull-requests.md) (row B13),
+  [ADR-0076](../adr/0076-require-status-checks-on-every-default-branch.md) (row B18)
 - Row B17's contract: [spec: README](readme.md)
 - Context: [design: quality loop](../design/quality-loop.md)

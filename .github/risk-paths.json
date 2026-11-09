@@ -8,6 +8,7 @@
     { "glob": "organization/contracts/**", "why": "deployment-and-infrastructure: organization contracts, such as repository settings and surfaces" },
     { "glob": "organization/schemas/**", "why": "deployment-and-infrastructure: schemas that validate the organization authority" },
     { "glob": "scripts/apply-repo-settings.sh", "why": "workflow-and-permissions: applies rulesets and repository settings" },
+    { "glob": "scripts/apply-triage-settings.sh", "why": "workflow-and-permissions: applies the required-checks ruleset and the level labels" },
     { "glob": "scripts/rollout-merge-queue.sh", "why": "workflow-and-permissions: applies the merge-queue ruleset across repositories" },
     { "glob": "scripts/sync-skills.sh", "why": "workflow-and-permissions: writes skills to other repositories with an app token" },
     { "glob": "scripts/lib/skills-sync-*.sh", "why": "workflow-and-permissions: authentication and containment of the skills sync" },

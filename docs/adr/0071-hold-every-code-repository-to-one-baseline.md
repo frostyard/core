@@ -182,3 +182,5 @@ against.
   (item 12, CI entry: separate jobs can run the parts of `make ci`)
 - Amended in part by: [ADR-0075](0075-batch-routine-pull-requests.md)
   (item 13, Dependabot: each entry groups its version updates)
+- Amended in part by: [ADR-0076](0076-require-status-checks-on-every-default-branch.md)
+  (item 18, required status checks: row B18)
