@@ -25,10 +25,22 @@ export function orphanTableRows(text) {
   const orphans = [];
   let fence = null;
   for (let i = 0; i < lines.length; i += 1) {
-    const fenceMatch = /^\s*(`{3,}|~{3,})/.exec(lines[i]);
-    if (fenceMatch) {
-      if (fence === null) fence = fenceMatch[1][0];
-      else if (fenceMatch[1][0] === fence) fence = null;
+    // CommonMark: a fence closes only with the same character, at least as
+    // many of them, and nothing but spaces after them.
+    const fenceMatch = /^\s*(`{3,}|~{3,})(.*)$/.exec(lines[i]);
+    if (fence === null && fenceMatch) {
+      fence = { char: fenceMatch[1][0], length: fenceMatch[1].length };
+      continue;
+    }
+    if (fence !== null) {
+      if (
+        fenceMatch &&
+        fenceMatch[1][0] === fence.char &&
+        fenceMatch[1].length >= fence.length &&
+        fenceMatch[2].trim() === ""
+      ) {
+        fence = null;
+      }
       continue;
     }
     if (fence !== null || !isRow(lines[i])) continue;
@@ -75,6 +87,15 @@ test("orphanTableRows accepts whole tables, indented tables and fenced code", ()
     "```",
   ].join("\n");
   assert.deepEqual(orphanTableRows(text), []);
+});
+
+test("orphanTableRows closes a fence only with the same character, length and no info text", () => {
+  const backticks = ["````markdown", "```text", "| example |", "```", "````", "| outside |"].join("\n");
+  assert.deepEqual(orphanTableRows(backticks), [6]);
+  const tildes = ["~~~~", "~~~", "| example |", "~~~~ text", "| still code |", "~~~~~", "| outside |"].join("\n");
+  assert.deepEqual(orphanTableRows(tildes), [7]);
+  const mixed = ["```", "~~~", "| example |", "```", "| outside |"].join("\n");
+  assert.deepEqual(orphanTableRows(mixed), [5]);
 });
 
 test("every table row in the tracked Markdown files belongs to a table", () => {
