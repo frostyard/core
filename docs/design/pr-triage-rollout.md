@@ -38,8 +38,9 @@ bot made each dry run below; it changed nothing.
 
 Not in this runbook (exempt from ADR-0076, no row): frostyard/hotedge,
 frostyard/Logomenu and bketelsen/pi-pocket (forks with no CI job on pull
-requests), frostyard/caddyscope and frostyard/frostyard-ai (no owner,
-inactive), bketelsen/homewiki (no pull requests).
+requests), frostyard/caddyscope (no owner, inactive),
+frostyard/frostyard-ai (archived on 2026-11-09), bketelsen/homewiki (no
+pull requests).
 
 ## Design
 
