@@ -68,11 +68,11 @@ check. Run each check in a clone of the repository at the commit you read
   | frostyard/hotedge, frostyard/Logomenu | GNOME Shell extension forks; no CI job on pull requests, 2 and 3 merged pull requests |
   | bketelsen/pi-pocket | a fork that tracks its upstream; no CI job on pull requests, 3 merged pull requests |
   | frostyard/caddyscope | no owner; inactive |
+  | bketelsen/homewiki | commits go straight to `main`; no pull requests to gate |
 
   ADR-0076 also exempts frostyard/frostyard-ai. It is archived since
-  2026-11-09, so it takes no pull requests, and neither the sweep nor the
-  survey reads it.
-  | bketelsen/homewiki | commits go straight to `main`; no pull requests to gate |
+  2026-11-09, so it takes no pull requests, and it is outside the sweep
+  and the 30-day survey.
 
 - The release and deploy part of B6 applies only to a repository that
   releases or deploys; B8 and B11 only
