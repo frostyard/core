@@ -19,6 +19,9 @@ layout and its reasons are in frostyard/core:
 - **Libraries do not**: clix, std and snowkit use pkg.go.dev only.
 - **frostyard.org stays an Astro site** and links to each tool site.
 - **frostyard/lab's Astro QA dashboard is exempt.**
+- **frostyard/snosi has no site**: frostyard.org documents its images and
+  sysexts
+  ([ADR-0080](https://github.com/frostyard/core/blob/main/docs/adr/0080-document-the-snosi-images-on-frostyard-org.md)).
 
 The payload is in [scaffold/](scaffold/). It is copied as `site/`:
 

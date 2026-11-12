@@ -184,3 +184,5 @@ against.
   (item 13, Dependabot: each entry groups its version updates)
 - Amended in part by: [ADR-0076](0076-require-status-checks-on-every-default-branch.md)
   (item 18, required status checks: row B18)
+- Amended in part by: [ADR-0080](0080-document-the-snosi-images-on-frostyard-org.md)
+  (exemptions: snosi has no tool site, item 9)

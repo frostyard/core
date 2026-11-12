@@ -123,3 +123,5 @@ pkg.go.dev from their module source.
   [ADR-0018](https://github.com/frostyard/nsl/blob/main/docs/adr/0018-user-documentation-site.md),
   [`site/`](https://github.com/frostyard/nsl/tree/main/site)
 - Related: [ADR-0071](0071-hold-every-code-repository-to-one-baseline.md)
+- Amended in part by: [ADR-0080](0080-document-the-snosi-images-on-frostyard-org.md)
+  (snosi has no tool site: frostyard.org documents its images and sysexts)

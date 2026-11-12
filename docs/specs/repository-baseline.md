@@ -50,6 +50,7 @@ check. Run each check in a clone of the repository at the commit you read
   | homebrew-tap | B3, B8, B9, B11 | Homebrew formulae only |
   | clix, std, snowkit | B9 | libraries: pkg.go.dev documents them |
   | lab | B9 | its Astro site is a QA dashboard, not tool documentation |
+  | snosi | B9 | OS images, not a tool: frostyard.org documents the images and their sysexts ([ADR-0080](../adr/0080-document-the-snosi-images-on-frostyard-org.md)) |
   | caddyscope | B18 | no owner; inactive |
 
 - An archived repository is not a code repository: no row applies to it,
@@ -94,6 +95,7 @@ check. Run each check in a clone of the repository at the commit you read
   [ADR-0072](../adr/0072-write-every-readme-to-one-standard.md),
   [ADR-0073](../adr/0073-let-ci-run-the-make-ci-targets-as-separate-jobs.md) (row B12),
   [ADR-0075](../adr/0075-batch-routine-pull-requests.md) (row B13),
-  [ADR-0076](../adr/0076-require-status-checks-on-every-default-branch.md) (row B18)
+  [ADR-0076](../adr/0076-require-status-checks-on-every-default-branch.md) (row B18),
+  [ADR-0080](../adr/0080-document-the-snosi-images-on-frostyard-org.md) (snosi, row B9)
 - Row B17's contract: [spec: README](readme.md)
 - Context: [design: quality loop](../design/quality-loop.md)
