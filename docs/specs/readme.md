@@ -34,7 +34,7 @@ block and `## Develop`.
 | `website` | a website that people read | frostyard-org |
 | `service` | a daemon, worker or web application that runs on a host and serves people over a network | lodge, porter, frostread, pilothouse, problem-intake, bketelsen/trimlights |
 | `library` | a module that other code imports, with no command | clix, std, snowkit |
-| `infrastructure` | configuration, pipelines, test suites or records for the team's own machines | lab, testsuite, bketelsen/fleet, bketelsen/pi-pocket-config, bketelsen/homewiki |
+| `infrastructure` | configuration, pipelines, test suites or records for the team's own machines | lab, testsuite, bketelsen/fleet, bketelsen/pi-pocket-config |
 
 **Pick the kind.** Go down the table from `org` to `infrastructure` and take
 the first row that describes the main thing the repository delivers: the
@@ -217,6 +217,10 @@ most of them.
   README starts with 1 line that links the file that says how the fork
   differs (Logomenu's `FROSTYARD.md`).
 - An archived repository is out of scope.
+- bketelsen/homewiki is out of scope
+  ([ADR-0079](../adr/0079-exempt-the-homelab-inventory-wiki-from-the-readme-spec.md)):
+  it is a private inventory wiki, and its root `README.md` is the wiki's
+  page index, which the wiki's own `AGENTS.md` governs.
 - A finding names the rule ID and quotes the checker's line. Its sweep key
   is `<repo>/baseline-B17`.
 - A rule that conflicts with a repository's own accepted ADR is a
@@ -236,6 +240,7 @@ most of them.
 ## References
 
 - Rationale: [ADR-0072](../adr/0072-write-every-readme-to-one-standard.md),
+  [ADR-0079](../adr/0079-exempt-the-homelab-inventory-wiki-from-the-readme-spec.md),
   [ADR-0071](../adr/0071-hold-every-code-repository-to-one-baseline.md),
   [ADR-0070](../adr/0070-build-tool-docs-sites-with-materialx-on-github-pages.md),
   [ADR-0025](../adr/0025-consolidate-repository-docs-into-docs.md)

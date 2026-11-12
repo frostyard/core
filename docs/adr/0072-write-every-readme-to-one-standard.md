@@ -123,3 +123,4 @@ differ in purpose, shape and size:
   [ADR-0069](0069-report-problems-local-first-opt-in-with-one-sender-per-host.md),
   [ADR-0070](0070-build-tool-docs-sites-with-materialx-on-github-pages.md),
   [ADR-0071](0071-hold-every-code-repository-to-one-baseline.md)
+- Amended in part by: [ADR-0079](0079-exempt-the-homelab-inventory-wiki-from-the-readme-spec.md)
