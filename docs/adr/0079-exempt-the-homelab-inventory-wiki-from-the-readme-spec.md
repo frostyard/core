@@ -1,7 +1,7 @@
 # 0079 — Exempt the homelab inventory wiki from the README spec
 
 - **Status:** Accepted
-- **Date:** 2026-11-10
+- **Date:** 2026-11-11
 - **Amends in part:** [ADR-0072](0072-write-every-readme-to-one-standard.md)
   (the scope of "every repository the team owns")
 
