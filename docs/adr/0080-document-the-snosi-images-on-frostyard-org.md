@@ -9,15 +9,15 @@
 
 ## Context
 
-ADR-0070 gives each user-facing tool, a repository that ships something
-people install, one ProperDocs and MaterialX site in `site/` on GitHub
-Pages. It says that frostyard.org describes each tool briefly and links to
+ADR-0070 gives each user-facing tool, "a repository that ships a command,
+an application or a service that people install", one ProperDocs and
+MaterialX site in `site/` on GitHub Pages. It says that frostyard.org describes each tool briefly and links to
 the tool's site. ADR-0071 item 9 and baseline row B9 hold each user-facing
 tool to that site.
 
 frostyard/snosi builds the operating system images (snow, snowfield,
-sundog, floe) and their sysexts. People install the images, so the
-conformance sweep holds snosi to row B9
+sundog, floe) and their sysexts. The conformance sweep applied row B9 to
+snosi
 ([frostyard/snosi#1239](https://github.com/frostyard/snosi/issues/1239)).
 
 The user documentation of the images and sysexts is already on
