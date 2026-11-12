@@ -18,7 +18,7 @@ puts addresses, MAC addresses, serial numbers and device details in scope.
 Its `README.md` is the first wiki page: the page index and the inventory
 table of the estate. At commit `73d253c`, the README checker fails it on
 rules R1, R4, R5, R9, R10 and R12: no kind marker, no status line, no
-documentation line, no `Develop` and no `Where to go next` section, 11
+documentation line, no `Develop` and no `Where to go next` section, 10
 private IPv4 addresses and 25 dates outside code.
 
 A README written to the spec is a front page with at most 2 dates and no
