@@ -103,7 +103,9 @@ Accepted ADRs are semantically immutable. Never rewrite one.
 
 - **Amend in part:** a new ADR whose title or status line says
   "amends ADR-NNNN in part", stating exactly which statements change and
-  which stay. In the old ADR, add only a reference line (link-only
+  which stay. Read the whole old ADR and list every statement the new
+  decision makes false, including the reasons and sub-items under a
+  decision, before you write "everything else stands". In the old ADR, add only a reference line (link-only
   maintenance,
   [core ADR-0033](https://github.com/frostyard/core/blob/main/docs/adr/0033-link-maintenance-in-immutable-adrs.md)):
 

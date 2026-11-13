@@ -41,9 +41,12 @@ stops the publication before any state changes.
 
 This amends these statements:
 
-- ADR-0060's registration item "`attested=no`", and its consequence "The
-  writer verifies no attestation for omarchy-apps. It trusts the release
-  assets as downloaded".
+- ADR-0060's registration item "`attested=no`", and its reason "The build
+  provenance names `refs/heads/main`, not the release tag that the writer
+  checks". For omarchy-apps, the writer now checks the registered branch
+  ref `refs/heads/main`, not a release tag.
+- ADR-0060's consequence "The writer verifies no attestation for
+  omarchy-apps. It trusts the release assets as downloaded".
 - ADR-0066's statement that "`attested=no`" stands.
 
 Everything else in ADR-0060 and ADR-0066, as
