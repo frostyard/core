@@ -1762,7 +1762,7 @@ test("the workflow writes the scripts, then runs the levels, readiness and shado
         "        id: deps\n" +
         `        if: ${shadowIf}\n` +
         "        continue-on-error: true\n" +
-        "        uses: dependabot/fetch-metadata@21025c705c08248db411dc16f3619e6b5f9ea21a # v2.5.0\n" +
+        "        uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0\n" +
         "        with:\n" +
         "          github-token: ${{ github.token }}\n" +
         "      - name: Write the Dependabot shadow call\n" +
@@ -1776,7 +1776,7 @@ test("the workflow writes the scripts, then runs the levels, readiness and shado
     ),
   );
   assert.ok(
-    text.includes("        uses: dependabot/fetch-metadata@21025c705c08248db411dc16f3619e6b5f9ea21a # v2.5.0\n"),
+    text.includes("        uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0\n"),
   );
   assert.ok(
     text.includes("        description: Run the Dependabot shadow step (docs/design/dependabot-shadow.md). " +
