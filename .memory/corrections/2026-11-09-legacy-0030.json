@@ -1,0 +1,7 @@
+{
+  "date": "2026-11-09",
+  "scope": "pr-triage",
+  "correction": "A shadow call written for 1 head must re-read the live head before it writes (twice: before the criteria and before the comment), must compare version numbers with BigInt so that 2 versions that differ above 2^53 are not equal, and must remove its own duplicate after a concurrent write by deleting the comment it wrote when an earlier marker for the same head has a lower comment id; else a delayed run judges newer files, a large patch reads as a minor update, and 2 runs leave 2 comments",
+  "evidence": "cross-review of the Dependabot shadow step; the new tests \"the shadow step writes nothing when the live head is not the event head\", \"the shadow step writes nothing when the head moves during the evaluation\", \"checkS1 compares version numbers exactly, with no size limit\" and \"the shadow step removes its own comment when an earlier one exists for this head\" in test/pr-triage.test.mjs",
+  "promoted_to": "test/pr-triage.test.mjs"
+}

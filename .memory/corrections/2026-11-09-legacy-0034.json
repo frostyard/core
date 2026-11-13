@@ -1,0 +1,7 @@
+{
+  "date": "2026-11-09",
+  "scope": "dependabot-shadow-report",
+  "correction": "A pull request takes its class from its last would-have-merged call by created_at, never by comment id or list order, and F2, F3 and F1 hold above an owner line: F4 applies to agreed only; else a call with other recorded checks decides the class and an owner line hides a safety failure",
+  "evidence": "cross-review of the Dependabot shadow report; the new tests \"the pull request class comes from the last would-have-merged call, not the first\", \"the later call by created_at is chosen even when its comment id is lower\", \"F2 wins over F3 when a revert and a person's commit both hold\", \"F3 stays and the F4 line for the same pull request is not applied\" and \"F1 stays and the F4 line for the same pull request is not applied\" in test/dependabot-shadow-report.test.mjs",
+  "promoted_to": "test/dependabot-shadow-report.test.mjs"
+}

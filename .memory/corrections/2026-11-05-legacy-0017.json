@@ -1,0 +1,7 @@
+{
+  "date": "2026-11-05",
+  "scope": "skills",
+  "correction": "A managed skill must hold no .go, go.mod, go.sum or go.work file, because the sync copies it into Go consumers where import and lint guards walk the repository; ship examples as fenced blocks in Markdown",
+  "evidence": "chairlift#268 TestOnlyReportingImportsNetHTTP after core#200 sync",
+  "promoted_to": "test/managed-skills-go-free.test.mjs"
+}

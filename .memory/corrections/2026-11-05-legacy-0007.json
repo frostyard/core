@@ -1,0 +1,7 @@
+{
+  "date": "2026-11-05",
+  "scope": "instruction-lint",
+  "correction": "A dead-reference check must not decide that a span is a path by the existence of its first folder: then a missing folder hides the dead reference. Decide by the span's shape (a file extension or a known top-level folder), and keep cross-repository references in an explicit ignore list",
+  "evidence": "T863 whole-plan check of plan T801: core#191 left `docs/missing.md` with no docs/ and `MISSING.md` unreported (exit 0)",
+  "promoted_to": "test/check-instructions.test.mjs"
+}

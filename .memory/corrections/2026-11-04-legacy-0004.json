@@ -1,0 +1,7 @@
+{
+  "date": "2026-11-04",
+  "scope": "flaky-scan",
+  "correction": "A cap or a counter computed from per-repository results must keep the done actions when a later read fails; returning a fresh error result drops them and the cap breaks. A flaky event needs the success in a later attempt or a later run, not only a later job with the same name",
+  "evidence": "core#192, cross-review (openai/gpt-6.1-sol) of head 469ea5c, findings R1-R3",
+  "promoted_to": "test/flaky-scan.test.mjs"
+}

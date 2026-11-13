@@ -1,0 +1,7 @@
+{
+  "date": "2026-11-04",
+  "scope": "flaky-scan",
+  "correction": "GitHub-generated workflows (path dynamic/..., such as Dependabot updates) run once per ecosystem on 1 SHA with 1 job name, so fail-then-pass there is no flaky test; and 1 Actions runs query returns at most 1,000 runs, so read busy repositories 1 day at a time",
+  "evidence": "first live dry run 2026-11-04 over 39 repositories (bketelsen/trimlights false positive, frostyard/lab at 1,000 runs)",
+  "promoted_to": "test/flaky-scan.test.mjs"
+}

@@ -1,0 +1,7 @@
+{
+  "date": "2026-11-09",
+  "scope": "pr-triage-backfill",
+  "correction": "With --apply, the backfill records a label change only after the real write worked (an add that throws records nothing; a removal that returns false for HTTP 404 records nothing), and a labels-missing row keeps its missing label names, names the repository and the settings command in the report, and never ends in the line that every open pull request has its level label; else the report counts failed writes as made and claims a complete backfill for a repository without level labels",
+  "evidence": "cross-review of frostyard/core#230 at 28072fd; the tests \"apply records no change when the real add fails\", \"apply keeps the add that worked when the removal after it fails\", \"apply records no removal when the label was already gone\", \"a labels-missing row keeps the missing names for the report\" and \"formatReport names a repository that lacks level labels and does not claim every label\" in test/pr-triage-backfill.test.mjs fail without the fix",
+  "promoted_to": "test/pr-triage-backfill.test.mjs"
+}

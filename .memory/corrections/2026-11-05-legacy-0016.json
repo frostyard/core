@@ -1,0 +1,7 @@
+{
+  "date": "2026-11-05",
+  "scope": "sync-skills",
+  "correction": "Read a JSON config with jq -s and require exactly 1 document, because plain jq accepts an empty file or a stream of objects with status 0 and no output",
+  "evidence": "core#200, cross-review re-review 1 (openai/gpt-6.1-sol) of head 2132c53, finding 2",
+  "promoted_to": "test/sync-skills.test.mjs"
+}

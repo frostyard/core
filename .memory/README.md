@@ -55,9 +55,9 @@ each add a record add 2 different files, so they do not conflict.
 
 Until its move PR merges, a repository keeps `.memory/corrections.jsonl`:
 1 JSON object for each line, the same 5 fields, append-only. There, a new
-record is 1 line at the end of that file. Core itself still has the old
-file. A repository has the old file or the folder, never both; after the
-folder exists, the old file does not come back.
+record is 1 line at the end of that file. Core moved to the folder. A
+repository has the old file or the folder, never both; after the folder
+exists, the old file does not come back.
 
 ## Tools
 

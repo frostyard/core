@@ -1,0 +1,7 @@
+{
+  "date": "2026-11-09",
+  "scope": "dependabot-shadow-report",
+  "correction": "No timestamp the report reads places the push of a commit that moved a pull request head: committer.date is set by the committer, and a check run at the SHA (a pr-triage run too) can belong to another branch or another pull request; place such a move only by history (a commit after the call head in GET pulls/{n}/commits), make the call superseded when its recorded checks never all passed and unknown when they all passed, and name the unknown count in the verdict; else a guessed time turns a call into superseded or would-have-merged by mistake",
+  "evidence": "cross-review of the Dependabot shadow report, 3 rounds; the tests \"a pushed commit after passed checks is unknown, with the reason\", \"an early pr-triage run at the new SHA, maybe of another pull request, does not prove superseded\" and \"a commit dated after the pass does not prove that the push came after it\" in test/dependabot-shadow-report.test.mjs fail with the earlier time rules",
+  "promoted_to": "test/dependabot-shadow-report.test.mjs"
+}

@@ -1,0 +1,7 @@
+{
+  "date": "2026-11-05",
+  "scope": "pr-outcomes",
+  "correction": "A metric computed from GitHub records must state and enforce its whole selection (default branch, 1 record per PR, merge commits by SHA, the same repository and date filter for fetched and file input) and resolve ties (identical titles) deterministically, or 2 readers or 2 input orders give 2 rates",
+  "evidence": "core#199, cross-review (openai/gpt-6.1-sol) of head bf7013b, findings 1 to 6",
+  "promoted_to": "test/pr-outcomes.test.mjs"
+}

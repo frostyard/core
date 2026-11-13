@@ -1,0 +1,7 @@
+{
+  "date": "2026-11-09",
+  "scope": "risk-paths",
+  "correction": "Two PRs that each rewrite .github/risk-paths.json can merge with no conflict marker and still drop an entry (the squash of #223 removed the scripts/apply-triage-settings.sh entry that #221 added, so the script fell to the default L3); after such a pair merges, read the list at main, and keep a test that names each settings script at L1",
+  "evidence": "git show bc38abd -- .github/risk-paths.json removes the entry that a6c0245 added; test \"core's list puts each administrative script (rulesets, settings, cross-repository writes) at L1\" in test/risk-paths.test.mjs fails without the entry",
+  "promoted_to": "test/risk-paths.test.mjs"
+}

@@ -70,9 +70,9 @@ function run(root, extra = []) {
 
 // ---------------------------------------------------------------- the head --
 
-test("repository corrections file passes", async () => {
+test("repository corrections records pass", async () => {
   const { stdout } = await run(repoRoot);
-  assert.match(stdout, /ok {3}corrections: [1-9]\d* lines \(legacy form: migrate to \.memory\/corrections\/\)/);
+  assert.match(stdout, /^ok {3}corrections: [1-9]\d* records\n$/);
 });
 
 test("valid 2-line file passes", async () => {

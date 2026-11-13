@@ -1,0 +1,7 @@
+{
+  "date": "2026-11-05",
+  "scope": "sync-skills",
+  "correction": "Match a git subcommand in a recorded invocation as a word of its own, never as a prefix, because the script runs git -c credential.helper=<helper with spaces> <subcommand>",
+  "evidence": "core#200, cross-review (openai/gpt-6.1-sol) of head c0421fe, finding 4",
+  "promoted_to": "test/sync-skills.test.mjs"
+}

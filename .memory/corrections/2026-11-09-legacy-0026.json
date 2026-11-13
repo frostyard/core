@@ -1,0 +1,7 @@
+{
+  "date": "2026-11-09",
+  "scope": "pr-triage",
+  "correction": "The readiness step reads check runs with an explicit filter=latest: it counts the latest run of each check name, as GitHub's checks rollup does, so an older failed run that a re-run replaced never revokes ready-for-human; the spec states the policy instead of leaving it to the API default",
+  "evidence": "core#220 cross-review (openai/gpt-6.1-sol) of head ced3dfb: listCheckRuns relied on the API default filter, and the any-check-run contract did not say which runs count",
+  "promoted_to": "test/pr-triage.test.mjs"
+}
