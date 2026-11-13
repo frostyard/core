@@ -17,12 +17,21 @@ guard" rule makes the pull request that fixes a blocking review point add 1
 line to it ([design: quality loop](../design/quality-loop.md)).
 
 - On 2026-11-13, 36 repositories have the file, with 838 records in all.
-  Every file passes core's `scripts/check-corrections.mjs`. 19 repositories
-  run a byte-equal copy of that validator in `make verify`, and in
-  `make ci` with `--base`, which also checks that no line is removed or
-  changed, except that an empty `promoted_to` is filled. 2
-  repositories run their own port of its rules: frostread in Go and
-  homebrew-tap in Python. 14 repositories run no check of the file.
+  Every file passes core's `scripts/check-corrections.mjs`. The checks of
+  the file at each default branch are:
+  - 20 repositories run core's validator: core itself and 19 repositories
+    with a byte-equal copy. `make verify` runs it, and `make ci` runs it
+    with `--base`, which also checks that no line is removed or changed,
+    except that an empty `promoted_to` is filled.
+  - 14 repositories run a port of its line rules in their own tests,
+    without `--base`: 9 in Go (repogen, std, clix, frostmail, frostnotes,
+    frostread, lodge, porter, trimlights), 2 in Python (flatpak-index,
+    homebrew-tap) and 3 in a shell script (bootc-debian, omarchy-apps,
+    apt-publisher).
+  - 2 repositories run no check of the file (updex, pi-pocket-config).
+- On 2026-11-13, the `.github/risk-paths.json` of 29 of these repositories
+  matches the path of their validator copy or port at level L1 or L2: 18
+  of the 19 copies and 11 of the 14 ports.
 - Each new record goes to the end of the same file. 2 open pull requests
   that each add 1 record change the same lines at the end of the file, so
   the second one conflicts after the first one merges. It then needs a
@@ -59,7 +68,9 @@ line to it ([design: quality loop](../design/quality-loop.md)).
   - A record that a pull request adds has the slug `pr-<N>-<words>`, where
     `<N>` is the pull request number, for example
     `2026-11-13-pr-412-cache-key.json`. 2 records in 1 pull request use
-    different words.
+    different words. A record written before the pull request opens gets
+    this name when the number is known; a rename before the merge is not a
+    rename against the base.
   - A record without a pull request has a slug of 2 to 5 words and 4
     random hexadecimal characters, for example
     `2026-11-13-agent-scope-rule-3f9a.json`.
@@ -72,14 +83,23 @@ line to it ([design: quality loop](../design/quality-loop.md)).
   test or skill that the record was promoted to.
 - **Canonical form.** The file text is exactly
   `JSON.stringify(record, null, 2) + "\n"`, with the keys in the order
-  above. Formatters do not rewrite these files; a repository whose
-  formatter reads JSON excludes `.memory/corrections/`.
+  above. In those bytes, a string escapes only `"`, `\` and the
+  characters below U+0020 (`\b`, `\t`, `\n`, `\f`, `\r`, else `\u00xx` in
+  lowercase hexadecimal), and a lone surrogate as `\udxxx`. Every other
+  character, `<`, `>`, `&`, `/`, U+2028 and U+2029 included, is written
+  as itself in UTF-8. Go's `encoding/json` escapes `<`, `>` and `&` by
+  default and U+2028 and U+2029 always, so a Go port does not use its
+  default output to make or compare this form. Formatters do not rewrite
+  these files; a repository whose formatter reads JSON excludes
+  `.memory/corrections/`.
 - **Records are permanent.** A record file is never removed or renamed.
   Its text never changes, except that an empty `promoted_to` is filled
   once.
 - **Cut-over.**
   - A repository has `.memory/corrections.jsonl` or `.memory/corrections/`,
-    never both. A repository that has neither has no records yet.
+    never both. A repository that has neither has no records yet. Until
+    its move merges, a repository that has the old file adds each new
+    record as 1 line of that file.
   - 1 pull request for each repository moves the file into the folder.
     Line `N` (counted from 1) becomes `<date>-legacy-<NNNN>.json`, with `N`
     in 4 digits (5 digits for a file of more than 9999 lines). Every
@@ -145,9 +165,15 @@ line to it ([design: quality loop](../design/quality-loop.md)).
     ever, so a result from the old reader on a moved repository is never
     read again.
   - bketelsen/agentic-template moves first of the 36 repositories, and its
-    diff is the pattern for the repositories made from it.
-  - The frostread and homebrew-tap ports, and each validator copy, change
-    in the move pull request of their own repository.
+    diff is the pattern for the repositories made from it. That diff
+    includes the template gate `scripts/check-template.mjs` (the hash pin
+    of the validator copy and the path in its failure lines) and its test
+    `test/check-template.test.mjs`.
+  - Each port and each validator copy changes in the move pull request of
+    its own repository. A port makes or compares the canonical form by the
+    byte rules above. A local ADR that states the old file gets a link
+    line to this ADR
+    ([ADR-0033](0033-link-maintenance-in-immutable-adrs.md)).
 - New obligations:
   - Core ships validator support for the folder form, a migration script
     that writes the `legacy-` files and the `pr-<N>-<k>` files from 1 old
@@ -159,15 +185,17 @@ line to it ([design: quality loop](../design/quality-loop.md)).
     repository moves, text that tells an agent where to add a record names
     both forms.
   - Each of the 36 repositories gets 1 move pull request from its owner.
-    In the 17 repositories whose `.github/risk-paths.json` lists
-    `scripts/check-corrections.mjs`, the move updates the validator copy,
-    so that pull request is high risk
-    ([ADR-0068](0068-label-pull-requests-that-touch-high-risk-paths.md)).
+    A move that changes a validator copy, a port or another file that its
+    repository's risk paths match at level L1 or L2 is high risk
+    ([ADR-0068](0068-label-pull-requests-that-touch-high-risk-paths.md),
+    [ADR-0078](0078-sort-pull-requests-by-levels-l1-to-l4.md)). On
+    2026-11-13 that is true for at least 29 of the 36 moves.
   - The text of all 838 existing records changes to the canonical form;
     every value stays. The validator's `--base` check on each move proves
     that no record is lost or changed.
-- Repositories without a `--base` gate (the 2 ports and the 14 without a
-  check) do not refuse the old file or a removed record automatically.
+- Repositories without a `--base` gate (the 14 with a port and the 2
+  without a check) do not refuse the old file or a removed record
+  automatically. After its move, a port refuses a tree with both forms.
   There, the instruction rules, the cross-review and the weekly
   conformance sweep, which reads row B2 at each default branch, are the
   controls. This ADR adds no gate to them.
