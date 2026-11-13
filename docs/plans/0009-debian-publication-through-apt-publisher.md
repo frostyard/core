@@ -152,7 +152,8 @@ Snosi `dd0def7`, 2026-10-02):
 - [x] **omarchy-apps.** Governed by
   [ADR-0060](../adr/0060-publish-omarchy-apps-through-the-apt-publisher.md)
   [ADR-0066](../adr/0066-build-only-the-omarchy-apps-packages-that-snosi-uses.md)
-  and [ADR-0067](../adr/0067-publish-omarchy-apps-on-change-and-keep-the-newest-two.md).
+  [ADR-0067](../adr/0067-publish-omarchy-apps-on-change-and-keep-the-newest-two.md)
+  and [ADR-0082](../adr/0082-verify-the-build-provenance-of-omarchy-apps.md).
   Shipped twelve Omarchy apps until 2026-11-02; since ADR-0066 it builds
   only `voxtype` and `moonlight-qt` (Snosi's sysexts). The other ten served
   the flurry desktop, which Snosi removed.
@@ -164,11 +165,12 @@ Snosi `dd0def7`, 2026-10-02):
     no bucket credentials.
   - Its registration keeps the newest two versions of each package
     (`keep` 2, ADR-0067).
-  - Registered by exact package names, `trixie` only, `attested=no`
+  - Registered by exact package names, `trixie` only
     (frostyard/apt-publisher#12).
     - Its versions carry no `~deb13` marker.
-    - Its attestations name `refs/heads/main`, not the release tag the
-      writer checks.
+    - Attested from `build.yml@refs/heads/main` since
+      frostyard/apt-publisher#28 (ADR-0082): the writer verifies the build
+      provenance of each `.deb`.
     - `gpu-screen-recorder` is also a Debian package (`forky`, `sid`).
   - `main-20261022024102-da2ea04` was published on 2026-10-22 by
     [publish run 39712749795](https://github.com/frostyard/apt-publisher/actions/runs/39712749795)
