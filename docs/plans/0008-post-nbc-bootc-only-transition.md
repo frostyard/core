@@ -1,6 +1,30 @@
 # Plan: Post-NBC bootc-only transition (Snosi/Firn)
 
-**Status:** Draft (not yet adopted; authorizes no deletion). This plan sequences Snosi/Firn bootc-only operations after
+**Status:** Draft (not yet adopted; authorizes no deletion). Partly
+delivered; checked on 2026-11-13 against the `frostyard/snosi` and
+`frostyard/nbc` default branches.
+
+- Landed: the public end-of-life notice in the
+  [nbc README](https://github.com/frostyard/nbc/blob/main/README.md)
+  (2026-09-30, Phase 1).
+  [snosi#1028](https://github.com/frostyard/snosi/pull/1028)
+  ([Snosi ADR-0018](https://github.com/frostyard/snosi/blob/main/docs/adr/0018-remove-native-ab-and-nbc-lanes.md),
+  merged 2026-10-01) removed the native A/B profiles, the native OS
+  publication workflow and the NBC package from new images (Phase 2). It also
+  made the Firn catalog bootc-only (`snow`, `snowfield`, `floe`, `sundog`)
+  and updated the migration runbook (Phase 3). `frostyard/nbc` is archived;
+  its last push is from 2026-10-01 (Phase 6).
+- Open: Phase 1 has no record of the 4 direct notices or of each user's
+  disposition. Phase 2 has no record of the exact-artifact emergency path.
+  Phase 3 waits for the pinning question under Open questions: the catalog
+  refs are `:latest`, and the ISO ships an unpinned `frostyard-firn`.
+  Phase 4 has no real-hardware readiness evidence: Snosi ADR-0018 records
+  fresh-install evidence as pending and Snowfield as untested. Phase 5: the
+  exact-object worksheet of the
+  [Snosi retirement plan](https://github.com/frostyard/snosi/blob/main/docs/plans/2026-09-24-native-ab-nbc-retirement-plan.md)
+  is not filled in. Phase 6: no record shows the archive preconditions.
+
+This plan sequences Snosi/Firn bootc-only operations after
 the 2026-09-30 NBC/native A/B support cutoff in
 [ADR-0047](../adr/0047-retire-nbc-on-a-proportional-fast-path.md). It
 coordinates with [Plan 0009](0009-debian-publication-through-apt-publisher.md)
