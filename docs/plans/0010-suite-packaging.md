@@ -35,9 +35,9 @@ Every artifact of the five suite repositories, and its side.
 | frostmail | maild and `mailctl` on a desktop | inside the Flatpak | ADR-0062 and frostmail [ADR-0046](https://github.com/frostyard/frostmail/blob/main/docs/adr/0046-the-desktop-flatpak-carries-its-own-maild.md): maild runs in its own sandbox of the app, and no user unit ships |
 | frostmail | the Windows install | not in this plan | frostmail M7 |
 | frostmail | `tools/lodgeprobe` | not shipped | development only |
-| frostread | `readd`, `readctl`, the `read` web build, `frostread.service`, `frostread.socket`, `sysusers.d` | sysext `readd` | **does not fit cleanly:** the repository is private, and Snosi's `verified_download` has no credentials, so it becomes public before Phase 3 builds `readd` |
+| frostread | `readd`, `readctl`, the `read` web build, `frostread.service`, `frostread.socket`, `sysusers.d` | sysext `readd` | the repository is public since 2026-10-27 (Phase 0), so Snosi's `verified_download` needs no credentials; the `readd` sysext is in Snosi's `main` ([snosi#1173](https://github.com/frostyard/snosi/pull/1173), 2026-10-28). On 2026-11-13 Snosi pins frostread `v0.5.0`'s attested `.deb`, and `https://repository.frostyard.org/ext/readd/` lists `readd` `0.1.0` to `0.5.0` |
 | frostread | `readdev` | not shipped | development only |
-| frostread | the desktop UI, readd, `readctl` | Flatpak (its ID set in a frostread ADR, per [ADR-0016](../adr/0016-reverse-dns-org-frostyard-identifiers.md)) | **not designed yet:** the desktop shell, content isolation and the lodge mode are open (ADR-0062) |
+| frostread | the desktop UI, readd, `readctl` | Flatpak `org.frostyard.Frostread` | carries the UI, readd and `readctl`; readd runs in its own sandbox of the app ([frostread ADR-0008](https://github.com/frostyard/frostread/blob/main/docs/adr/0008-the-desktop-flatpak-carries-its-own-readd-and-lodge-is-a-connection.md), which sets the ID per [ADR-0016](../adr/0016-reverse-dns-org-frostyard-identifiers.md); amended in part by frostread [ADR-0009](https://github.com/frostyard/frostread/blob/main/docs/adr/0009-readd-stops-when-the-gnome-session-ends.md)); lodge connection mode; [ADR-0062](../adr/0062-make-desktop-suite-apps-standalone-flatpaks-with-opt-in-lodge.md). Released as `v0.6.0` on 2026-11-13: `ghcr.io/frostyard/frostread@sha256:20c4f3e7595e107663ecf821e8b61c9df891ef8a9fa06335756b894d96dbb886`, the attested candidate `v0.6.0-rc.6` (commit `fb0ba06`) that passed the standalone check; listed in the `frostyard` remote ([flatpak-index#16](https://github.com/frostyard/flatpak-index/pull/16)) and installed from it on a clean Snow VM ([frostread#86](https://github.com/frostyard/frostread/pull/86)); see [Phase 5c](#phase-5c--read-as-a-standalone-flatpak-large) |
 | porter | `porterd`, the `porter` web build, `frostporter.service`, `frostporter.socket`, `sysusers.d` | sysext `porterd` | stages `/usr/local/bin` today; the host runs `/opt/lodge/bin/porterd`; no Flatpak (ADR-0062) |
 
 Two more facts do not fit cleanly:
@@ -471,12 +471,81 @@ ID. Nothing else waits for it.
 
 - frostread's ADR: the desktop design and the app's ID
   ([ADR-0016](../adr/0016-reverse-dns-org-frostyard-identifiers.md)).
-- The desktop shell.
+  ✅ 2026-10-28: frostread
+  [ADR-0008](https://github.com/frostyard/frostread/blob/main/docs/adr/0008-the-desktop-flatpak-carries-its-own-readd-and-lodge-is-a-connection.md)
+  is Accepted ([frostread#24](https://github.com/frostyard/frostread/pull/24)).
+  The ID is `org.frostyard.Frostread`.
+- The desktop shell. ✅ A Tauri v2 shell over the web bundle, with a
+  bridge to readd ([frostread#35](https://github.com/frostyard/frostread/pull/35),
+  2026-11-01).
 - Isolation of untrusted article content without `lodge-content`.
-- The lodge mode: sync or connection.
-- Save as note, as an optional link to Notes.
+  ✅ readd renders the sanitized page with its images as `data:` URLs,
+  and the window shows it in a `srcdoc` frame without `allow-scripts`,
+  under an app CSP with no network source
+  ([frostread#32](https://github.com/frostyard/frostread/pull/32),
+  2026-10-31); a hostile corpus tests it
+  ([frostread#37](https://github.com/frostyard/frostread/pull/37)).
+- The lodge mode: sync or connection. ✅ A connection: the window uses
+  lodge's readd and holds no copy (ADR-0008;
+  [frostread#54](https://github.com/frostyard/frostread/pull/54) and
+  [frostread#61](https://github.com/frostyard/frostread/pull/61),
+  2026-11-05 and 2026-11-06).
+- Save as note, as an optional link to Notes. ✅ In local mode, "Export
+  as Markdown…" to a file the user picks; save as note only in lodge
+  mode (ADR-0008;
+  [frostread#63](https://github.com/frostyard/frostread/pull/63),
+  2026-11-07).
 - **Done when:** Read passes the standalone check, with its core local
   work: add a source, read and poll.
+
+*Done 2026-11-13:* Read passed the standalone check, and `v0.6.0` is
+released and listed. frostread
+[plan 0002](https://github.com/frostyard/frostread/blob/main/docs/plans/0002-the-standalone-desktop-flatpak.md)
+carries this phase. The sources are its Phase 10 and 11 records, and the
+tags and runs they name.
+
+- The check (plan 0002 Phase 10, the clean-install gate): on 2026-11-12
+  all 7 items passed on the release candidate `v0.6.0-rc.6` (commit
+  `fb0ba06`), which a clean Snow VM installed from flatpak-index's
+  staged catalogue by its attested digest; item 5 updated the baseline
+  `v0.6.0-rc.5` to it
+  ([the gate on v0.6.0-rc.6](https://github.com/frostyard/frostread/blob/main/docs/plans/0002-the-standalone-desktop-flatpak.md#the-gate-on-v060-rc6)).
+  The core local work held: 2 feeds and 1 page whose feed was
+  discovered were added, an article showed with its images, and readd
+  polled with the window closed and at the next login. The gate on
+  `v0.6.0-rc.5` had failed item 7: a mode change with an item open
+  marked an item of the other reader read.
+  [frostread#78](https://github.com/frostyard/frostread/pull/78) fixed
+  it in `v0.6.0-rc.6`. A finding of the gate, that readd lives as long
+  as the user's systemd instance and not the graphical session, led to
+  frostread
+  [ADR-0009](https://github.com/frostyard/frostread/blob/main/docs/adr/0009-readd-stops-when-the-gnome-session-ends.md)
+  and [frostread#83](https://github.com/frostyard/frostread/pull/83)
+  (2026-11-13), on `main` after `v0.6.0`.
+- The release (plan 0002 Phase 11): the tag `v0.6.0` is commit
+  `fb0ba06`, the commit of `v0.6.0-rc.6`. Promote (run 43450798973)
+  copied the candidate's attested digest
+  `sha256:20c4f3e7595e107663ecf821e8b61c9df891ef8a9fa06335756b894d96dbb886`
+  to `v0.6.0` and `latest`, with no new build. Release (run 43448954167)
+  made `frostyard-readd_0.6.0_amd64.deb` from the same commit.
+  `ghcr.io/frostyard/frostread` answers anonymous pulls.
+- The listing (Phase 6):
+  [flatpak-index#16](https://github.com/frostyard/flatpak-index/pull/16),
+  merged 2026-11-13 (`0886d3c`), adds `frostyard/frostread` to
+  `apps.json`. The public catalogue lists `org.frostyard.Frostread` at
+  that digest.
+- The install: on 2026-11-13 a clean Snow VM ran flatpak-index's README
+  commands and installed `org.frostyard.Frostread` from the `frostyard`
+  remote, with no credentials. `flatpak info` shows version 0.6.0, that
+  digest as its Alt-id, and the Flatpak commit `b15ea974…` that the gate
+  installed. The app started from the overview's search with no dialog,
+  added The Go Blog's feed (10 items), and `readctl -desktop status`
+  gives `readd 0.6.0`
+  ([frostread#86](https://github.com/frostyard/frostread/pull/86),
+  plan 0002's
+  [Phase 11 record](https://github.com/frostyard/frostread/blob/main/docs/plans/0002-the-standalone-desktop-flatpak.md#phase-11s-record)).
+  As for Mail, Snow's clean image already has the user remote
+  `frostyard`, so the README's `remote-add` changed nothing.
 
 Porter has no Phase 5 item: it stays lodge's app `porter` (ADR-0062,
 porter ADR-0003).
