@@ -14,6 +14,10 @@ legacy `stable` suite to explicit codenames at
   producer whose packages Snosi installs, and Snosi itself (Phases 1–5).
 - **What remains:** validating `forky` (Phase 6) and steady state
   (Phase 7).
+- **Suites:** `forky` is a 2nd suite beside `trixie`, not its successor.
+  `trixie` stays, and it stays the default; nothing is promoted or moved.
+  The aim is a pipeline that works for `forky` the day Debian releases it,
+  and that a host can switch to now, by choice.
 
 NBC retirement stays with
 [Plan 0008](0008-post-nbc-bootc-only-transition.md). omarchy-apps publishes
@@ -247,11 +251,24 @@ until that queue is processed.
 - [ ] Producers that register `forky` publish to it: unmarked static builds
   directly, and distribution-linked packages as `~deb14` builds.
   - Done for updex, intuneme and firn.
-  - chairlift and first-setup wait for a smoke test on a `forky` image.
+  - chairlift: a smoke test of v0.17.1 on `debian:forky` passed
+    (frostyard/chairlift#306); its registration is in
+    frostyard/apt-publisher#50. first-setup has no producer row today.
   - bootc-debian needs a `debian:forky` build with `~deb14` versions and
-    per-codename `Depends`. Its ostree must be at least 2026.4, because
-    `forky` ships libostree 2026.4-1 (frostyard/bootc-debian#5).
-  - incus needs a Debian 14 build carrying `~deb14`.
+    per-codename `Depends` (frostyard/bootc-debian#27). Its ostree must be
+    at least 2026.6, because `forky` ships libostree 2026.6-1 on 2026-11-13.
+  - incus needs a Debian 14 build carrying `~deb14`
+    (frostyard/incus#17).
+  - omarchy-apps (`voxtype`, `moonlight-qt`) is `trixie` only. Its unmarked
+    builds can go to `forky` after an install and start test on
+    `debian:forky` (frostyard/omarchy-apps#19).
+  - frostyard/apt-publisher#50 registers bootc-debian, incus, omarchy-apps
+    and chairlift for `forky`, and must merge before they request it.
+- [ ] Build each sysext for each suite. updex picks a sysext by `%w`, the
+  host's `VERSION_ID`, and Debian `forky`'s os-release has no `VERSION_ID`
+  before Debian releases it (base-files 14.2), so a `forky` image must set
+  `VERSION_ID=14`. A host that switches suite must never merge a sysext of
+  the other suite.
 - [ ] Prove clean install, update and rollback on `forky`, without changing
   `trixie` or `stable`.
 - [ ] Rebase or replace Snosi PR #924 once packages and products validate.
@@ -273,8 +290,9 @@ until that queue is processed.
     [audit run 40188675832](https://github.com/frostyard/apt-publisher/actions/runs/40188675832)
     passed the same day, at apt-publisher `c1696ce`. It found every `.deb`
     of all eight producers' latest releases, firn now at v0.9.0.
-- [ ] Keep `trixie` readable for at least 90 days after `forky` is promoted,
-  and signed `stable` unchanged through at least 2027-09-30.
+- [ ] Keep `trixie` published beside `forky`: `forky` is not promoted, so
+  `trixie` has no end date in this plan. Keep signed `stable` unchanged
+  through at least 2027-09-30.
 - **Done when:** the nightly audit passes, and the retention windows are
   recorded in this plan.
 
