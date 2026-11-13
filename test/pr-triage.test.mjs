@@ -24,6 +24,7 @@ import {
   readinessMarker,
   runLevelsStep,
   runReadinessStep,
+  newestCheckRuns,
   runShadowStep,
   shadowComment,
   shadowMarker,
@@ -267,6 +268,72 @@ test("the step's own pr-triage run is left out", async () => {
 test("another check whose name only contains pr-triage still counts", async () => {
   const { result } = await labeled({ checkRuns: [run("not pr-triage", "failure")] });
   assert.equal(result.outcome, "revoked");
+});
+
+// A check run as the check-runs API gives it: an id in creation order and the app.
+const apiRun = (id, name, conclusion = "success", status = "completed", app = { id: 15368, slug: "github-actions" }) => ({
+  id,
+  name,
+  status,
+  conclusion,
+  app,
+});
+
+test("a cancelled run that a newer run of the same check replaced does not count (updex#515)", async () => {
+  // frostyard/updex#515 at bb9c272, filter=latest: 3 check suites each give 1
+  // "Conventional PR title" run; the middle one was cancelled by the newest.
+  const checkRuns = [
+    apiRun(132237066225, "Conventional PR title", "cancelled"),
+    apiRun(132236621585, "Conventional PR title"),
+    apiRun(132237129379, "Conventional PR title"),
+    apiRun(132236621661, "Unit Tests"),
+  ];
+  const { result, calls } = await labeled({ checkRuns });
+  assert.deepEqual(result, { outcome: "green" });
+  assert.deepEqual(names(calls), ["listCheckRuns", "listCommitStatuses"]);
+});
+
+test("a cancelled newest run still revokes, after an older green run of the same check", async () => {
+  const checkRuns = [apiRun(10, "Conventional PR title"), apiRun(11, "Conventional PR title", "cancelled")];
+  const { result, summary } = await labeled({ checkRuns });
+  assert.equal(result.outcome, "revoked");
+  assert.match(summary, /\| Conventional PR title \| check run \| cancelled \|/);
+});
+
+test("a newest run that is still in progress revokes, after an older green run", async () => {
+  const checkRuns = [apiRun(10, "ci"), apiRun(11, "ci", null, "in_progress")];
+  const { result } = await labeled({ checkRuns });
+  assert.equal(result.outcome, "revoked");
+});
+
+test("runs of the same name from different apps each count", async () => {
+  const checkRuns = [
+    apiRun(10, "ci", "failure", "completed", { id: 1, slug: "other-ci" }),
+    apiRun(11, "ci"),
+  ];
+  const { result } = await labeled({ checkRuns });
+  assert.equal(result.outcome, "revoked");
+});
+
+test("newestCheckRuns keeps the highest id per name and app, and every run of a group with no integer id", () => {
+  const kept = newestCheckRuns([
+    apiRun(12, "a", "cancelled"),
+    apiRun(13, "a"),
+    apiRun(5, "b", "failure"),
+    run("c", "cancelled"),
+    run("c"),
+    apiRun(7, "d"),
+  ]);
+  assert.deepEqual(
+    kept.map((r) => [r.id ?? null, r.name, r.conclusion]),
+    [
+      [13, "a", "success"],
+      [5, "b", "failure"],
+      [null, "c", "cancelled"],
+      [null, "c", "success"],
+      [7, "d", "success"],
+    ],
+  );
 });
 
 test("the summary lists at most 50 checks that are not green and escapes cells", async () => {

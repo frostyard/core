@@ -650,9 +650,10 @@ export function createGitHubApi({ token, apiUrl = "https://api.github.com", fetc
       return response !== null;
     },
 
-    // The latest run of each check name (filter=latest), as GitHub's checks
-    // rollup counts them: an older failed run that a re-run replaced does not
-    // count.
+    // The latest run of each check name in each check suite (filter=latest).
+    // Each workflow run is a check suite of its own, so the list can still
+    // hold an older run of the same check from another workflow run; the
+    // readiness step keeps only the newest (newestCheckRuns in pr-triage.mjs).
     async listCheckRuns(owner, repo, sha) {
       return paginate(`/repos/${enc(owner)}/${enc(repo)}/commits/${enc(sha)}/check-runs?filter=latest&per_page=100`, {
         field: "check_runs",

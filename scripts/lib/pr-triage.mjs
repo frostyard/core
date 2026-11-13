@@ -103,11 +103,38 @@ export function readinessComment({ reason, before, after, head }) {
 
 // ---- Checks ---------------------------------------------------------------
 
+// Keeps the newest check run of each check name and app. `filter=latest`
+// gives the latest run per check suite, and each workflow run is a check suite
+// of its own: a run that a newer workflow run of the same check cancelled stays
+// in the list (updex#515: a cancelled "Conventional PR title" beside its green
+// successor). The newest run is the one with the highest id; GitHub gives
+// check run ids in creation order. When a run of a group has no integer id,
+// the group keeps every run, as before.
+export function newestCheckRuns(checkRuns) {
+  const groups = new Map();
+  for (const run of checkRuns) {
+    const app = run?.app?.id ?? run?.app?.slug ?? "";
+    const key = JSON.stringify([String(app), String(run?.name ?? "")]);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(run);
+  }
+  const kept = [];
+  for (const group of groups.values()) {
+    if (group.length > 1 && group.every((run) => Number.isSafeInteger(run?.id))) {
+      kept.push(group.reduce((newest, run) => (run.id > newest.id ? run : newest)));
+    } else {
+      kept.push(...group);
+    }
+  }
+  return kept;
+}
+
 // Returns { relevant, notGreen } for the check runs and commit statuses of a
 // head. The check runs of this workflow (names that start with pr-triage) are
-// left out: the step cannot wait for itself.
+// left out: the step cannot wait for itself. Of the other check runs, only the
+// newest of each check name and app counts (newestCheckRuns).
 export function evaluateChecks(checkRuns, statuses) {
-  const runs = checkRuns.filter((run) => !String(run?.name ?? "").startsWith(OWN_CHECK_PREFIX));
+  const runs = newestCheckRuns(checkRuns.filter((run) => !String(run?.name ?? "").startsWith(OWN_CHECK_PREFIX)));
   const notGreen = [];
   for (const run of runs) {
     if (run?.status !== "completed") {
