@@ -1,0 +1,7 @@
+{
+  "date": "2026-11-06",
+  "scope": "docs-gate",
+  "correction": "The gate ignores a link only when the whole match is in a code span of a safe run; a run with a |, an escaped backtick, a < with a later >, a line with an unpaired backtick run, a `](` or `][` outside every span with a later backtick, or a GFM autolink start (`www.`, `://`) or a `$` outside every span with a later backtick keeps every link checked. Code spans are computed on the original text, never on fence-stripped text; blank lines contain only spaces and tabs, and CR, LF and CRLF all end a line, so a code-span rule never hides a real link",
+  "evidence": "core#200 cross-review (openai/gpt-6.1-sol), cases listed in core#201; core#216 cross-review (openai/gpt-6.1-sol) of head 3dc57b1 (findings 1 to 3)",
+  "promoted_to": "test/docs-integrity.test.mjs"
+}

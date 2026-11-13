@@ -1,0 +1,7 @@
+{
+  "date": "2026-11-10",
+  "scope": "docs-markdown-tables",
+  "correction": "A note added to a Markdown table goes after the last row, never between rows: a row cut off from its table by a paragraph or a blank line renders as plain text, and the reader loses that row",
+  "evidence": "cross-review of frostyard/core#232 at c80f892: the B18 exemption table in docs/specs/repository-baseline.md lost its bketelsen/homewiki row; the test \"every table row in the tracked Markdown files belongs to a table\" in test/markdown-tables.test.mjs fails on docs/specs/repository-baseline.md:75 without the fix",
+  "promoted_to": "test/markdown-tables.test.mjs"
+}

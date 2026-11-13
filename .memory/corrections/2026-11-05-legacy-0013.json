@@ -1,0 +1,7 @@
+{
+  "date": "2026-11-05",
+  "scope": "sync-skills",
+  "correction": "Validate the shape of the sync config (arrays of strings, and no group that names another group) before any resolution or clone and report the problem in its own ::error:: line, or a malformed config stops the run with a bare jq status",
+  "evidence": "core#200, cross-review (openai/gpt-6.1-sol) of head c0421fe, finding 2",
+  "promoted_to": "test/sync-skills.test.mjs"
+}

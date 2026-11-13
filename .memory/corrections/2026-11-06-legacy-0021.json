@@ -1,0 +1,7 @@
+{
+  "date": "2026-11-06",
+  "scope": "repository-baseline",
+  "correction": "A check that a workflow runs a command reads only the run: key of a job step (on the step's dash line or at its key indent, never under env:), never comments, step names or shell comments; a folded (>) block is 1 command and a literal (|) block is 1 command per line; a recipe command is compared whole, not as a substring; a Makefile recipe continues past blank lines and comment lines",
+  "evidence": "core#211, cross-review (openai/gpt-6.1-sol) of heads d092fc3 (findings 1 to 3) and 1259baa (findings 1 to 3)",
+  "promoted_to": "test/repository-baseline.test.mjs"
+}

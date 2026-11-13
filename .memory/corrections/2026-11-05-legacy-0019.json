@@ -1,0 +1,7 @@
+{
+  "date": "2026-11-05",
+  "scope": "skills",
+  "correction": "Retiring a skill payload also retires its design history under the skill folder: frostyard-design/docs/superpowers still presented the Astro docs-site scaffold as an approved spec after the MaterialX skill replaced it",
+  "evidence": "core#204, cross-review (openai/gpt-6.1-sol) of head 9ce45c5, finding 3",
+  "promoted_to": "test/no-leftover-agent-trees.test.mjs"
+}

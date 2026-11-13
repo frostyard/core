@@ -1,0 +1,7 @@
+{
+  "date": "2026-11-09",
+  "scope": "apply-triage-settings",
+  "correction": "A settings script that gates --apply on a GitHub read must read every page (closed pulls until the newest merged one is certain, workflow runs, jobs, labels) and must fail closed on any helper exit code other than its defined 0 or 1; a first page alone or an ignored helper error lets --apply write a merge-queue ruleset without proof, or POST a level label that exists on page 2. A YAML trigger check must also accept a quoted key followed directly by ':' (on: {\"merge_group\":{}})",
+  "evidence": "core#221 cross-review (openai/gpt-6.1-sol) of head b58940c, findings 1 to 4; targeted tests in test/apply-triage-settings.test.mjs, test/required-checks-survey.test.mjs and test/workflow-triggers.test.mjs",
+  "promoted_to": "test/apply-triage-settings.test.mjs"
+}

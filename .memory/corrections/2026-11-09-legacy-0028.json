@@ -1,0 +1,7 @@
+{
+  "date": "2026-11-09",
+  "scope": "apply-triage-settings",
+  "correction": "A bash helper that callers run in an if condition (if ! x=\"$(helper)\") runs without set -e, so each jq or other step inside it must check its own status and the helper must reject a page that is not JSON or not an array; else a failed jq turns a bad page into a short, successful result and --apply writes on partial data",
+  "evidence": "core#221 re-review 1 (openai/gpt-6.1-sol) of head 166f594, finding R1: paged_json returned page 1 only when page 2 was malformed JSON",
+  "promoted_to": "test/apply-triage-settings.test.mjs"
+}

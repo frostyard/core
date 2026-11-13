@@ -1,0 +1,7 @@
+{
+  "date": "2026-11-05",
+  "scope": "pr-outcomes",
+  "correction": "Drop an out-of-scope record only after every fact it carries for other records is read (an off-branch PR's merge commit still excludes its commit), and write each tie-break the code uses into the spec",
+  "evidence": "core#199, cross-review re-review 1 (openai/gpt-6.1-sol) of head be391ed, findings 1 and 2",
+  "promoted_to": "test/pr-outcomes.test.mjs"
+}

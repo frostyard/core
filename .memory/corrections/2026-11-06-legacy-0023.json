@@ -1,0 +1,7 @@
+{
+  "date": "2026-11-06",
+  "scope": "skills-sync",
+  "correction": "The skills sync writes only to real directories at .agents/skills/<name>/ and refuses a symlink there, and a sync PR gets the label only when its head is current with the consumer's default branch (behind_by 0); a stale sync PR cut before a layout move merged green and put a skill outside .agents/skills/",
+  "evidence": "frostyard/chairlift#273 and #276 (red main CI after a stale sync PR)",
+  "promoted_to": "test/sync-skills-containment.test.mjs, test/skills-sync-docs.test.mjs, docs/design/shared-skills.md"
+}

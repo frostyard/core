@@ -1,0 +1,7 @@
+{
+  "date": "2026-11-09",
+  "scope": "dependabot-shadow-report",
+  "correction": "GET repos/{r}/issues/comments?since=... filters by updated_at, so a call comment written before the window is not in it; a Dependabot pull request of the window with no call in that read must have its own comments read (1 read of issues/{n}/comments, merged by comment id), or a call from before the window is lost and the pull request is counted as missed or no metadata",
+  "evidence": "cross-review of the Dependabot shadow report; the new tests \"mergeCallComments keeps 1 comment for each id and orders the calls by created_at\" and \"the collector reads the own comments of a Dependabot pull request that holds no call in the window\" in test/dependabot-shadow-report.test.mjs",
+  "promoted_to": "test/dependabot-shadow-report.test.mjs"
+}

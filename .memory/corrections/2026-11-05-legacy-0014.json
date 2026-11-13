@@ -1,0 +1,7 @@
+{
+  "date": "2026-11-05",
+  "scope": "sync-skills",
+  "correction": "Give an empty effective skill list to the sync as no arguments at all, because one empty string resolves to the whole .agents/skills tree and mirrors every skill into the consumer",
+  "evidence": "core#200, cross-review (openai/gpt-6.1-sol) of head c0421fe, finding 3",
+  "promoted_to": "test/sync-skills.test.mjs"
+}

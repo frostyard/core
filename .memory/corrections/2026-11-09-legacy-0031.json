@@ -1,0 +1,7 @@
+{
+  "date": "2026-11-09",
+  "scope": "pr-triage",
+  "correction": "The dedupe of a shadow call after a concurrent write must also run on the early path, not only after the write, and by a durable rule: the call comments of a head are the github-actions[bot] comments with that head's marker, the lowest comment id is the call, and each run deletes every other one; else a run whose second comment list or delete failed leaves 2 comments, and a retry returns exists without repairing them",
+  "evidence": "cross-review of the Dependabot shadow step, blocker on the cleanup of a failed dedupe; the new test \"a retry after a failed cleanup removes the duplicate\" in test/pr-triage.test.mjs fails without the early-path cleanup",
+  "promoted_to": "test/pr-triage.test.mjs"
+}

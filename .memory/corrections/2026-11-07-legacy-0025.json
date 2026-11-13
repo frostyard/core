@@ -1,0 +1,7 @@
+{
+  "date": "2026-11-07",
+  "scope": "repository-baseline",
+  "correction": "ungroupedEntries (row B13) passes an entry only when its groups key has exactly 1 group, whose patterns is [\"*\"] and which has no applies-to: security-updates; it reads an item that starts with a standalone '-' line, and it fails closed with \"(unparsed) updates\" when updates has no parsed entry or a package-ecosystem key is outside a parsed entry. A catch-all group beside a specific group makes 2 version-update PRs, and a missed item made the check pass on an ungrouped entry",
+  "evidence": "core cross-review of head 1ac6ec7 (branch lucilla/batch-routine-prs, ADR-0075): an entry with groups react [\"react*\"] and all [\"*\"] passed, and an ungrouped entry that starts with a standalone '-' returned []",
+  "promoted_to": "test/repository-baseline.test.mjs"
+}

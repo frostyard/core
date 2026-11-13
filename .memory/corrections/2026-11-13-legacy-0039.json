@@ -1,0 +1,7 @@
+{
+  "date": "2026-11-13",
+  "scope": "corrections-tools",
+  "correction": "Scripts that read or write the corrections inbox must lstat every path part (.memory, .memory/corrections) and refuse symbolic links, create temp files with the exclusive flag and a random name, and decode record bytes with a fatal UTF-8 decoder; a lossy decode or a followed link lets a record change or leave its path unseen",
+  "evidence": "frostyard/core#240, cross-review of head d74d043",
+  "promoted_to": "test/check-corrections.test.mjs"
+}

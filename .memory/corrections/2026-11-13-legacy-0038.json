@@ -1,0 +1,7 @@
+{
+  "date": "2026-11-13",
+  "scope": "adr-amend-in-part",
+  "correction": "An ADR that amends another in part lists every statement of the old ADR that its decision makes false, the reasons and sub-items under a decision too, before it says everything else stands; else the old ADR keeps a rule that contradicts the new one under the amendment",
+  "evidence": "cross-review of frostyard/core#239 at 0fdfbf6: ADR-0082 amended ADR-0060 attested=no but left its reason, that the writer checks the release tag, standing; no test can read ADR meaning, so the rule went into AGENTS.md (Working conventions) and the write-adr skill",
+  "promoted_to": "AGENTS.md"
+}

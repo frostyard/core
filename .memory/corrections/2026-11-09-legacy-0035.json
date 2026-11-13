@@ -1,0 +1,7 @@
+{
+  "date": "2026-11-09",
+  "scope": "pr-triage",
+  "correction": "In a private repository the job token (contents: read, pull-requests: write) gets HTTP 403 from GET commits/{head}/check-runs and commits/{head}/status; the readiness step on labeled must read that 403 from the client error's status field and report readiness unknown (notice and summary, no label change, no comment, exit 0), and every other error must still fail; else every ready-for-human label in a private repository gives a red pr-triage run",
+  "evidence": "bketelsen/fleet run 42646228960 failed with 'GitHub API GET /repos/bketelsen/fleet/commits/<sha>/check-runs failed: HTTP 403'; the tests \"labeled with HTTP 403 on the check runs is readiness unknown\", \"labeled with HTTP 403 on the commit statuses is readiness unknown\", \"main on labeled with HTTP 403 on the check runs passes with a notice and makes no change\" and \"an HTTP error from the client carries the status and keeps its message\" in test/pr-triage.test.mjs fail without the fix",
+  "promoted_to": "test/pr-triage.test.mjs"
+}

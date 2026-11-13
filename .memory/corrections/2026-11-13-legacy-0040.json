@@ -1,0 +1,7 @@
+{
+  "date": "2026-11-13",
+  "scope": "corrections-tools",
+  "correction": "Match correction records across checkouts by their permanent identity (legacy line number or file name), never by content and place; decode with ignoreBOM so a BOM is not stripped; a restart test compares complete trees with no name filter and the script removes its own leftover temp files",
+  "evidence": "frostyard/core#240, cross-review re-review 1 of head 9d41622",
+  "promoted_to": "test/corrections-report.test.mjs"
+}

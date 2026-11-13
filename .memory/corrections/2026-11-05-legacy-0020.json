@@ -1,0 +1,7 @@
+{
+  "date": "2026-11-05",
+  "scope": "tests",
+  "correction": "A workflow check must tie each actions/checkout step to persist-credentials: false under its own with: mapping and ignore comments; workflow-wide counts passed a commented-out setting, and a flat step scan passed the key under env:",
+  "evidence": "core#205, cross-review (openai/gpt-6.1-sol) of head 86a187b, finding 1",
+  "promoted_to": "test/repository-baseline.test.mjs"
+}
