@@ -398,18 +398,20 @@ function discoverRepositories(root, maxDepth) {
 
 // The permanent identity of a record: line N of the old file and the record
 // file <date>-legacy-<digits>.json that line N became are the same record, and
-// every other record file is named by its file name. Content is not identity:
-// 2 distinct records may hold the same 4 fields, and a checkout may hold a
-// different set of them, so a merge by content would move a promotion.
+// every other record file is named by its file name. A line number alone is
+// not identity: 2 branches can append 2 different records at line N of the old
+// file, so the 4 fields of the record name it too. A promotion changes only
+// promoted_to, so the promoted copy still has the identity of its record.
 const LEGACY_FILE = /^(\d{4}-\d{2}-\d{2})-legacy-(\d+)\.json$/;
 
 function recordIdentity(line) {
-  if (line.source === OLD) return `legacy:${Number(line.line)}`;
+  const fields = JSON.stringify([line.date, line.scope, line.correction, line.evidence]);
+  if (line.source === OLD) return `legacy:${Number(line.line)}:${fields}`;
   const name = line.source.startsWith(`${DIR}/`) ? line.source.slice(DIR.length + 1) : line.source;
   const match = LEGACY_FILE.exec(name);
   // 4 digits and 5 digits name the same line, so the number counts, not its
   // padding.
-  return match ? `legacy:${Number(match[2])}` : `file:${name}`;
+  return match ? `legacy:${Number(match[2])}:${fields}` : `file:${name}`;
 }
 
 function mergeCheckouts(checkouts) {

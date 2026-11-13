@@ -400,12 +400,13 @@ test("--ref reads only the file at the ref, once per clone", async () => {
   const { stdout: trees } = await run(root, ["--json"]);
   const treeReport = JSON.parse(trees);
   assert.equal(treeReport.ref, null);
-  // Working trees count both branches, but line 1 is the same record in both,
-  // and line 2 of each checkout is line 2 of the old file: 1 record each.
-  assert.equal(treeReport.lines, 2);
-  assert.deepEqual(treeReport.repositories[0].pending.map((item) => [item.source, item.line]), [
-    [".memory/corrections.jsonl", 1],
-    [".memory/corrections.jsonl", 2],
+  assert.equal(treeReport.lines, 3, "working trees count the branch and the uncommitted lines");
+  // 2 branches appended 2 different records at line 2 of the old file: the
+  // line number names 2 records, so both are kept, each with its checkout.
+  assert.deepEqual(treeReport.repositories[0].pending.map((item) => [item.path, item.correction]), [
+    ["repo-a", "Merged correction"],
+    ["repo-a-feature", "Branch-only correction"],
+    ["repo-a", "Uncommitted correction"],
   ]);
 
   const { stdout } = await run(root, ["--ref", "origin/main", "--json"]);
@@ -626,6 +627,71 @@ test("a migration and the old form are 1 record: line 3 and its legacy- file", a
     // The promoted copy of the third record is the one kept, with its source.
     const group = report.repeated_in_repository.find((item) => item.scope === "agent");
     assert.equal(group.lines, 3);
+    assert.equal(group.promoted, 1);
+  }
+});
+
+test("2 different records at legacy line 2 in 2 checkouts stay 2 records", async () => {
+  const root = await fixture();
+  const first = line("2026-11-01", "agent", "First");
+  // Checkout A still has the old file, where line 2 is record X; checkout B
+  // moved the file and its line 2 became 1 file that holds another record Y.
+  const old = path.join(root, "repo-a");
+  mkdirSync(old);
+  await initRepo(old, "repo-a");
+  writeJsonl(old, [first, line("2026-11-02", "agent", "Record X")]);
+  await commitAll(old, "old form");
+  const migrated = path.join(root, "repo-a-worktree");
+  mkdirSync(migrated);
+  await initRepo(migrated, "repo-a");
+  mkdirSync(path.join(migrated, ".memory/corrections"), { recursive: true });
+  writeFileSync(
+    path.join(migrated, ".memory/corrections/2026-11-02-legacy-0002.json"),
+    canonical(line("2026-11-02", "agent", "Record Y")),
+  );
+  await commitAll(migrated, "migrated");
+
+  for (const extra of [[], ["--ref", "HEAD"]]) {
+    const report = JSON.parse((await run(root, ["--json", ...extra])).stdout);
+    // Line 1 is the same record in both; the 2 records at line 2 are not.
+    assert.equal(report.records, 3, extra.join(" "));
+    assert.deepEqual(report.repositories[0].pending.map((item) => [item.path, item.correction]), [
+      ["repo-a", "First"],
+      ["repo-a", "Record X"],
+      ["repo-a-worktree", "Record Y"],
+    ]);
+  }
+});
+
+test("the same record at line 2 in both forms is 1 record, promoted", async () => {
+  const root = await fixture();
+  const first = line("2026-11-01", "agent", "First");
+  const shared = line("2026-11-02", "agent", "Same record");
+  const old = path.join(root, "repo-a");
+  mkdirSync(old);
+  await initRepo(old, "repo-a");
+  writeJsonl(old, [first, shared]);
+  await commitAll(old, "old form");
+  const migrated = path.join(root, "repo-a-worktree");
+  mkdirSync(migrated);
+  await initRepo(migrated, "repo-a");
+  mkdirSync(path.join(migrated, ".memory/corrections"), { recursive: true });
+  writeFileSync(path.join(migrated, ".memory/corrections/2026-11-01-legacy-0001.json"), canonical(first));
+  writeFileSync(
+    path.join(migrated, ".memory/corrections/2026-11-02-legacy-0002.json"),
+    canonical({ ...shared, promoted_to: "AGENTS.md" }),
+  );
+  await commitAll(migrated, "migrated");
+
+  for (const extra of [[], ["--ref", "HEAD"]]) {
+    const report = JSON.parse((await run(root, ["--json", ...extra])).stdout);
+    // 2 records, not 4: each line and its record file are 1 record, and the
+    // promotion of the copy is kept.
+    assert.equal(report.records, 2, extra.join(" "));
+    assert.equal(report.pending, 1);
+    assert.deepEqual(report.repositories[0].pending.map((item) => item.correction), ["First"]);
+    const group = report.repeated_in_repository.find((item) => item.scope === "agent");
+    assert.equal(group.lines, 2);
     assert.equal(group.promoted, 1);
   }
 });
