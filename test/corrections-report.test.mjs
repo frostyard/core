@@ -551,6 +551,125 @@ test("--ref lists a checkout without the ref whose .memory folder is denied", { 
   ]);
 });
 
+test("2 records with 1 key and different promoted_to stay 2 records", async () => {
+  const root = await fixture();
+  const repo = path.join(root, "repo-a");
+  mkdirSync(repo);
+  await initRepo(repo, "repo-a");
+  mkdirSync(path.join(repo, ".memory/corrections"), { recursive: true });
+  const shared = line("2026-11-04", "agent", "Same key", "check");
+  writeFileSync(path.join(repo, ".memory/corrections/2026-11-04-one.json"), canonical(shared));
+  writeFileSync(path.join(repo, ".memory/corrections/2026-11-04-two.json"), canonical({ ...shared, promoted_to: "AGENTS.md" }));
+  await commitAll(repo, "2 records");
+
+  for (const extra of [[], ["--ref", "HEAD"]]) {
+    const report = JSON.parse((await run(root, ["--json", ...extra])).stdout);
+    assert.equal(report.records, 2, extra.join(" "));
+    assert.equal(report.pending, 1);
+    // The unpromoted record is pending, and it names its own file.
+    assert.deepEqual(report.repositories[0].pending.map((item) => [item.source, item.line]), [
+      [".memory/corrections/2026-11-04-one.json", null],
+    ]);
+    assert.equal(report.repeated_in_repository.length, 1);
+    assert.equal(report.repeated_in_repository[0].lines, 2);
+    assert.equal(report.repeated_in_repository[0].promoted, 1);
+    assert.deepEqual(report.repeated_in_repository[0].pending.map((item) => item.source), [
+      ".memory/corrections/2026-11-04-one.json",
+    ]);
+  }
+});
+
+test("an old-form line and a record file with 1 key stay 2 records", async () => {
+  const root = await fixture();
+  const repo = path.join(root, "repo-a");
+  mkdirSync(repo);
+  await initRepo(repo, "repo-a");
+  const shared = line("2026-11-04", "agent", "Same key", "check");
+  writeJsonl(repo, [shared]);
+  mkdirSync(path.join(repo, ".memory/corrections"), { recursive: true });
+  writeFileSync(path.join(repo, ".memory/corrections/2026-11-04-two.json"), canonical({ ...shared, promoted_to: "AGENTS.md" }));
+  await commitAll(repo, "both forms");
+
+  for (const extra of [[], ["--ref", "HEAD"]]) {
+    const report = JSON.parse((await run(root, ["--json", ...extra])).stdout);
+    assert.equal(report.records, 2, extra.join(" "));
+    assert.equal(report.pending, 1);
+    assert.deepEqual(report.repositories[0].pending.map((item) => [item.source, item.line]), [
+      [".memory/corrections.jsonl", 1],
+    ]);
+    assert.equal(report.repeated_in_repository[0].lines, 2);
+    assert.equal(report.repeated_in_repository[0].promoted, 1);
+  }
+});
+
+test("2 checkouts of 1 repository with the same 2 records give 2 records", async () => {
+  const root = await fixture();
+  const shared = line("2026-11-04", "agent", "Same key", "check");
+  for (const name of ["repo-a", "repo-a-worktree"]) {
+    const repo = path.join(root, name);
+    mkdirSync(repo);
+    await initRepo(repo, "repo-a");
+    mkdirSync(path.join(repo, ".memory/corrections"), { recursive: true });
+    writeFileSync(path.join(repo, ".memory/corrections/2026-11-04-one.json"), canonical(shared));
+    writeFileSync(path.join(repo, ".memory/corrections/2026-11-04-two.json"), canonical({ ...shared, promoted_to: "AGENTS.md" }));
+    await commitAll(repo, "2 records");
+  }
+
+  for (const extra of [[], ["--ref", "HEAD"]]) {
+    const report = JSON.parse((await run(root, ["--json", ...extra])).stdout);
+    assert.equal(report.repositories.length, 1);
+    assert.deepEqual(report.repositories[0].paths, ["repo-a", "repo-a-worktree"]);
+    assert.equal(report.records, 2, extra.join(" "));
+    assert.equal(report.pending, 1);
+  }
+});
+
+test("--ref lists a dangling .memory link as unreadable and reads nothing", async () => {
+  const root = await fixture();
+  const repo = path.join(root, "repo-a");
+  mkdirSync(repo);
+  await initRepo(repo, "repo-a");
+  symlinkSync(path.join(root, "gone"), path.join(repo, ".memory"));
+
+  const report = JSON.parse((await run(root, ["--ref", "origin/main", "--json"])).stdout);
+  assert.equal(report.records, 0);
+  assert.deepEqual(report.unreadable, [{
+    repository: "frostyard/repo-a",
+    path: "repo-a/.memory",
+    source: ".memory",
+    line: null,
+    reason: "ref not found: origin/main; symbolic link, not followed",
+  }]);
+});
+
+test("--ref does not read the records behind a .memory link", async () => {
+  const root = await fixture();
+  const outside = await fixture();
+  mkdirSync(path.join(outside, ".memory/corrections"), { recursive: true });
+  writeFileSync(
+    path.join(outside, ".memory/corrections/2026-11-04-one.json"),
+    canonical(line("2026-11-04", "Outside", "Outside correction")),
+  );
+  const repo = path.join(root, "repo-a");
+  mkdirSync(repo);
+  await initRepo(repo, "repo-a");
+  symlinkSync(path.join(outside, ".memory"), path.join(repo, ".memory"));
+
+  const { stdout } = await run(root, ["--ref", "origin/main", "--json"]);
+  const report = JSON.parse(stdout);
+  assert.equal(report.records, 0);
+  assert.doesNotMatch(stdout, /Outside correction/);
+  assert.deepEqual(report.unreadable.map((item) => [item.source, item.reason]), [
+    [".memory", "ref not found: origin/main; symbolic link, not followed"],
+  ]);
+
+  const tree = JSON.parse((await run(root, ["--json"])).stdout);
+  assert.equal(tree.records, 0);
+  assert.deepEqual(tree.unreadable.map((item) => [item.source, item.reason]), [
+    [".memory", "symbolic link, not followed"],
+  ]);
+});
+
 // The 2 forms of the records (ADR-0081). Each fixture is the exact --json
 // output of 1 checkout, with the temporary root replaced by <ROOT>.
 const fixtureFolder = {
@@ -593,21 +712,28 @@ async function buildReportFixture(root, form) {
   return repo;
 }
 
-function fixtureReport(name) {
-  return JSON.parse(readFileSync(path.join(repoRoot, "test/fixtures/corrections-report", name), "utf8"));
+// The fixture is the exact --json text: the record field names, their order
+// and the spacing are pinned with it, not only the values.
+function fixtureText(name) {
+  return readFileSync(path.join(repoRoot, "test/fixtures/corrections-report", name), "utf8");
+}
+
+function normaliseJson(text, root, ref) {
+  const out = text.replaceAll(root, "<ROOT>");
+  return ref === null ? out : out.replace(`"ref": "${ref}"`, '"ref": null');
 }
 
 test("the folder fixture is the exact report in the working tree and at a ref", async () => {
-  const expected = fixtureReport("folder.json");
+  const expected = fixtureText("folder.json");
   const root = await fixture();
   await buildReportFixture(root, "folder");
 
-  const workingTree = JSON.parse((await run(root, ["--json"])).stdout);
-  assert.deepEqual({ ...workingTree, root: "<ROOT>" }, expected);
+  const workingTree = (await run(root, ["--json"])).stdout;
+  assert.equal(normaliseJson(workingTree, root, null), expected);
 
-  const atRef = JSON.parse((await run(root, ["--ref", "HEAD", "--json"])).stdout);
-  assert.equal(atRef.ref, "HEAD");
-  assert.deepEqual({ ...atRef, root: "<ROOT>", ref: null }, expected);
+  const atRef = (await run(root, ["--ref", "HEAD", "--json"])).stdout;
+  assert.ok(atRef.includes('"ref": "HEAD"'));
+  assert.equal(normaliseJson(atRef, root, "HEAD"), expected);
 
   const { stdout } = await run(root);
   assert.match(stdout, /lines: 3; records: 3; pending: 2/);
@@ -615,16 +741,16 @@ test("the folder fixture is the exact report in the working tree and at a ref", 
 });
 
 test("the legacy fixture is the exact report in the working tree and at a ref", async () => {
-  const expected = fixtureReport("legacy.json");
+  const expected = fixtureText("legacy.json");
   const root = await fixture();
   await buildReportFixture(root, "legacy");
 
-  const workingTree = JSON.parse((await run(root, ["--json"])).stdout);
-  assert.deepEqual({ ...workingTree, root: "<ROOT>" }, expected);
+  const workingTree = (await run(root, ["--json"])).stdout;
+  assert.equal(normaliseJson(workingTree, root, null), expected);
 
-  const atRef = JSON.parse((await run(root, ["--ref", "HEAD", "--json"])).stdout);
-  assert.equal(atRef.ref, "HEAD");
-  assert.deepEqual({ ...atRef, root: "<ROOT>", ref: null }, expected);
+  const atRef = (await run(root, ["--ref", "HEAD", "--json"])).stdout;
+  assert.ok(atRef.includes('"ref": "HEAD"'));
+  assert.equal(normaliseJson(atRef, root, "HEAD"), expected);
 
   const { stdout } = await run(root);
   assert.match(stdout, /- 2026-11-01 \[Agent\] Read both forms — evidence: review 412 \(\.memory\/corrections\.jsonl:1\)/);

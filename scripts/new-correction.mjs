@@ -3,7 +3,7 @@
 // canonical bytes, under the name <date>-<slug>.json, never over an existing
 // record. A repository that still has .memory/corrections.jsonl gets a line
 // there instead, so this helper refuses it.
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -74,10 +74,34 @@ const record = {
 };
 const name = `${date}-${slug}.json`;
 const folder = resolve(root, DIR);
-try {
-  mkdirSync(folder, { recursive: true });
-} catch (error) {
-  fail(`cannot create ${DIR}: ${error.code ?? error.message}`);
+
+// The record lives at .memory/corrections. A symbolic link or a file at either
+// path part is refused before the write, so the record never leaves its path
+// unseen. The folder is created only when it does not exist.
+function lstatOrNull(path) {
+  try {
+    return lstatSync(path);
+  } catch (error) {
+    if (error.code === "ENOENT" || error.code === "ENOTDIR") return null;
+    fail(`cannot read ${path}: ${error.code ?? error.message}`);
+  }
+}
+
+const memory = lstatOrNull(resolve(root, ".memory"));
+if (memory !== null) {
+  if (memory.isSymbolicLink()) fail(".memory: symbolic link, not followed");
+  if (!memory.isDirectory()) fail(".memory: not a folder");
+}
+const existing = lstatOrNull(folder);
+if (existing !== null) {
+  if (existing.isSymbolicLink()) fail(`${DIR}: symbolic link, not followed`);
+  if (!existing.isDirectory()) fail(`${DIR}: not a folder`);
+} else {
+  try {
+    mkdirSync(folder, { recursive: true });
+  } catch (error) {
+    fail(`cannot create ${DIR}: ${error.code ?? error.message}`);
+  }
 }
 const target = resolve(folder, name);
 try {

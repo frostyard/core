@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { copyFile, mkdir, mkdtemp, readdir, rm, symlink, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, mkdtemp, readdir, rename, rm, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -320,6 +320,25 @@ test("every problem is listed and the count is the number of problems", async ()
   await assert.rejects(run(root), (error) => error.stdout.includes("FAIL corrections: 3 problem(s)"));
 });
 
+test("a symbolic link at .memory fails, with and without --base", async () => {
+  const root = await fixture();
+  await removeJsonl(root);
+  await writeRecords(root, { "2026-11-04-one.json": canonical(record()) });
+  await initGit(root);
+  await commitAll(root);
+  // The records move behind a relative link: the paths the gate reads still
+  // resolve, so a gate that follows the link would pass.
+  await rename(path.join(root, ".memory"), path.join(root, "archive"));
+  await symlink("archive", path.join(root, ".memory"), "dir");
+
+  await assert.rejects(run(root), (error) =>
+    error.code === 1 && error.stderr.includes("FAIL corrections: .memory: symbolic link, not followed")
+  );
+  await assert.rejects(run(root, ["--base", "HEAD"]), (error) =>
+    error.code === 1 && error.stderr.includes("FAIL corrections: .memory: symbolic link, not followed")
+  );
+});
+
 // ------------------------------------------------------------------ --base --
 
 test("base removal of line 1 or last line fails", async () => {
@@ -595,6 +614,24 @@ test("base old file: a move that changes a line fails", async () => {
   await writeRecords(root, { "2026-11-04-legacy-0001.json": canonical({ ...record(), correction: "Changed" }) });
   await assert.rejects(run(root, ["--base", "HEAD"]), (error) =>
     error.stderr.includes("record differs from line 1 of .memory/corrections.jsonl")
+  );
+});
+
+test("base old file: a bad byte in the old file fails the move", async () => {
+  const root = await fixture();
+  // The base line holds a lone 0x80: a lossy decode would read it as U+FFFD
+  // and accept the record the head shows.
+  await writeFile(path.join(root, ".memory/corrections.jsonl"), Buffer.concat([
+    Buffer.from('{"date":"2026-11-04","scope":"agent","correction":"a', "utf8"),
+    Buffer.from([0x80]),
+    Buffer.from('b","evidence":"check","promoted_to":""}\n', "utf8"),
+  ]));
+  await initGit(root);
+  await commitAll(root);
+  await removeJsonl(root);
+  await writeRecords(root, { "2026-11-04-legacy-0001.json": canonical(record("2026-11-04", { correction: "a\uFFFDb" })) });
+  await assert.rejects(run(root, ["--base", "HEAD"]), (error) =>
+    error.code === 1 && error.stderr.includes(".memory/corrections.jsonl at HEAD is not valid UTF-8")
   );
 });
 

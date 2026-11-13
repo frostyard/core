@@ -396,17 +396,26 @@ function discoverRepositories(root, maxDepth) {
   return found.sort((a, b) => compareText(a.path, b.path));
 }
 
+// 2 distinct records may hold the same 4 fields (2 record files, or a line of
+// the old form and a record file), so a record is named by its key and by its
+// place among the records with that key: (key, k). The k-th record with a key
+// in 1 checkout is the k-th record with that key in another checkout of the
+// same repository, so the checkouts merge and 2 records never collapse to 1.
 function mergeCheckouts(checkouts) {
   const merged = new Map();
 
   for (const checkout of checkouts.sort((a, b) => compareText(a.path, b.path))) {
-    for (const line of checkout.lines) {
+    const place = new Map();
+    for (const line of [...checkout.lines].sort(compareLines)) {
       const key = JSON.stringify([line.date, line.scope, line.correction, line.evidence]);
-      const existing = merged.get(key);
+      const k = (place.get(key) ?? 0) + 1;
+      place.set(key, k);
+      const mergeKey = JSON.stringify([key, k]);
+      const existing = merged.get(mergeKey);
       if (!existing) {
-        merged.set(key, { ...line });
+        merged.set(mergeKey, { ...line });
       } else if (existing.promoted_to.trim() === "" && line.promoted_to.trim() !== "") {
-        merged.set(key, { ...line });
+        merged.set(mergeKey, { ...line });
       }
     }
   }
@@ -474,12 +483,17 @@ export function groupScopes(repositories) {
 function workingTreeSources(folder, ref) {
   const sources = [];
   const memoryFolder = resolve(folder, ".memory");
+  let stat;
   try {
-    lstatSync(memoryFolder);
+    stat = lstatSync(memoryFolder);
   } catch (error) {
     if (absent(error)) return sources;
     return [{ source: ".memory", reason: `ref not found: ${ref}; cannot read: ${error.code ?? error.message}` }];
   }
+  // Neither a link nor a file is read: the records of a checkout are at the
+  // path the checkout names, never behind a link that leaves it.
+  if (stat.isSymbolicLink()) return [{ source: ".memory", reason: `ref not found: ${ref}; symbolic link, not followed` }];
+  if (!stat.isDirectory()) return sources;
   for (const source of [OLD, DIR]) {
     try {
       lstatSync(resolve(folder, source));

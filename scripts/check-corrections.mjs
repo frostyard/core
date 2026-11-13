@@ -210,7 +210,7 @@ function readBase() {
   } catch {
     fatal(`base ref ${base} does not exist`);
   }
-  const state = { old: null, folder: null };
+  const state = { old: null, oldValidUtf8: true, folder: null };
 
   let entries;
   try {
@@ -222,7 +222,11 @@ function readBase() {
   if (oldEntry) {
     if (oldEntry.type !== "blob") fatal(`cannot read ${OLD} at ${base}: not a file`);
     try {
-      state.old = git(["cat-file", "blob", oldEntry.oid]).toString("utf8");
+      const bytes = git(["cat-file", "blob", oldEntry.oid]);
+      // The move to the folder reads this text as records, so its bytes must
+      // be valid UTF-8; a lossy decode would write U+FFFD into a record.
+      state.oldValidUtf8 = decodeBytes(bytes) !== null;
+      state.old = bytes.toString("utf8");
     } catch (error) {
       fatal(`cannot read ${OLD} at ${base}: ${gitMessage(error)}`);
     }
@@ -250,6 +254,16 @@ function readBase() {
     }
   }
   return state;
+}
+
+// A symbolic link at .memory would move the records out of the path this gate
+// reads, so it fails before either form is read.
+function linkedMemory() {
+  try {
+    return lstatSync(resolve(root, ".memory")).isSymbolicLink();
+  } catch {
+    return false;
+  }
 }
 
 function readOld() {
@@ -495,6 +509,10 @@ function checkBase(baseState, head) {
     return;
   }
   if (headFolder) {
+    if (!baseState.oldValidUtf8) {
+      fail(OLD, `${OLD} at ${base} is not valid UTF-8`);
+      return;
+    }
     checkMove(baseOld, head.folder, base);
     return;
   }
@@ -502,7 +520,13 @@ function checkBase(baseState, head) {
 }
 
 const baseState = base !== undefined ? readBase() : null;
-const head = { old: readOld(), folder: checkFolder() };
+const head = { old: null, folder: { present: false, records: 0, files: new Map() } };
+if (linkedMemory()) {
+  fail(".memory", "symbolic link, not followed");
+} else {
+  head.old = readOld();
+  head.folder = checkFolder();
+}
 const both = head.old !== null && head.folder.present;
 
 const records = head.folder.records;

@@ -4,7 +4,7 @@
 // line is matched to the legacy- record that main already holds, and a line
 // with no match becomes <date>-pr-<N>-<k>.json. Every output is planned and
 // checked before 1 byte is written, so a failure changes nothing.
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -154,6 +154,32 @@ function stop(message) {
   process.exit(1);
 }
 
+function lstatOrNull(path) {
+  try {
+    return lstatSync(path);
+  } catch (error) {
+    if (error.code === "ENOENT" || error.code === "ENOTDIR") return null;
+    stop(`cannot read ${path}: ${error.code ?? error.message}`);
+  }
+}
+
+// The records live at .memory/corrections. A symbolic link or a file at either
+// path part is refused before any write, so no record leaves its path unseen.
+// Returns whether the folder already exists.
+function checkPaths() {
+  const memory = lstatOrNull(resolve(root, ".memory"));
+  if (memory !== null) {
+    if (memory.isSymbolicLink()) stop(".memory: symbolic link, not followed");
+    if (!memory.isDirectory()) stop(".memory: not a folder");
+  }
+  const folder = lstatOrNull(resolve(root, DIR));
+  if (folder !== null) {
+    if (folder.isSymbolicLink()) stop(`${DIR}: symbolic link, not followed`);
+    if (!folder.isDirectory()) stop(`${DIR}: not a folder`);
+  }
+  return folder !== null;
+}
+
 function sha256(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
 }
@@ -164,14 +190,22 @@ if (!existsSync(oldPath)) {
   process.exit(0);
 }
 
-let text;
+let bytes;
 try {
-  text = readFileSync(oldPath, "utf8");
+  bytes = readFileSync(oldPath);
 } catch (error) {
   stop(`cannot read ${OLD}: ${error.code ?? error.message}`);
 }
+// A lossy decode would write U+FFFD into a record, so the bytes must be valid
+// UTF-8 before any of them is written.
+let utf8;
+try {
+  utf8 = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+} catch {
+  stop(`${OLD}: not valid UTF-8`);
+}
 
-const lines = splitLines(text);
+const lines = splitLines(utf8);
 const records = [];
 const problems = [];
 for (let i = 0; i < lines.length; i++) {
@@ -193,6 +227,7 @@ if (problems.length > 0) {
 
 // ---- plan every output, check every destination, write nothing yet ----
 
+checkPaths();
 const dirPath = resolve(root, DIR);
 const outputs = []; // { name, bytes, action: "new" | "unchanged" | "promoted" }
 
@@ -306,24 +341,30 @@ if (pr === undefined) {
 
 // ---- write, then delete the old file ----
 
-try {
-  mkdirSync(dirPath, { recursive: true });
-} catch (error) {
-  stop(`cannot create ${DIR}: ${error.code ?? error.message}`);
+if (!existsSync(dirPath)) {
+  try {
+    mkdirSync(dirPath, { recursive: true });
+  } catch (error) {
+    stop(`cannot create ${DIR}: ${error.code ?? error.message}`);
+  }
 }
 
 for (const output of outputs) {
   if (output.bytes === null) continue;
   const target = resolve(dirPath, output.name);
-  const temp = resolve(root, ".memory", `.migrate-${output.name}.tmp`);
+  // A random name, created exclusively: an existing entry, or a symbolic link
+  // at a guessed name, is never followed and never truncated.
+  const temp = resolve(root, ".memory", `.migrate-${randomBytes(8).toString("hex")}.tmp`);
+  let created = false;
   try {
-    writeFileSync(temp, output.bytes);
+    writeFileSync(temp, output.bytes, { flag: "wx" });
+    created = true;
     renameSync(temp, target);
   } catch (error) {
     // Never remove a file this run already wrote: a promoted output replaces
     // a record that main already holds, and a record is never removed. A
     // rerun after the stop is the recovery: it writes the same bytes.
-    rmSync(temp, { force: true });
+    if (created) rmSync(temp, { force: true });
     stop(`cannot write ${DIR}/${output.name}: ${error.code ?? error.message}`);
   }
 }

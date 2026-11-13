@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { lstatSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { lstatSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -41,6 +41,13 @@ function fixture() {
   roots.push(root);
   mkdirSync(path.join(root, ".memory"), { recursive: true });
   return root;
+}
+
+// A folder that holds nothing, outside the fixture tree.
+function emptyDir() {
+  const dir = mkdtempSync(path.join(os.tmpdir(), "core-migrate-outside-"));
+  roots.push(dir);
+  return dir;
 }
 
 function writeOld(root, objects) {
@@ -238,6 +245,74 @@ test("more than 9999 lines use 5-digit names", async () => {
   assert.equal(names.length, total);
   assert.equal(names[0], "2026-11-04-legacy-00001.json");
   assert.equal(names[total - 1], "2026-11-04-legacy-10001.json");
+});
+
+test("invalid UTF-8 in the old file exits 1 and writes nothing", async () => {
+  const root = fixture();
+  // A lone 0x80 byte inside a field: a lossy decode would write U+FFFD into
+  // the record and no error would show.
+  writeFileSync(path.join(root, ".memory/corrections.jsonl"), Buffer.concat([
+    Buffer.from('{"date":"2026-11-04","scope":"agent","correction":"a', "utf8"),
+    Buffer.from([0x80]),
+    Buffer.from('b","evidence":"check","promoted_to":""}\n', "utf8"),
+  ]));
+  const before = snapshot(root);
+  await assert.rejects(run(root), (error) => error.code === 1 && error.stderr.includes("not valid UTF-8"));
+  assert.deepEqual(snapshot(root), before);
+});
+
+test("a link at a temp name is never followed and its target stays unchanged", async () => {
+  const root = fixture();
+  const outside = emptyDir();
+  const target = path.join(outside, "keep.txt");
+  writeFileSync(target, "keep me");
+  // The temp path of an earlier fixed form: a write that follows it would
+  // land outside the repository.
+  symlinkSync(target, path.join(root, ".memory/.migrate-2026-11-04-legacy-0001.json.tmp"));
+  writeOld(root, [record()]);
+
+  const { stdout } = await run(root);
+  assert.equal(stdout, "migrated 1 records (1 new files, 0 unchanged, 0 promoted)\n");
+  assert.equal(readFileSync(target, "utf8"), "keep me");
+  assert.deepEqual(readdirSync(outside), ["keep.txt"]);
+  // The only temp entry left is the link of the fixture: this run made none.
+  assert.deepEqual(readdirSync(path.join(root, ".memory")).filter((name) => name.endsWith(".tmp")), [
+    ".migrate-2026-11-04-legacy-0001.json.tmp",
+  ]);
+});
+
+test("a symbolic link at the folder exits 1 and keeps the old file", async () => {
+  const root = fixture();
+  const outside = emptyDir();
+  writeOld(root, [record()]);
+  symlinkSync(outside, path.join(root, ".memory/corrections"));
+  const before = snapshot(root);
+  await assert.rejects(run(root), (error) =>
+    error.code === 1 && error.stderr.includes(".memory/corrections: symbolic link, not followed")
+  );
+  await assert.rejects(run(root, ["--pr", "7"]), (error) => error.code === 1 && error.stderr.includes("symbolic link, not followed"));
+  assert.deepEqual(snapshot(root), before);
+  assert.deepEqual(readdirSync(outside), []);
+});
+
+test("a symbolic link at .memory exits 1 and keeps the old file", async () => {
+  const root = emptyDir();
+  const outside = emptyDir();
+  writeFileSync(path.join(outside, "corrections.jsonl"), jsonlText([record()]));
+  symlinkSync(outside, path.join(root, ".memory"));
+
+  await assert.rejects(run(root), (error) => error.code === 1 && error.stderr.includes(".memory: symbolic link, not followed"));
+  assert.deepEqual(readdirSync(outside), ["corrections.jsonl"]);
+  assert.deepEqual(readdirSync(root), [".memory"]);
+});
+
+test("a file at the folder path exits 1 and keeps the old file", async () => {
+  const root = fixture();
+  writeOld(root, [record()]);
+  writeFileSync(path.join(root, ".memory/corrections"), "not a folder");
+  const before = snapshot(root);
+  await assert.rejects(run(root), (error) => error.code === 1 && error.stderr.includes(".memory/corrections: not a folder"));
+  assert.deepEqual(snapshot(root), before);
 });
 
 // ----------------------------------------------------------------- --pr N --

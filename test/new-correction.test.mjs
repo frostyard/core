@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -22,6 +22,13 @@ function fixture() {
   const root = mkdtempSync(path.join(os.tmpdir(), "core-new-correction-"));
   roots.push(root);
   return root;
+}
+
+// A folder that holds nothing, outside the fixture tree.
+function emptyDir() {
+  const dir = mkdtempSync(path.join(os.tmpdir(), "core-new-correction-outside-"));
+  roots.push(dir);
+  return dir;
 }
 
 function args(root, extra = []) {
@@ -146,6 +153,34 @@ test("an existing record name exits 1 and does not change the file", async () =>
     error.code === 1 && error.stderr.includes(`record exists: .memory/corrections/${name}`)
   );
   assert.deepEqual(readFileSync(path.join(root, ".memory/corrections", name)), before);
+});
+
+test("a symbolic link at the folder exits 1 and the outside folder stays empty", async () => {
+  const root = fixture();
+  const outside = emptyDir();
+  mkdirSync(path.join(root, ".memory"), { recursive: true });
+  symlinkSync(outside, path.join(root, ".memory/corrections"));
+  await assert.rejects(run(root), (error) =>
+    error.code === 1 && error.stderr.includes(".memory/corrections: symbolic link, not followed")
+  );
+  assert.deepEqual(readdirSync(outside), []);
+  assert.deepEqual(readdirSync(path.join(root, ".memory")), ["corrections"]);
+});
+
+test("a symbolic link at .memory exits 1 and the outside folder stays empty", async () => {
+  const root = fixture();
+  const outside = emptyDir();
+  symlinkSync(outside, path.join(root, ".memory"));
+  await assert.rejects(run(root), (error) => error.code === 1 && error.stderr.includes(".memory: symbolic link, not followed"));
+  assert.deepEqual(readdirSync(outside), []);
+});
+
+test("a file at the folder path exits 1 and nothing is written", async () => {
+  const root = fixture();
+  mkdirSync(path.join(root, ".memory"), { recursive: true });
+  writeFileSync(path.join(root, ".memory/corrections"), "not a folder");
+  await assert.rejects(run(root), (error) => error.code === 1 && error.stderr.includes(".memory/corrections: not a folder"));
+  assert.deepEqual(tree(root), [".memory", ".memory/corrections"]);
 });
 
 test("a record with a text value that starts with -- is written as given", async () => {
