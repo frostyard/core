@@ -200,10 +200,13 @@ removed. -->
 - Conformance alias symlinks are listed in
   [ADR-0029](docs/adr/0029-acmm-conformance-via-canonical-aliases.md) —
   edit their canonical targets, never the aliases.
-- Corrections go to `.memory/corrections.jsonl` (append-only five-field
-  schema, [ADR-0018](docs/adr/0018-org-wide-agent-instruction-and-knowledge-surfaces.md));
-  promote into this file, docs, or skills — never duplicate without
-  setting `promoted_to`.
+- Corrections go to 1 file under `.memory/corrections/` (five-field
+  schema, canonical form, [ADR-0018](docs/adr/0018-org-wide-agent-instruction-and-knowledge-surfaces.md),
+  [ADR-0081](docs/adr/0081-store-each-correction-in-a-file-of-its-own.md);
+  `scripts/new-correction.mjs` writes one); in a repository that still has
+  `.memory/corrections.jsonl` (core does, until its move PR), 1 line
+  appended there. Promote into this file, docs, or skills — never
+  duplicate without setting `promoted_to`.
 - Task runbooks live in [.github/prompts/](.github/prompts/README.md) as
   `*.prompt.md`; rules stay here.
 

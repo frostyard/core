@@ -13,7 +13,10 @@ names what the decision binds in core and where it lives here.
 
 - [ADR-0018 — Org-wide agent instruction and knowledge surfaces](adr/0018-org-wide-agent-instruction-and-knowledge-surfaces.md)
   — `AGENTS.md` is the canonical instruction surface; the corrections inbox is
-  [.memory/corrections.jsonl](../.memory/README.md).
+  [.memory/](../.memory/README.md): 1 file for each record in
+  `.memory/corrections/`, in the form that
+  [ADR-0081](adr/0081-store-each-correction-in-a-file-of-its-own.md) sets
+  (core still has `.memory/corrections.jsonl` until its move PR).
 - [ADR-0019 — Repository governance as machine-readable policy with risk tiers](adr/0019-governance-as-code-and-risk-tiers.md)
   — every PR declares a risk tier in
   [.github/pull_request_template.md](../.github/pull_request_template.md).
