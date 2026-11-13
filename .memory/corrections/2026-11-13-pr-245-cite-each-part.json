@@ -1,0 +1,7 @@
+{
+  "date": "2026-11-13",
+  "scope": "plans",
+  "correction": "In a plan record of another repository's work, cite each part to the PR that made it and give the date of the change, not the date a record noted it; check each against that repository's main",
+  "evidence": "frostyard/core#245, frostread owner review of head 0a084fa: wrong public date, items.render and the app CSP put on frostread#32, save as note put on frostread#63",
+  "promoted_to": "AGENTS.md"
+}

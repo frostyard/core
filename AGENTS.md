@@ -274,3 +274,8 @@ anchors valid) and add the back-links on the targets. Use relative paths.
 - New significant decision ⇒ new ADR *first*, then update the affected design
   docs/specs in the same change.
 - Convert relative dates ("next weekend") to absolute dates in all docs.
+- A plan record of another repository's work cites each part to the PR or
+  commit that made that part (not 1 PR for several parts), and gives the
+  date of the change itself, not the date a record noted it. Check each
+  against that repository's `main` before the PR
+  ([core#245](https://github.com/frostyard/core/pull/245)).

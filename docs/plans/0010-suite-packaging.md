@@ -35,7 +35,7 @@ Every artifact of the five suite repositories, and its side.
 | frostmail | maild and `mailctl` on a desktop | inside the Flatpak | ADR-0062 and frostmail [ADR-0046](https://github.com/frostyard/frostmail/blob/main/docs/adr/0046-the-desktop-flatpak-carries-its-own-maild.md): maild runs in its own sandbox of the app, and no user unit ships |
 | frostmail | the Windows install | not in this plan | frostmail M7 |
 | frostmail | `tools/lodgeprobe` | not shipped | development only |
-| frostread | `readd`, `readctl`, the `read` web build, `frostread.service`, `frostread.socket`, `sysusers.d` | sysext `readd` | the repository is public since 2026-10-27 (Phase 0), so Snosi's `verified_download` needs no credentials; the `readd` sysext is in Snosi's `main` ([snosi#1173](https://github.com/frostyard/snosi/pull/1173), 2026-10-28). On 2026-11-13 Snosi pins frostread `v0.5.0`'s attested `.deb`, and `https://repository.frostyard.org/ext/readd/` lists `readd` `0.1.0` to `0.5.0` |
+| frostread | `readd`, `readctl`, the `read` web build, `frostread.service`, `frostread.socket`, `sysusers.d` | sysext `readd` | the repository is public since 2026-10-23 (Phase 0 recorded it on 2026-10-27), so Snosi's `verified_download` needs no credentials; the `readd` sysext is in Snosi's `main` ([snosi#1173](https://github.com/frostyard/snosi/pull/1173), 2026-10-28). On 2026-11-13 Snosi pins frostread `v0.5.0`'s attested `.deb`, and `https://repository.frostyard.org/ext/readd/` lists `readd` `0.1.0` to `0.5.0` |
 | frostread | `readdev` | not shipped | development only |
 | frostread | the desktop UI, readd, `readctl` | Flatpak `org.frostyard.Frostread` | carries the UI, readd and `readctl`; readd runs in its own sandbox of the app ([frostread ADR-0008](https://github.com/frostyard/frostread/blob/main/docs/adr/0008-the-desktop-flatpak-carries-its-own-readd-and-lodge-is-a-connection.md), which sets the ID per [ADR-0016](../adr/0016-reverse-dns-org-frostyard-identifiers.md); amended in part by frostread [ADR-0009](https://github.com/frostyard/frostread/blob/main/docs/adr/0009-readd-stops-when-the-gnome-session-ends.md)); lodge connection mode; [ADR-0062](../adr/0062-make-desktop-suite-apps-standalone-flatpaks-with-opt-in-lodge.md). Released as `v0.6.0` on 2026-11-13: `ghcr.io/frostyard/frostread@sha256:20c4f3e7595e107663ecf821e8b61c9df891ef8a9fa06335756b894d96dbb886`, the attested candidate `v0.6.0-rc.6` (commit `fb0ba06`) that passed the standalone check; listed in the `frostyard` remote ([flatpak-index#16](https://github.com/frostyard/flatpak-index/pull/16)) and installed from it on a clean Snow VM ([frostread#86](https://github.com/frostyard/frostread/pull/86)); see [Phase 5c](#phase-5c--read-as-a-standalone-flatpak-large) |
 | porter | `porterd`, the `porter` web build, `frostporter.service`, `frostporter.socket`, `sysusers.d` | sysext `porterd` | stages `/usr/local/bin` today; the host runs `/opt/lodge/bin/porterd`; no Flatpak (ADR-0062) |
@@ -479,11 +479,14 @@ ID. Nothing else waits for it.
   bridge to readd ([frostread#35](https://github.com/frostyard/frostread/pull/35),
   2026-11-01).
 - Isolation of untrusted article content without `lodge-content`.
-  ✅ readd renders the sanitized page with its images as `data:` URLs,
-  and the window shows it in a `srcdoc` frame without `allow-scripts`,
-  under an app CSP with no network source
+  ✅ readd renders the sanitized page with its images as `data:` URLs
+  ([frostread#25](https://github.com/frostyard/frostread/pull/25),
+  2026-10-28), and the window shows it in a `srcdoc` frame without
+  `allow-scripts`
   ([frostread#32](https://github.com/frostyard/frostread/pull/32),
-  2026-10-31); a hostile corpus tests it
+  2026-10-31), under an app CSP with no network source
+  ([frostread#35](https://github.com/frostyard/frostread/pull/35),
+  2026-11-01); a hostile corpus tests it
   ([frostread#37](https://github.com/frostyard/frostread/pull/37)).
 - The lodge mode: sync or connection. ✅ A connection: the window uses
   lodge's readd and holds no copy (ADR-0008;
@@ -493,8 +496,9 @@ ID. Nothing else waits for it.
 - Save as note, as an optional link to Notes. ✅ In local mode, "Export
   as Markdown…" to a file the user picks; save as note only in lodge
   mode (ADR-0008;
+  [frostread#61](https://github.com/frostyard/frostread/pull/61) and
   [frostread#63](https://github.com/frostyard/frostread/pull/63),
-  2026-11-07).
+  2026-11-06 and 2026-11-07).
 - **Done when:** Read passes the standalone check, with its core local
   work: add a source, read and poll.
 
