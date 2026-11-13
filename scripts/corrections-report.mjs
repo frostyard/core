@@ -1,5 +1,7 @@
 #!/usr/bin/env node
-// Read-only report for .memory/corrections.jsonl files in local git checkouts.
+// Read-only report for the corrections inbox of local git checkouts: the
+// folder form .memory/corrections/ (1 file for each record) and the old form
+// .memory/corrections.jsonl, both read while repositories move (ADR-0081).
 import { execFileSync } from "node:child_process";
 import { lstatSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { dirname, relative, resolve, sep } from "node:path";
@@ -7,6 +9,9 @@ import { fileURLToPath } from "node:url";
 
 const usage = "Usage: node scripts/corrections-report.mjs --root DIR [--depth N] [--ref REF] [--json] [--out FILE]";
 const requiredFields = ["date", "scope", "correction", "evidence", "promoted_to"];
+const OLD = ".memory/corrections.jsonl";
+const DIR = ".memory/corrections";
+const NAME = /^(\d{4}-\d{2}-\d{2})-([a-z0-9]+(?:-[a-z0-9]+)*)\.json$/;
 
 function plainObject(value) {
   if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
@@ -22,6 +27,20 @@ function splitLines(text) {
 
 function compareText(a, b) {
   return a < b ? -1 : a > b ? 1 : 0;
+}
+
+// The order of the records: by date, then by the path each record comes from
+// (byte order), then by line (a folder record has no line, counted as 0).
+function compareSource(a, b) {
+  return Buffer.compare(Buffer.from(a ?? "", "utf8"), Buffer.from(b ?? "", "utf8"));
+}
+
+function compareLines(a, b) {
+  return compareText(a.date, b.date)
+    || compareSource(a.source, b.source)
+    || (a.line ?? 0) - (b.line ?? 0)
+    || compareText(a.correction, b.correction)
+    || compareText(a.evidence, b.evidence);
 }
 
 function relativePath(root, folder) {
@@ -111,39 +130,227 @@ function resolveRef(folder, ref) {
   }
 }
 
-// Reads .memory/corrections.jsonl at a commit, not in the working tree, so a
-// line on an unmerged branch or an uncommitted edit is not counted. Returns
-// { text }, { absent: true } or { error }.
+function parseRecord(text) {
+  let value;
+  try {
+    value = JSON.parse(text);
+  } catch {
+    return { error: "invalid JSON" };
+  }
+  if (!plainObject(value)) return { error: "not a plain object" };
+
+  const missing = requiredFields.filter((field) => !Object.hasOwn(value, field));
+  if (missing.length > 0) return { error: `missing field(s): ${missing.join(", ")}` };
+  for (const field of requiredFields) {
+    if (typeof value[field] !== "string") return { error: `value for ${field} is not a string` };
+  }
+  return { value };
+}
+
+function parseLines(text, found) {
+  for (const [index, lineText] of splitLines(text).entries()) {
+    const lineNumber = index + 1;
+    const parsed = parseRecord(lineText);
+    if (parsed.error) {
+      found.problems.push({ source: OLD, line: lineNumber, reason: parsed.error });
+      continue;
+    }
+    found.records.push({ ...parsed.value, source: OLD, line: lineNumber });
+  }
+}
+
+// 1 entry of the folder form, in either form (a Git tree entry or a directory
+// entry): its bytes via read(), or the reason it cannot be a record.
+function folderEntry(name, mode, read, lost) {
+  if (name === ".gitkeep") return null;
+  const source = `${DIR}/${name}`;
+  if (mode === "link") return { source, problem: "symbolic link, not followed" };
+  if (mode !== "file") return { source, problem: "not a regular file" };
+  if (!NAME.test(name)) return { source, problem: "not a record file name" };
+  let text;
+  try {
+    text = read();
+  } catch {
+    return { source, problem: lost };
+  }
+  const parsed = parseRecord(text);
+  if (parsed.error) return { source, problem: parsed.error };
+  return { source, record: parsed.value };
+}
+
+function addFolderEntry(entry, found) {
+  if (entry === null) return;
+  if (entry.problem) {
+    found.problems.push({ source: entry.source, line: null, reason: entry.problem });
+    return;
+  }
+  found.records.push({ ...entry.record, source: entry.source, line: null });
+}
+
+function cannotRead(ref, error) {
+  return `cannot read ${ref}: ${String(error.stderr || error.message).trim().split("\n")[0]}`;
+}
+
+// Reads both forms at a commit, not in the working tree, so a line on an
+// unmerged branch or an uncommitted edit is not counted. Returns
+// { absent: true } or { records, problems } (the problems are sources with
+// the reason they cannot be read).
 function readAtCommit(folder, commit, ref) {
-  // 1 tree at a time: `ls-tree` given a folder path lists the folder's
-  // content, not the folder's own entry.
-  const entry = (tree, name) => {
+  const entryOf = (tree, name) => {
     for (const item of git(folder, ["ls-tree", "-z", tree]).split("\0")) {
       const match = item.match(/^(\d+) (\w+) ([0-9a-f]+)\t(.*)$/s);
       if (match && match[4] === name) return { mode: match[1], type: match[2], oid: match[3] };
     }
     return null;
   };
+  const blob = (oid) => git(folder, ["cat-file", "blob", oid]);
+  const found = { records: [], problems: [] };
+
   let memory;
-  let file;
   try {
-    memory = entry(commit, ".memory");
-    if (!memory) return { absent: true };
-    if (memory.mode === "120000") return { error: "symbolic link, not followed", path: ".memory" };
-    if (memory.type !== "tree") return { absent: true };
-    file = entry(memory.oid, "corrections.jsonl");
+    memory = entryOf(commit, ".memory");
   } catch (error) {
-    return { error: `cannot read ${ref}: ${String(error.stderr || error.message).trim().split("\n")[0]}` };
+    found.problems.push({ source: ".memory", line: null, reason: cannotRead(ref, error) });
+    return found;
   }
-  if (!file) return { absent: true };
-  if (file.mode === "120000") return { error: "symbolic link, not followed" };
-  if (file.type !== "blob") return { absent: true };
+  if (!memory) return { absent: true };
+  if (memory.mode === "120000") {
+    found.problems.push({ source: ".memory", line: null, reason: "symbolic link, not followed" });
+    return found;
+  }
+  if (memory.type !== "tree") return { absent: true };
+
+  // The old form: 1 JSON object for each line.
+  let legacy;
   try {
-    return { text: git(folder, ["cat-file", "blob", file.oid]) };
-  } catch {
-    // Also a blob that a partial clone does not hold: it is not fetched.
-    return { error: `cannot read file at ${ref}` };
+    legacy = entryOf(memory.oid, "corrections.jsonl");
+  } catch (error) {
+    found.problems.push({ source: OLD, line: null, reason: cannotRead(ref, error) });
+    legacy = null;
   }
+  if (legacy) {
+    if (legacy.mode === "120000") found.problems.push({ source: OLD, line: null, reason: "symbolic link, not followed" });
+    else if (legacy.type === "blob") {
+      try {
+        parseLines(blob(legacy.oid), found);
+      } catch {
+        // Also a blob that a partial clone does not hold: it is not fetched.
+        found.problems.push({ source: OLD, line: null, reason: `cannot read file at ${ref}` });
+      }
+    }
+  }
+
+  // The folder form: 1 file for each record.
+  let corrections;
+  try {
+    corrections = entryOf(memory.oid, "corrections");
+  } catch (error) {
+    found.problems.push({ source: DIR, line: null, reason: cannotRead(ref, error) });
+    corrections = null;
+  }
+  if (corrections) {
+    if (corrections.mode === "120000") found.problems.push({ source: DIR, line: null, reason: "symbolic link, not followed" });
+    else if (corrections.type !== "tree") found.problems.push({ source: DIR, line: null, reason: "not a folder" });
+    else {
+      let listed;
+      try {
+        listed = git(folder, ["ls-tree", "-z", corrections.oid]).split("\0");
+      } catch (error) {
+        found.problems.push({ source: DIR, line: null, reason: cannotRead(ref, error) });
+        listed = [];
+      }
+      for (const item of listed) {
+        const match = item.match(/^(\d+) (\w+) ([0-9a-f]+)\t(.*)$/s);
+        if (!match) continue;
+        const mode = match[1] === "120000" ? "link" : match[2] === "blob" ? "file" : "other";
+        addFolderEntry(
+          folderEntry(match[4], mode, () => blob(match[3]), `cannot read file at ${ref}`),
+          found,
+        );
+      }
+    }
+  }
+
+  if (found.records.length === 0 && found.problems.length === 0) return { absent: true };
+  return found;
+}
+
+// Both forms of 1 checkout in its working tree.
+function readWorkingTree(folder) {
+  const found = { records: [], problems: [] };
+  const memoryFolder = resolve(folder, ".memory");
+  let stat;
+  try {
+    stat = lstatSync(memoryFolder);
+  } catch (error) {
+    if (!absent(error)) found.problems.push({ source: ".memory", line: null, reason: `cannot read: ${error.code ?? error.message}` });
+    return found;
+  }
+  if (stat.isSymbolicLink()) {
+    found.problems.push({ source: ".memory", line: null, reason: "symbolic link, not followed" });
+    return found;
+  }
+  if (!stat.isDirectory()) return found;
+
+  const legacyPath = resolve(memoryFolder, "corrections.jsonl");
+  try {
+    stat = lstatSync(legacyPath);
+  } catch (error) {
+    if (!absent(error)) found.problems.push({ source: OLD, line: null, reason: `cannot read: ${error.code ?? error.message}` });
+    stat = null;
+  }
+  if (stat) {
+    if (stat.isSymbolicLink()) found.problems.push({ source: OLD, line: null, reason: "symbolic link, not followed" });
+    else if (stat.isFile()) {
+      try {
+        parseLines(readFileSync(legacyPath, "utf8"), found);
+      } catch {
+        found.problems.push({ source: OLD, line: null, reason: "cannot read file" });
+      }
+    }
+  }
+
+  const correctionsFolder = resolve(memoryFolder, "corrections");
+  try {
+    stat = lstatSync(correctionsFolder);
+  } catch (error) {
+    if (!absent(error)) found.problems.push({ source: DIR, line: null, reason: `cannot read: ${error.code ?? error.message}` });
+    return found;
+  }
+  if (stat.isSymbolicLink()) {
+    found.problems.push({ source: DIR, line: null, reason: "symbolic link, not followed" });
+    return found;
+  }
+  if (!stat.isDirectory()) {
+    found.problems.push({ source: DIR, line: null, reason: "not a folder" });
+    return found;
+  }
+  let names;
+  try {
+    names = readdirSync(correctionsFolder).sort(compareText);
+  } catch (error) {
+    found.problems.push({ source: DIR, line: null, reason: `cannot read: ${error.code ?? error.message}` });
+    return found;
+  }
+  for (const name of names) {
+    const path = resolve(correctionsFolder, name);
+    let entryStat;
+    try {
+      entryStat = lstatSync(path);
+    } catch (error) {
+      found.problems.push({ source: `${DIR}/${name}`, line: null, reason: `cannot read: ${error.code ?? error.message}` });
+      continue;
+    }
+    const mode = entryStat.isSymbolicLink() ? "link" : entryStat.isFile() ? "file" : "other";
+    addFolderEntry(folderEntry(name, mode, () => readFileSync(path, "utf8"), "cannot read file"), found);
+  }
+  return found;
+}
+
+// Only "no such path" means "no corrections": every other error is listed as
+// unreadable, so a checkout is never left out without a trace.
+function absent(error) {
+  return error?.code === "ENOENT" || error?.code === "ENOTDIR";
 }
 
 function discoverRepositories(root, maxDepth) {
@@ -189,21 +396,22 @@ function discoverRepositories(root, maxDepth) {
   return found.sort((a, b) => compareText(a.path, b.path));
 }
 
-function parseLine(text) {
-  let value;
-  try {
-    value = JSON.parse(text);
-  } catch {
-    return { error: "invalid JSON" };
-  }
-  if (!plainObject(value)) return { error: "not a plain object" };
+// The permanent identity of a record: line N of the old file and the record
+// file <date>-legacy-<digits>.json that line N became are the same record, and
+// every other record file is named by its file name. A line number alone is
+// not identity: 2 branches can append 2 different records at line N of the old
+// file, so the 4 fields of the record name it too. A promotion changes only
+// promoted_to, so the promoted copy still has the identity of its record.
+const LEGACY_FILE = /^(\d{4}-\d{2}-\d{2})-legacy-(\d+)\.json$/;
 
-  const missing = requiredFields.filter((field) => !Object.hasOwn(value, field));
-  if (missing.length > 0) return { error: `missing field(s): ${missing.join(", ")}` };
-  for (const field of requiredFields) {
-    if (typeof value[field] !== "string") return { error: `value for ${field} is not a string` };
-  }
-  return { value };
+function recordIdentity(line) {
+  const fields = JSON.stringify([line.date, line.scope, line.correction, line.evidence]);
+  if (line.source === OLD) return `legacy:${Number(line.line)}:${fields}`;
+  const name = line.source.startsWith(`${DIR}/`) ? line.source.slice(DIR.length + 1) : line.source;
+  const match = LEGACY_FILE.exec(name);
+  // 4 digits and 5 digits name the same line, so the number counts, not its
+  // padding.
+  return match ? `legacy:${Number(match[2])}:${fields}` : `file:${name}`;
 }
 
 function mergeCheckouts(checkouts) {
@@ -211,22 +419,17 @@ function mergeCheckouts(checkouts) {
 
   for (const checkout of checkouts.sort((a, b) => compareText(a.path, b.path))) {
     for (const line of checkout.lines) {
-      const key = JSON.stringify([line.date, line.scope, line.correction, line.evidence]);
-      const existing = merged.get(key);
+      // The record that is kept brings its own source and line.
+      const identity = recordIdentity(line);
+      const existing = merged.get(identity);
       if (!existing) {
-        merged.set(key, { ...line });
+        merged.set(identity, { ...line });
       } else if (existing.promoted_to.trim() === "" && line.promoted_to.trim() !== "") {
-        merged.set(key, { ...line });
+        merged.set(identity, { ...line });
       }
     }
   }
-  return [...merged.values()].sort((a, b) =>
-    compareText(a.date, b.date)
-    || a.line - b.line
-    || compareText(a.scope, b.scope)
-    || compareText(a.correction, b.correction)
-    || compareText(a.evidence, b.evidence)
-  );
+  return [...merged.values()].sort(compareLines);
 }
 
 export function groupScopes(repositories) {
@@ -285,60 +488,47 @@ export function groupScopes(repositories) {
   return { inRepository, acrossRepositories: repeatedAcrossRepositories };
 }
 
-function compareLines(a, b) {
-  return compareText(a.date, b.date)
-    || (a.line ?? 0) - (b.line ?? 0)
-    || compareText(a.correction, b.correction)
-    || compareText(a.evidence, b.evidence);
-}
-
-function parseCorrections(text, name, checkout, unreadable) {
-  const lines = [];
-  for (const [index, lineText] of splitLines(text).entries()) {
-    const lineNumber = index + 1;
-    const parsed = parseLine(lineText);
-    if (parsed.error) {
-      unreadable.push({ repository: name, path: `${checkout.path}/.memory/corrections.jsonl`, line: lineNumber, reason: parsed.error });
-      continue;
-    }
-    const value = parsed.value;
-    lines.push({
-      date: value.date,
-      scope: value.scope,
-      correction: value.correction,
-      evidence: value.evidence,
-      promoted_to: value.promoted_to,
-      path: checkout.path,
-      line: lineNumber,
-    });
+// What a checkout that does not hold the ref keeps in its working tree: 1
+// entry for each form it has, or for the reason it cannot be read.
+function workingTreeSources(folder, ref) {
+  const sources = [];
+  const memoryFolder = resolve(folder, ".memory");
+  let stat;
+  try {
+    stat = lstatSync(memoryFolder);
+  } catch (error) {
+    if (absent(error)) return sources;
+    return [{ source: ".memory", reason: `ref not found: ${ref}; cannot read: ${error.code ?? error.message}` }];
   }
-  return lines;
+  // Neither a link nor a file is read: the records of a checkout are at the
+  // path the checkout names, never behind a link that leaves it.
+  if (stat.isSymbolicLink()) return [{ source: ".memory", reason: `ref not found: ${ref}; symbolic link, not followed` }];
+  if (!stat.isDirectory()) return sources;
+  for (const source of [OLD, DIR]) {
+    try {
+      lstatSync(resolve(folder, source));
+      sources.push({ source, reason: `ref not found: ${ref}` });
+    } catch (error) {
+      if (!absent(error)) sources.push({ source, reason: `ref not found: ${ref}; cannot read: ${error.code ?? error.message}` });
+    }
+  }
+  return sources;
 }
 
 function buildReport(root, maxDepth, ref = null) {
   const checkouts = discoverRepositories(root, maxDepth);
   const repositoryMap = new Map();
   const unreadable = [];
-  let repositoriesScanned = checkouts.length;
+  const repositoriesScanned = checkouts.length;
 
-  // Only "no such path" means "no corrections": every other error (a denied
-  // folder, a symbolic link out of the checkout) is listed as unreadable, so
-  // a checkout is never left out without a trace.
-  const absent = (error) => error?.code === "ENOENT" || error?.code === "ENOTDIR";
   const repositoryFor = (checkout, known = null) => {
     const name = known ?? (remoteName(checkout.absolute) || `local:${checkout.path}`);
     if (!repositoryMap.has(name)) repositoryMap.set(name, { name, checkouts: [] });
     return repositoryMap.get(name);
   };
-  const skip = (checkout, path, reason) => {
-    const repository = repositoryFor(checkout);
-    repository.checkouts.push({ path: checkout.path, lines: [] });
-    unreadable.push({ repository: repository.name, path: `${checkout.path}/${path}`, line: null, reason });
-  };
-
   // With a ref, the worktrees of 1 clone are 1 group (their shared git
   // folder). The group's identity is the first remote that any of its
-  // worktrees names, and a file at 1 commit is read once per group.
+  // worktrees names, and a commit is read once per group.
   const groupOf = new Map();
   if (ref !== null) {
     const groups = new Map();
@@ -350,16 +540,6 @@ function buildReport(root, maxDepth, ref = null) {
       groupOf.set(checkout, group);
     }
   }
-  // null when the path is absent; else the reason to list the checkout.
-  const workingFile = (folder) => {
-    try {
-      lstatSync(resolve(folder, ".memory/corrections.jsonl"));
-      return `ref not found: ${ref}`;
-    } catch (error) {
-      if (absent(error)) return null;
-      return `ref not found: ${ref}; cannot read: ${error.code ?? error.message}`;
-    }
-  };
 
   for (const checkout of checkouts) {
     if (ref !== null) {
@@ -367,14 +547,16 @@ function buildReport(root, maxDepth, ref = null) {
       const name = group.remote ?? `local:${group.firstPath}`;
       const commit = resolveRef(checkout.absolute, ref);
       if (commit === null) {
-        // Without the ref, a checkout with a working-tree file is listed, so
-        // it is never left out without a trace; one without the file has
+        // Without the ref, a checkout with a working-tree form is listed, so
+        // it is never left out without a trace; one without records has
         // nothing to report.
-        const reason = workingFile(checkout.absolute);
-        if (reason !== null) {
+        const sources = workingTreeSources(checkout.absolute, ref);
+        if (sources.length > 0) {
           const repository = repositoryFor(checkout, name);
           repository.checkouts.push({ path: checkout.path, lines: [] });
-          unreadable.push({ repository: name, path: `${checkout.path}/.memory/corrections.jsonl`, line: null, reason });
+          for (const { source, reason } of sources) {
+            unreadable.push({ repository: name, path: `${checkout.path}/${source}`, source, line: null, reason });
+          }
         }
         continue;
       }
@@ -383,58 +565,39 @@ function buildReport(root, maxDepth, ref = null) {
       const result = group.read.get(commit);
       if (result.absent) continue;
       const repository = repositoryFor(checkout, name);
-      if (seen) {
-        repository.checkouts.push({ path: checkout.path, lines: [] });
-        continue;
+      repository.checkouts.push({
+        path: checkout.path,
+        lines: result.records.map((record) => ({ ...record, path: checkout.path })),
+      });
+      if (seen) continue;
+      for (const problem of result.problems) {
+        unreadable.push({
+          repository: name,
+          path: `${checkout.path}/${problem.source}`,
+          source: problem.source,
+          line: problem.line,
+          reason: problem.reason,
+        });
       }
-      if (result.error) {
-        repository.checkouts.push({ path: checkout.path, lines: [] });
-        unreadable.push({ repository: name, path: `${checkout.path}/${result.path ?? ".memory/corrections.jsonl"}`, line: null, reason: result.error });
-        continue;
-      }
-      repository.checkouts.push({ path: checkout.path, lines: parseCorrections(result.text, name, checkout, unreadable) });
       continue;
     }
 
-    const memoryFolder = resolve(checkout.absolute, ".memory");
-    const correctionsFile = resolve(memoryFolder, "corrections.jsonl");
-    let stat;
-    try {
-      stat = lstatSync(memoryFolder);
-    } catch (error) {
-      if (!absent(error)) skip(checkout, ".memory", `cannot read: ${error.code ?? error.message}`);
-      continue;
-    }
-    if (stat.isSymbolicLink()) {
-      skip(checkout, ".memory", "symbolic link, not followed");
-      continue;
-    }
-    if (!stat.isDirectory()) continue;
-    try {
-      stat = lstatSync(correctionsFile);
-    } catch (error) {
-      if (!absent(error)) skip(checkout, ".memory/corrections.jsonl", `cannot read: ${error.code ?? error.message}`);
-      continue;
-    }
-    if (stat.isSymbolicLink()) {
-      skip(checkout, ".memory/corrections.jsonl", "symbolic link, not followed");
-      continue;
-    }
-    if (!stat.isFile()) continue;
-
+    const found = readWorkingTree(checkout.absolute);
+    if (found.records.length === 0 && found.problems.length === 0) continue;
     const repository = repositoryFor(checkout);
-    const name = repository.name;
-
-    let text;
-    try {
-      text = readFileSync(correctionsFile, "utf8");
-    } catch {
-      unreadable.push({ repository: name, path: `${checkout.path}/.memory/corrections.jsonl`, line: null, reason: "cannot read file" });
-      repository.checkouts.push({ path: checkout.path, lines: [] });
-      continue;
+    repository.checkouts.push({
+      path: checkout.path,
+      lines: found.records.map((record) => ({ ...record, path: checkout.path })),
+    });
+    for (const problem of found.problems) {
+      unreadable.push({
+        repository: repository.name,
+        path: `${checkout.path}/${problem.source}`,
+        source: problem.source,
+        line: problem.line,
+        reason: problem.reason,
+      });
     }
-
-    repository.checkouts.push({ path: checkout.path, lines: parseCorrections(text, name, checkout, unreadable) });
   }
 
   const repositories = [];
@@ -450,6 +613,7 @@ function buildReport(root, maxDepth, ref = null) {
         correction: line.correction,
         evidence: line.evidence,
         path: line.path,
+        source: line.source,
         line: line.line,
       }));
     repositories.push({ name: repository.name, paths, lines, pending });
@@ -462,8 +626,7 @@ function buildReport(root, maxDepth, ref = null) {
     || compareText(a.reason, b.reason)
   );
 
-  const repositoriesWithCorrections = repositories.length;
-  const lineCount = repositories.reduce((sum, repository) => sum + repository.lines.length, 0);
+  const recordCount = repositories.reduce((sum, repository) => sum + repository.lines.length, 0);
   const pendingCount = repositories.reduce((sum, repository) => sum + repository.pending.length, 0);
   const groups = groupScopes(repositories);
 
@@ -472,8 +635,9 @@ function buildReport(root, maxDepth, ref = null) {
     root,
     ref,
     repositories_scanned: repositoriesScanned,
-    repositories_with_corrections: repositoriesWithCorrections,
-    lines: lineCount,
+    repositories_with_corrections: repositories.length,
+    lines: recordCount,
+    records: recordCount,
     pending: pendingCount,
     repositories,
     repeated_in_repository: groups.inRepository,
@@ -488,10 +652,15 @@ function clean(value) {
   return String(value).replace(/[\u0000-\u001f\u007f-\u009f]+/g, " ");
 }
 
+// The path a record comes from: the old file with its line, or the record file.
+function sourceOf(line) {
+  return line.line === null ? `(${clean(line.source)})` : `(${clean(line.source)}:${line.line})`;
+}
+
 function textReport(report) {
   const lines = [];
   lines.push(`Corrections report: ${report.root}${report.ref === null ? " (working trees)" : ` (at ${clean(report.ref)})`}`);
-  lines.push(`Repositories scanned: ${report.repositories_scanned}; with corrections: ${report.repositories_with_corrections}; lines: ${report.lines}; pending: ${report.pending}`);
+  lines.push(`Repositories scanned: ${report.repositories_scanned}; with corrections: ${report.repositories_with_corrections}; lines: ${report.lines}; records: ${report.records}; pending: ${report.pending}`);
 
   lines.push("");
   lines.push("## Pending (promoted_to is empty)");
@@ -502,7 +671,7 @@ function textReport(report) {
     for (const repository of pendingRepositories) {
       lines.push(`### ${clean(repository.name)} (${clean(repository.paths.join(", "))})`);
       for (const line of [...repository.pending].sort(compareLines)) {
-        lines.push(`- ${clean(line.date)} [${clean(line.scope)}] ${clean(line.correction)} — evidence: ${clean(line.evidence)}`);
+        lines.push(`- ${clean(line.date)} [${clean(line.scope)}] ${clean(line.correction)} — evidence: ${clean(line.evidence)} ${sourceOf(line)}`);
       }
     }
   }
@@ -515,7 +684,7 @@ function textReport(report) {
     for (const group of report.repeated_in_repository) {
       lines.push(`### ${clean(group.repository)}: ${clean(group.scope)} (${group.lines} lines, ${group.promoted} promoted)`);
       for (const line of group.pending) {
-        lines.push(`- ${clean(line.date)} ${clean(line.correction)} — evidence: ${clean(line.evidence)}`);
+        lines.push(`- ${clean(line.date)} ${clean(line.correction)} — evidence: ${clean(line.evidence)} ${sourceOf(line)}`);
       }
     }
   }
@@ -528,7 +697,7 @@ function textReport(report) {
     for (const group of report.repeated_across_repositories) {
       lines.push(`### ${clean(group.scope)}: ${clean(group.repositories.join(", "))} (${group.lines} lines, ${group.promoted} promoted)`);
       for (const line of group.pending) {
-        lines.push(`- ${clean(line.repository)} ${clean(line.date)} ${clean(line.correction)} — evidence: ${clean(line.evidence)}`);
+        lines.push(`- ${clean(line.repository)} ${clean(line.date)} ${clean(line.correction)} — evidence: ${clean(line.evidence)} ${sourceOf(line)}`);
       }
     }
   }
@@ -563,6 +732,7 @@ function jsonReport(report) {
       correction: line.correction,
       evidence: line.evidence,
       path: line.path,
+      source: line.source,
       line: line.line,
     })),
   }));
@@ -577,6 +747,7 @@ function jsonReport(report) {
       correction: line.correction,
       evidence: line.evidence,
       path: line.path,
+      source: line.source,
       line: line.line,
     })),
   }));
@@ -588,6 +759,7 @@ function jsonReport(report) {
     repositories_scanned: report.repositories_scanned,
     repositories_with_corrections: report.repositories_with_corrections,
     lines: report.lines,
+    records: report.records,
     pending: report.pending,
     repositories,
     repeated_in_repository: repeatedInRepository,

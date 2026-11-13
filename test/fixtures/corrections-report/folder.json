@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "root": "<ROOT>",
+  "ref": null,
+  "repositories_scanned": 1,
+  "repositories_with_corrections": 1,
+  "lines": 3,
+  "records": 3,
+  "pending": 2,
+  "repositories": [
+    {
+      "name": "frostyard/repo-a",
+      "paths": [
+        "repo-a"
+      ],
+      "lines": 3,
+      "pending": [
+        {
+          "date": "2026-11-04",
+          "scope": "Agent",
+          "correction": "Read both forms",
+          "evidence": "review 412",
+          "path": "repo-a",
+          "source": ".memory/corrections/2026-11-04-alpha.json",
+          "line": null
+        },
+        {
+          "date": "2026-11-05",
+          "scope": "agent",
+          "correction": "Name a record by its date and slug",
+          "evidence": "review 413",
+          "path": "repo-a",
+          "source": ".memory/corrections/2026-11-05-beta.json",
+          "line": null
+        }
+      ]
+    }
+  ],
+  "repeated_in_repository": [
+    {
+      "repository": "frostyard/repo-a",
+      "scope": "Agent",
+      "lines": 2,
+      "promoted": 0,
+      "pending": [
+        {
+          "date": "2026-11-04",
+          "correction": "Read both forms",
+          "evidence": "review 412",
+          "path": "repo-a",
+          "source": ".memory/corrections/2026-11-04-alpha.json",
+          "line": null
+        },
+        {
+          "date": "2026-11-05",
+          "correction": "Name a record by its date and slug",
+          "evidence": "review 413",
+          "path": "repo-a",
+          "source": ".memory/corrections/2026-11-05-beta.json",
+          "line": null
+        }
+      ]
+    }
+  ],
+  "repeated_across_repositories": [],
+  "unreadable": []
+}

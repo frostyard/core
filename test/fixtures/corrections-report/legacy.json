@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "root": "<ROOT>",
+  "ref": null,
+  "repositories_scanned": 1,
+  "repositories_with_corrections": 1,
+  "lines": 3,
+  "records": 3,
+  "pending": 2,
+  "repositories": [
+    {
+      "name": "frostyard/repo-a",
+      "paths": [
+        "repo-a"
+      ],
+      "lines": 3,
+      "pending": [
+        {
+          "date": "2026-11-01",
+          "scope": "Agent",
+          "correction": "Read both forms",
+          "evidence": "review 412",
+          "path": "repo-a",
+          "source": ".memory/corrections.jsonl",
+          "line": 1
+        },
+        {
+          "date": "2026-11-02",
+          "scope": "agent",
+          "correction": "Keep the old reader",
+          "evidence": "review 413",
+          "path": "repo-a",
+          "source": ".memory/corrections.jsonl",
+          "line": 2
+        }
+      ]
+    }
+  ],
+  "repeated_in_repository": [
+    {
+      "repository": "frostyard/repo-a",
+      "scope": "Agent",
+      "lines": 2,
+      "promoted": 0,
+      "pending": [
+        {
+          "date": "2026-11-01",
+          "correction": "Read both forms",
+          "evidence": "review 412",
+          "path": "repo-a",
+          "source": ".memory/corrections.jsonl",
+          "line": 1
+        },
+        {
+          "date": "2026-11-02",
+          "correction": "Keep the old reader",
+          "evidence": "review 413",
+          "path": "repo-a",
+          "source": ".memory/corrections.jsonl",
+          "line": 2
+        }
+      ]
+    }
+  ],
+  "repeated_across_repositories": [],
+  "unreadable": []
+}

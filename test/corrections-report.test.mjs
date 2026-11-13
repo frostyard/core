@@ -127,7 +127,7 @@ test("two checkouts of one repository merge and prefer promoted state", async ()
   writeJsonl(path.join(root, "repo-a-worktree"), [{ ...duplicate, promoted_to: "AGENTS.md" }]);
 
   const { stdout } = await run(root);
-  assert.match(stdout, /Repositories scanned: 2; with corrections: 1; lines: 1; pending: 0/);
+  assert.match(stdout, /Repositories scanned: 2; with corrections: 1; lines: 1; records: 1; pending: 0/);
   assert.doesNotMatch(stdout, /- 2026-11-04 \[Same state\]/);
   assert.doesNotMatch(stdout, /Repeated scopes in 1 repository[\s\S]*frostyard\/repo-a: Same state|One correction/);
 
@@ -401,6 +401,13 @@ test("--ref reads only the file at the ref, once per clone", async () => {
   const treeReport = JSON.parse(trees);
   assert.equal(treeReport.ref, null);
   assert.equal(treeReport.lines, 3, "working trees count the branch and the uncommitted lines");
+  // 2 branches appended 2 different records at line 2 of the old file: the
+  // line number names 2 records, so both are kept, each with its checkout.
+  assert.deepEqual(treeReport.repositories[0].pending.map((item) => [item.path, item.correction]), [
+    ["repo-a", "Merged correction"],
+    ["repo-a-feature", "Branch-only correction"],
+    ["repo-a", "Uncommitted correction"],
+  ]);
 
   const { stdout } = await run(root, ["--ref", "origin/main", "--json"]);
   const report = JSON.parse(stdout);
@@ -431,7 +438,7 @@ test("--ref lists a checkout with the file but without the ref, and skips one wi
   const report = JSON.parse(stdout);
   assert.equal(report.lines, 0);
   assert.deepEqual(report.unreadable, [
-    { repository: "frostyard/repo-a", path: "repo-a/.memory/corrections.jsonl", line: null, reason: "ref not found: origin/main" },
+    { repository: "frostyard/repo-a", path: "repo-a/.memory/corrections.jsonl", source: ".memory/corrections.jsonl", line: null, reason: "ref not found: origin/main" },
   ]);
 });
 
@@ -455,8 +462,8 @@ test("--ref does not follow a committed symbolic link and reports bad lines at t
   const report = JSON.parse(stdout);
   assert.equal(report.lines, 1);
   assert.deepEqual(report.unreadable, [
-    { repository: "frostyard/repo-a", path: "repo-a/.memory/corrections.jsonl", line: null, reason: "symbolic link, not followed" },
-    { repository: "frostyard/repo-b", path: "repo-b/.memory/corrections.jsonl", line: 2, reason: "invalid JSON" },
+    { repository: "frostyard/repo-a", path: "repo-a/.memory/corrections.jsonl", source: ".memory/corrections.jsonl", line: null, reason: "symbolic link, not followed" },
+    { repository: "frostyard/repo-b", path: "repo-b/.memory/corrections.jsonl", source: ".memory/corrections.jsonl", line: 2, reason: "invalid JSON" },
   ]);
 });
 
@@ -484,7 +491,7 @@ test("--ref checks each worktree for a file when the clone has no such ref", asy
   const report = JSON.parse(stdout);
   assert.equal(report.lines, 0);
   assert.deepEqual(report.unreadable, [
-    { repository: "frostyard/repo-a", path: "repo-a-wt/.memory/corrections.jsonl", line: null, reason: "ref not found: origin/main" },
+    { repository: "frostyard/repo-a", path: "repo-a-wt/.memory/corrections.jsonl", source: ".memory/corrections.jsonl", line: null, reason: "ref not found: origin/main" },
   ]);
 });
 
@@ -544,7 +551,413 @@ test("--ref lists a checkout without the ref whose .memory folder is denied", { 
   const { stdout } = await run(root, ["--ref", "origin/main", "--json"]);
   chmodSync(memory, 0o755);
   const report = JSON.parse(stdout);
-  assert.deepEqual(report.unreadable, [
-    { repository: "frostyard/repo-a", path: "repo-a/.memory/corrections.jsonl", line: null, reason: "ref not found: origin/main; cannot read: EACCES" },
+  // Both candidate paths of the checkout fail to read, so both are listed.
+  assert.deepEqual(report.unreadable.map((item) => [item.source, item.reason]), [
+    [".memory/corrections", "ref not found: origin/main; cannot read: EACCES"],
+    [".memory/corrections.jsonl", "ref not found: origin/main; cannot read: EACCES"],
   ]);
+});
+
+test("a promotion is not moved to another record that holds the same key", async () => {
+  const root = await fixture();
+  const shared = line("2026-11-04", "pr-20", "Same key", "check");
+  // Checkout A holds 1 promoted record; checkout B holds the same file
+  // pending and 1 more record with the same 4 key fields.
+  for (const [name, records] of [
+    ["repo-a", { "2026-11-04-pr-20-z.json": { ...shared, promoted_to: "AGENTS.md" } }],
+    ["repo-a-worktree", { "2026-11-04-pr-20-z.json": shared, "2026-11-04-pr-20-a.json": shared }],
+  ]) {
+    const repo = path.join(root, name);
+    mkdirSync(repo);
+    await initRepo(repo, "repo-a");
+    mkdirSync(path.join(repo, ".memory/corrections"), { recursive: true });
+    for (const [file, value] of Object.entries(records)) {
+      writeFileSync(path.join(repo, ".memory/corrections", file), canonical(value));
+    }
+    await commitAll(repo, "records");
+  }
+
+  for (const extra of [[], ["--ref", "HEAD"]]) {
+    const report = JSON.parse((await run(root, ["--json", ...extra])).stdout);
+    assert.equal(report.records, 2, extra.join(" "));
+    assert.equal(report.pending, 1);
+    assert.deepEqual(report.repositories[0].pending.map((item) => item.source), [
+      ".memory/corrections/2026-11-04-pr-20-a.json",
+    ]);
+  }
+});
+
+test("a migration and the old form are 1 record: line 3 and its legacy- file", async () => {
+  const root = await fixture();
+  const shared = line("2026-11-04", "agent", "Same key", "check");
+  // Checkout A still has the old file, line 3 pending; checkout B moved the
+  // file and its record was promoted since.
+  const old = path.join(root, "repo-a");
+  mkdirSync(old);
+  await initRepo(old, "repo-a");
+  writeJsonl(old, [
+    line("2026-11-01", "agent", "First"),
+    line("2026-11-02", "agent", "Second"),
+    shared,
+  ]);
+  await commitAll(old, "old form");
+  const migrated = path.join(root, "repo-a-worktree");
+  mkdirSync(migrated);
+  await initRepo(migrated, "repo-a");
+  mkdirSync(path.join(migrated, ".memory/corrections"), { recursive: true });
+  for (const [name, value] of [
+    ["2026-11-01-legacy-0001.json", line("2026-11-01", "agent", "First")],
+    ["2026-11-02-legacy-0002.json", line("2026-11-02", "agent", "Second")],
+    ["2026-11-04-legacy-0003.json", { ...shared, promoted_to: "AGENTS.md" }],
+  ]) {
+    writeFileSync(path.join(migrated, ".memory/corrections", name), canonical(value));
+  }
+  await commitAll(migrated, "migrated");
+
+  for (const extra of [[], ["--ref", "HEAD"]]) {
+    const report = JSON.parse((await run(root, ["--json", ...extra])).stdout);
+    // Line 3 of the old file and 2026-11-04-legacy-0003.json are 1 record, not
+    // 2: 3 records, not 4.
+    assert.equal(report.records, 3, extra.join(" "));
+    assert.equal(report.pending, 2);
+    assert.deepEqual(report.repositories[0].pending.map((item) => [item.source, item.line]), [
+      [".memory/corrections.jsonl", 1],
+      [".memory/corrections.jsonl", 2],
+    ]);
+    // The promoted copy of the third record is the one kept, with its source.
+    const group = report.repeated_in_repository.find((item) => item.scope === "agent");
+    assert.equal(group.lines, 3);
+    assert.equal(group.promoted, 1);
+  }
+});
+
+test("2 different records at legacy line 2 in 2 checkouts stay 2 records", async () => {
+  const root = await fixture();
+  const first = line("2026-11-01", "agent", "First");
+  // Checkout A still has the old file, where line 2 is record X; checkout B
+  // moved the file and its line 2 became 1 file that holds another record Y.
+  const old = path.join(root, "repo-a");
+  mkdirSync(old);
+  await initRepo(old, "repo-a");
+  writeJsonl(old, [first, line("2026-11-02", "agent", "Record X")]);
+  await commitAll(old, "old form");
+  const migrated = path.join(root, "repo-a-worktree");
+  mkdirSync(migrated);
+  await initRepo(migrated, "repo-a");
+  mkdirSync(path.join(migrated, ".memory/corrections"), { recursive: true });
+  writeFileSync(
+    path.join(migrated, ".memory/corrections/2026-11-02-legacy-0002.json"),
+    canonical(line("2026-11-02", "agent", "Record Y")),
+  );
+  await commitAll(migrated, "migrated");
+
+  for (const extra of [[], ["--ref", "HEAD"]]) {
+    const report = JSON.parse((await run(root, ["--json", ...extra])).stdout);
+    // Line 1 is the same record in both; the 2 records at line 2 are not.
+    assert.equal(report.records, 3, extra.join(" "));
+    assert.deepEqual(report.repositories[0].pending.map((item) => [item.path, item.correction]), [
+      ["repo-a", "First"],
+      ["repo-a", "Record X"],
+      ["repo-a-worktree", "Record Y"],
+    ]);
+  }
+});
+
+test("the same record at line 2 in both forms is 1 record, promoted", async () => {
+  const root = await fixture();
+  const first = line("2026-11-01", "agent", "First");
+  const shared = line("2026-11-02", "agent", "Same record");
+  const old = path.join(root, "repo-a");
+  mkdirSync(old);
+  await initRepo(old, "repo-a");
+  writeJsonl(old, [first, shared]);
+  await commitAll(old, "old form");
+  const migrated = path.join(root, "repo-a-worktree");
+  mkdirSync(migrated);
+  await initRepo(migrated, "repo-a");
+  mkdirSync(path.join(migrated, ".memory/corrections"), { recursive: true });
+  writeFileSync(path.join(migrated, ".memory/corrections/2026-11-01-legacy-0001.json"), canonical(first));
+  writeFileSync(
+    path.join(migrated, ".memory/corrections/2026-11-02-legacy-0002.json"),
+    canonical({ ...shared, promoted_to: "AGENTS.md" }),
+  );
+  await commitAll(migrated, "migrated");
+
+  for (const extra of [[], ["--ref", "HEAD"]]) {
+    const report = JSON.parse((await run(root, ["--json", ...extra])).stdout);
+    // 2 records, not 4: each line and its record file are 1 record, and the
+    // promotion of the copy is kept.
+    assert.equal(report.records, 2, extra.join(" "));
+    assert.equal(report.pending, 1);
+    assert.deepEqual(report.repositories[0].pending.map((item) => item.correction), ["First"]);
+    const group = report.repeated_in_repository.find((item) => item.scope === "agent");
+    assert.equal(group.lines, 2);
+    assert.equal(group.promoted, 1);
+  }
+});
+
+test("2 records with 1 key and different promoted_to stay 2 records", async () => {
+  const root = await fixture();
+  const repo = path.join(root, "repo-a");
+  mkdirSync(repo);
+  await initRepo(repo, "repo-a");
+  mkdirSync(path.join(repo, ".memory/corrections"), { recursive: true });
+  const shared = line("2026-11-04", "agent", "Same key", "check");
+  writeFileSync(path.join(repo, ".memory/corrections/2026-11-04-one.json"), canonical(shared));
+  writeFileSync(path.join(repo, ".memory/corrections/2026-11-04-two.json"), canonical({ ...shared, promoted_to: "AGENTS.md" }));
+  await commitAll(repo, "2 records");
+
+  for (const extra of [[], ["--ref", "HEAD"]]) {
+    const report = JSON.parse((await run(root, ["--json", ...extra])).stdout);
+    assert.equal(report.records, 2, extra.join(" "));
+    assert.equal(report.pending, 1);
+    // The unpromoted record is pending, and it names its own file.
+    assert.deepEqual(report.repositories[0].pending.map((item) => [item.source, item.line]), [
+      [".memory/corrections/2026-11-04-one.json", null],
+    ]);
+    assert.equal(report.repeated_in_repository.length, 1);
+    assert.equal(report.repeated_in_repository[0].lines, 2);
+    assert.equal(report.repeated_in_repository[0].promoted, 1);
+    assert.deepEqual(report.repeated_in_repository[0].pending.map((item) => item.source), [
+      ".memory/corrections/2026-11-04-one.json",
+    ]);
+  }
+});
+
+test("an old-form line and a record file with 1 key stay 2 records", async () => {
+  const root = await fixture();
+  const repo = path.join(root, "repo-a");
+  mkdirSync(repo);
+  await initRepo(repo, "repo-a");
+  const shared = line("2026-11-04", "agent", "Same key", "check");
+  writeJsonl(repo, [shared]);
+  mkdirSync(path.join(repo, ".memory/corrections"), { recursive: true });
+  writeFileSync(path.join(repo, ".memory/corrections/2026-11-04-two.json"), canonical({ ...shared, promoted_to: "AGENTS.md" }));
+  await commitAll(repo, "both forms");
+
+  for (const extra of [[], ["--ref", "HEAD"]]) {
+    const report = JSON.parse((await run(root, ["--json", ...extra])).stdout);
+    assert.equal(report.records, 2, extra.join(" "));
+    assert.equal(report.pending, 1);
+    assert.deepEqual(report.repositories[0].pending.map((item) => [item.source, item.line]), [
+      [".memory/corrections.jsonl", 1],
+    ]);
+    assert.equal(report.repeated_in_repository[0].lines, 2);
+    assert.equal(report.repeated_in_repository[0].promoted, 1);
+  }
+});
+
+test("2 checkouts of 1 repository with the same 2 records give 2 records", async () => {
+  const root = await fixture();
+  const shared = line("2026-11-04", "agent", "Same key", "check");
+  for (const name of ["repo-a", "repo-a-worktree"]) {
+    const repo = path.join(root, name);
+    mkdirSync(repo);
+    await initRepo(repo, "repo-a");
+    mkdirSync(path.join(repo, ".memory/corrections"), { recursive: true });
+    writeFileSync(path.join(repo, ".memory/corrections/2026-11-04-one.json"), canonical(shared));
+    writeFileSync(path.join(repo, ".memory/corrections/2026-11-04-two.json"), canonical({ ...shared, promoted_to: "AGENTS.md" }));
+    await commitAll(repo, "2 records");
+  }
+
+  for (const extra of [[], ["--ref", "HEAD"]]) {
+    const report = JSON.parse((await run(root, ["--json", ...extra])).stdout);
+    assert.equal(report.repositories.length, 1);
+    assert.deepEqual(report.repositories[0].paths, ["repo-a", "repo-a-worktree"]);
+    assert.equal(report.records, 2, extra.join(" "));
+    assert.equal(report.pending, 1);
+  }
+});
+
+test("--ref lists a dangling .memory link as unreadable and reads nothing", async () => {
+  const root = await fixture();
+  const repo = path.join(root, "repo-a");
+  mkdirSync(repo);
+  await initRepo(repo, "repo-a");
+  symlinkSync(path.join(root, "gone"), path.join(repo, ".memory"));
+
+  const report = JSON.parse((await run(root, ["--ref", "origin/main", "--json"])).stdout);
+  assert.equal(report.records, 0);
+  assert.deepEqual(report.unreadable, [{
+    repository: "frostyard/repo-a",
+    path: "repo-a/.memory",
+    source: ".memory",
+    line: null,
+    reason: "ref not found: origin/main; symbolic link, not followed",
+  }]);
+});
+
+test("--ref does not read the records behind a .memory link", async () => {
+  const root = await fixture();
+  const outside = await fixture();
+  mkdirSync(path.join(outside, ".memory/corrections"), { recursive: true });
+  writeFileSync(
+    path.join(outside, ".memory/corrections/2026-11-04-one.json"),
+    canonical(line("2026-11-04", "Outside", "Outside correction")),
+  );
+  const repo = path.join(root, "repo-a");
+  mkdirSync(repo);
+  await initRepo(repo, "repo-a");
+  symlinkSync(path.join(outside, ".memory"), path.join(repo, ".memory"));
+
+  const { stdout } = await run(root, ["--ref", "origin/main", "--json"]);
+  const report = JSON.parse(stdout);
+  assert.equal(report.records, 0);
+  assert.doesNotMatch(stdout, /Outside correction/);
+  assert.deepEqual(report.unreadable.map((item) => [item.source, item.reason]), [
+    [".memory", "ref not found: origin/main; symbolic link, not followed"],
+  ]);
+
+  const tree = JSON.parse((await run(root, ["--json"])).stdout);
+  assert.equal(tree.records, 0);
+  assert.deepEqual(tree.unreadable.map((item) => [item.source, item.reason]), [
+    [".memory", "symbolic link, not followed"],
+  ]);
+});
+
+// The 2 forms of the records (ADR-0081). Each fixture is the exact --json
+// output of 1 checkout, with the temporary root replaced by <ROOT>.
+const fixtureFolder = {
+  "2026-11-04-alpha.json": { date: "2026-11-04", scope: "Agent", correction: "Read both forms", evidence: "review 412", promoted_to: "" },
+  "2026-11-05-beta.json": { date: "2026-11-05", scope: "agent", correction: "Name a record by its date and slug", evidence: "review 413", promoted_to: "" },
+  "2026-11-06-gamma.json": { date: "2026-11-06", scope: "docs", correction: "Write the canonical bytes", evidence: "review 414", promoted_to: "AGENTS.md" },
+};
+const fixtureLegacy = [
+  { date: "2026-11-01", scope: "Agent", correction: "Read both forms", evidence: "review 412", promoted_to: "" },
+  { date: "2026-11-02", scope: "agent", correction: "Keep the old reader", evidence: "review 413", promoted_to: "" },
+  { date: "2026-11-03", scope: "docs", correction: "Promote the rule", evidence: "review 414", promoted_to: "AGENTS.md" },
+];
+
+function canonical(value) {
+  const ordered = {
+    date: value.date,
+    scope: value.scope,
+    correction: value.correction,
+    evidence: value.evidence,
+    promoted_to: value.promoted_to,
+  };
+  return `${JSON.stringify(ordered, null, 2)}\n`;
+}
+
+async function buildReportFixture(root, form) {
+  const repo = path.join(root, "repo-a");
+  mkdirSync(repo);
+  await initRepo(repo, "repo-a");
+  mkdirSync(path.join(repo, ".memory"), { recursive: true });
+  if (form === "folder") {
+    mkdirSync(path.join(repo, ".memory/corrections"), { recursive: true });
+    for (const [name, value] of Object.entries(fixtureFolder)) {
+      writeFileSync(path.join(repo, ".memory/corrections", name), canonical(value));
+    }
+    writeFileSync(path.join(repo, ".memory/corrections/.gitkeep"), "");
+  } else {
+    writeJsonl(repo, fixtureLegacy);
+  }
+  await commitAll(repo, "records");
+  return repo;
+}
+
+// The fixture is the exact --json text: the record field names, their order
+// and the spacing are pinned with it, not only the values.
+function fixtureText(name) {
+  return readFileSync(path.join(repoRoot, "test/fixtures/corrections-report", name), "utf8");
+}
+
+function normaliseJson(text, root, ref) {
+  const out = text.replaceAll(root, "<ROOT>");
+  return ref === null ? out : out.replace(`"ref": "${ref}"`, '"ref": null');
+}
+
+test("the folder fixture is the exact report in the working tree and at a ref", async () => {
+  const expected = fixtureText("folder.json");
+  const root = await fixture();
+  await buildReportFixture(root, "folder");
+
+  const workingTree = (await run(root, ["--json"])).stdout;
+  assert.equal(normaliseJson(workingTree, root, null), expected);
+
+  const atRef = (await run(root, ["--ref", "HEAD", "--json"])).stdout;
+  assert.ok(atRef.includes('"ref": "HEAD"'));
+  assert.equal(normaliseJson(atRef, root, "HEAD"), expected);
+
+  const { stdout } = await run(root);
+  assert.match(stdout, /lines: 3; records: 3; pending: 2/);
+  assert.match(stdout, /- 2026-11-04 \[Agent\] Read both forms — evidence: review 412 \(\.memory\/corrections\/2026-11-04-alpha\.json\)/);
+});
+
+test("the legacy fixture is the exact report in the working tree and at a ref", async () => {
+  const expected = fixtureText("legacy.json");
+  const root = await fixture();
+  await buildReportFixture(root, "legacy");
+
+  const workingTree = (await run(root, ["--json"])).stdout;
+  assert.equal(normaliseJson(workingTree, root, null), expected);
+
+  const atRef = (await run(root, ["--ref", "HEAD", "--json"])).stdout;
+  assert.ok(atRef.includes('"ref": "HEAD"'));
+  assert.equal(normaliseJson(atRef, root, "HEAD"), expected);
+
+  const { stdout } = await run(root);
+  assert.match(stdout, /- 2026-11-01 \[Agent\] Read both forms — evidence: review 412 \(\.memory\/corrections\.jsonl:1\)/);
+});
+
+test("a folder record has no line and names its file as its source", async () => {
+  const root = await fixture();
+  const repo = path.join(root, "repo-a");
+  mkdirSync(repo);
+  await initRepo(repo, "repo-a");
+  mkdirSync(path.join(repo, ".memory/corrections"), { recursive: true });
+  writeFileSync(path.join(repo, ".memory/corrections/2026-11-04-one.json"), canonical(line("2026-11-04", "Scope", "One")));
+
+  const report = JSON.parse((await run(root, ["--json"])).stdout);
+  assert.equal(report.records, 1);
+  assert.equal(report.lines, report.records);
+  const pending = report.repositories[0].pending[0];
+  assert.equal(pending.line, null);
+  assert.equal(pending.source, ".memory/corrections/2026-11-04-one.json");
+  assert.equal(pending.path, "repo-a");
+});
+
+test("a symbolic link in the folder is listed as unreadable, at the ref too", async () => {
+  const root = await fixture();
+  const repo = path.join(root, "repo-a");
+  mkdirSync(repo);
+  await initRepo(repo, "repo-a");
+  mkdirSync(path.join(repo, ".memory/corrections"), { recursive: true });
+  writeFileSync(path.join(repo, ".memory/corrections/2026-11-04-one.json"), canonical(line("2026-11-04", "Scope", "One")));
+  symlinkSync("/etc/hostname", path.join(repo, ".memory/corrections/2026-11-05-two.json"));
+  await commitAll(repo, "records");
+
+  for (const extra of [[], ["--ref", "HEAD"]]) {
+    const report = JSON.parse((await run(root, ["--json", ...extra])).stdout);
+    assert.equal(report.records, 1);
+    assert.deepEqual(report.unreadable, [{
+      repository: "frostyard/repo-a",
+      path: "repo-a/.memory/corrections/2026-11-05-two.json",
+      source: ".memory/corrections/2026-11-05-two.json",
+      line: null,
+      reason: "symbolic link, not followed",
+    }]);
+  }
+});
+
+test("a checkout with both forms reads both", async () => {
+  const root = await fixture();
+  const repo = path.join(root, "repo-a");
+  mkdirSync(repo);
+  await initRepo(repo, "repo-a");
+  mkdirSync(path.join(repo, ".memory/corrections"), { recursive: true });
+  writeJsonl(repo, [line("2026-11-04", "Legacy scope", "From the old file")]);
+  writeFileSync(path.join(repo, ".memory/corrections/2026-11-05-one.json"), canonical(line("2026-11-05", "Folder scope", "From a record file")));
+  await commitAll(repo, "both forms");
+
+  for (const extra of [[], ["--ref", "HEAD"]]) {
+    const report = JSON.parse((await run(root, ["--json", ...extra])).stdout);
+    assert.equal(report.records, 2);
+    assert.equal(report.pending, 2);
+    assert.deepEqual(report.repositories[0].pending.map((item) => [item.source, item.line]), [
+      [".memory/corrections.jsonl", 1],
+      [".memory/corrections/2026-11-05-one.json", null],
+    ]);
+  }
 });

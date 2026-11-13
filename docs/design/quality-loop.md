@@ -85,34 +85,43 @@ PR template ──► review rubric ──► CI gates ──► corrections ─
   failed row; owners fix the gaps in normal work. The organization gate
   stays the presence check above.
 - **Learn** — corrections land in
-  [.memory/corrections.jsonl](../../.memory/README.md) (append-only,
-  five-field schema, ADR-0018) and are promoted into `AGENTS.md`, docs, or
-  skills; promotion is the only sanctioned duplication.
+  [.memory/corrections/](../../.memory/README.md), 1 file for each record
+  (five-field schema, ADR-0018, [ADR-0081](../adr/0081-store-each-correction-in-a-file-of-its-own.md)),
+  and are promoted into `AGENTS.md`, docs, or skills; promotion is the only
+  sanctioned duplication. A repository that has not moved yet still has
+  `.memory/corrections.jsonl`, 1 record for each line (append-only).
   `scripts/check-corrections.mjs` (`npm run check:corrections`, part of
-  `make verify`) validates every line; with `--base <ref>` it also enforces
-  append-only, where the only allowed change to an existing line is an empty
-  `promoted_to` that is filled.
+  `make verify`) validates every record in either form; with `--base <ref>`
+  it also checks that no record is removed, renamed or changed (the only
+  allowed change is an empty `promoted_to` that is filled), that the old
+  file does not come back after the move, and that the move keeps every
+  line. `scripts/migrate-corrections.mjs` makes the move, and
+  `scripts/new-correction.mjs` writes 1 record file in canonical form.
   - **Blocker to guard.** When a review (cross-review, owner review, or a
     human) finds a blocking point, the PR that fixes it also adds a guard in
     the same PR: a targeted test that fails without the fix (preferred), or
-    an `AGENTS.md` rule when no test can catch it. The same PR appends one
-    line to `.memory/corrections.jsonl`: `evidence` names the PR and the
-    review, and `promoted_to` names the test or the rule.
+    an `AGENTS.md` rule when no test can catch it. The same PR adds 1
+    record file under `.memory/corrections/`
+    (`<date>-pr-<N>-<words>.json`); in a repository that still has
+    `.memory/corrections.jsonl`, it appends 1 line there instead.
+    `evidence` names the PR and the review, and `promoted_to` names the
+    test or the rule.
   - **Lessons live in the repository.** A lesson about one repository goes
     into that repository by PR — a test, an `AGENTS.md` rule, or a
-    corrections line — so other agents, other tools, and humans see it.
+    corrections record — so other agents, other tools, and humans see it.
     Agent-private memory keeps only an agent's role, its owner's
     preferences, lessons that span repositories, and facts of one machine.
   - **Weekly promotion.** Each week (the Friday hygiene line) each owner runs
     `node scripts/corrections-report.mjs --root ~/projects --ref origin/main`
     against its local checkouts, after a `git fetch` in each. With `--ref` it
-    reads each `.memory/corrections.jsonl` at that ref, once per clone, so a
-    line on an unmerged branch, an uncommitted edit, or a second worktree is
-    not counted; a checkout that has the file but not the ref is listed as
+    reads the records at that ref (the `.memory/corrections/` files or the
+    `.memory/corrections.jsonl` lines), once per clone, so a record on an
+    unmerged branch, an uncommitted edit, or a second worktree is not
+    counted; a checkout that has records but not the ref is listed as
     unreadable. Without `--ref` it reads the working trees. It reads only
-    and lists, per repository, the lines with an empty `promoted_to`, and
-    the scopes that repeat (2 or more lines in 1
-    repository, or 1 scope in 2 or more repositories). A repeat in 1
+    and lists, per repository, the records with an empty `promoted_to`
+    (each with its `source` path), and the scopes that repeat (2 or more
+    records in 1 repository, or 1 scope in 2 or more repositories). A repeat in 1
     repository becomes an `AGENTS.md` rule or a test; a repeat across
     repositories becomes a core skill or ADR; the owner then fills
     `promoted_to` by PR.
@@ -157,7 +166,8 @@ copy it as-is.
   [ADR-0071](../adr/0071-hold-every-code-repository-to-one-baseline.md),
   [ADR-0072](../adr/0072-write-every-readme-to-one-standard.md),
   [ADR-0077](../adr/0077-bind-ready-for-human-to-the-head-commit.md),
-  [ADR-0078](../adr/0078-sort-pull-requests-by-levels-l1-to-l4.md)
+  [ADR-0078](../adr/0078-sort-pull-requests-by-levels-l1-to-l4.md),
+  [ADR-0081](../adr/0081-store-each-correction-in-a-file-of-its-own.md)
 - Contracts: [specs/pr-review-rubric.md](../specs/pr-review-rubric.md),
   [specs/pr-acceptance-metric.md](../specs/pr-acceptance-metric.md),
   [specs/risk-paths.md](../specs/risk-paths.md),
