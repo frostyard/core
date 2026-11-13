@@ -1,8 +1,11 @@
 # Plan: Support suites in Repogen
 
-**Status:** Implementation plan. This document records order and gates; it
-does not itself authorize credential changes, publication, deployment, merge,
-or support announcements.
+**Status:** Superseded by [Plan 0009](0009-debian-publication-through-apt-publisher.md)
+on 2026-10-02 (status line corrected on 2026-11-13). Repogen
+[ADR-0015](https://github.com/frostyard/repogen/blob/main/docs/adr/0015-remove-the-superseded-production-path.md)
+removed Repogen's Debian production path on 2026-10-24: apt-publisher is the
+only Frostyard Debian writer. This document records order and gates; it does not itself authorize credential changes, publication,
+deployment, merge, or support announcements.
 
 **Superseded by [Plan 0009](0009-debian-publication-through-apt-publisher.md)** on 2026-10-02, when
 [ADR-0055](../adr/0055-publish-debian-packages-through-the-apt-publisher.md) and

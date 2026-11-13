@@ -1,5 +1,17 @@
 # Plan: Organization portfolio stewardship
 
+**Status:** Superseded on 2026-11-13. Its issues
+[core#56](https://github.com/frostyard/core/issues/56),
+[#57](https://github.com/frostyard/core/issues/57) and
+[#58](https://github.com/frostyard/core/issues/58) closed as not planned on
+2026-08-24, and Phases 1 to 4 did not start. The
+[repository baseline](../specs/repository-baseline.md)
+([ADR-0071](../adr/0071-hold-every-code-repository-to-one-baseline.md))
+and its weekly conformance sweep replace Phase 2's adoption measure; no
+portfolio map or quarterly review replaces Phases 1 and 4. The Dev release
+concurrency item is done: chairlift#208 and pilothouse#197 merged on
+2026-08-13 ([Plan 0004](0004-dev-release-concurrency-rollout.md)).
+
 This plan turns core from a shared-material repository into the visible
 planning surface for Frostyard's repository portfolio. It establishes a
 reviewable lifecycle map, measurable adoption of core-managed practices, and

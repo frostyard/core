@@ -1,5 +1,12 @@
 # Plan: Organization authority rollout
 
+**Status:** Superseded on 2026-11-13 by [ADR-0064](../adr/0064-retire-snowcat.md),
+which retired Snowcat on 2026-11-01: no service imports the organization
+authority tree. Phase 1 is done; Phase 2 is partly done (the
+[verification profiles](../specs/organization-verification-profiles.md) and
+[goals](../specs/organization-goals.md) specs, 2026-08-16 and 2026-08-17).
+Phases 3 and 4 are not done. ADR-0064 keeps this plan as history.
+
 This plan delivers core's machine-readable authority surface in independently
 reviewable slices. It complements the
 [organization portfolio roadmap](0002-org-portfolio-roadmap.md): the portfolio

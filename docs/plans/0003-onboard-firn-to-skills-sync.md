@@ -1,5 +1,9 @@
 # Firn Skills Sync Onboarding Implementation Plan
 
+**Status:** Done on 2026-08-12. `.github/skills-sync.json` assigns `firn`
+its extra skills (commit 0394183; now `@go`), and firn merges the
+skills-sync pull requests (latest frostyard/firn#138, 2026-11-06).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use
 > superpowers:subagent-driven-development (recommended) or
 > superpowers:executing-plans to implement this plan task-by-task. Steps use
