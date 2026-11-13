@@ -396,26 +396,34 @@ function discoverRepositories(root, maxDepth) {
   return found.sort((a, b) => compareText(a.path, b.path));
 }
 
-// 2 distinct records may hold the same 4 fields (2 record files, or a line of
-// the old form and a record file), so a record is named by its key and by its
-// place among the records with that key: (key, k). The k-th record with a key
-// in 1 checkout is the k-th record with that key in another checkout of the
-// same repository, so the checkouts merge and 2 records never collapse to 1.
+// The permanent identity of a record: line N of the old file and the record
+// file <date>-legacy-<digits>.json that line N became are the same record, and
+// every other record file is named by its file name. Content is not identity:
+// 2 distinct records may hold the same 4 fields, and a checkout may hold a
+// different set of them, so a merge by content would move a promotion.
+const LEGACY_FILE = /^(\d{4}-\d{2}-\d{2})-legacy-(\d+)\.json$/;
+
+function recordIdentity(line) {
+  if (line.source === OLD) return `legacy:${Number(line.line)}`;
+  const name = line.source.startsWith(`${DIR}/`) ? line.source.slice(DIR.length + 1) : line.source;
+  const match = LEGACY_FILE.exec(name);
+  // 4 digits and 5 digits name the same line, so the number counts, not its
+  // padding.
+  return match ? `legacy:${Number(match[2])}` : `file:${name}`;
+}
+
 function mergeCheckouts(checkouts) {
   const merged = new Map();
 
   for (const checkout of checkouts.sort((a, b) => compareText(a.path, b.path))) {
-    const place = new Map();
-    for (const line of [...checkout.lines].sort(compareLines)) {
-      const key = JSON.stringify([line.date, line.scope, line.correction, line.evidence]);
-      const k = (place.get(key) ?? 0) + 1;
-      place.set(key, k);
-      const mergeKey = JSON.stringify([key, k]);
-      const existing = merged.get(mergeKey);
+    for (const line of checkout.lines) {
+      // The record that is kept brings its own source and line.
+      const identity = recordIdentity(line);
+      const existing = merged.get(identity);
       if (!existing) {
-        merged.set(mergeKey, { ...line });
+        merged.set(identity, { ...line });
       } else if (existing.promoted_to.trim() === "" && line.promoted_to.trim() !== "") {
-        merged.set(mergeKey, { ...line });
+        merged.set(identity, { ...line });
       }
     }
   }

@@ -180,6 +180,34 @@ function checkPaths() {
   return folder !== null;
 }
 
+// The name of this script's temp file, which a stopped run may leave behind.
+const TEMP = /^\.migrate-[0-9a-f]{16}\.tmp$/;
+
+// A run that stopped after its temp write and before the rename leaves a temp
+// file. It is this script's own file, so the next run removes it: a regular
+// file or a symbolic link is removed at the link itself, never its target, and
+// a folder is left alone.
+function removeLeftovers() {
+  const memory = resolve(root, ".memory");
+  let names;
+  try {
+    names = readdirSync(memory);
+  } catch (error) {
+    stop(`cannot read .memory: ${error.code ?? error.message}`);
+  }
+  for (const name of names.sort(compareBytes)) {
+    if (!TEMP.test(name)) continue;
+    const path = resolve(memory, name);
+    const stat = lstatOrNull(path);
+    if (stat === null || stat.isDirectory()) continue;
+    try {
+      rmSync(path, { force: true });
+    } catch (error) {
+      stop(`cannot remove .memory/${name}: ${error.code ?? error.message}`);
+    }
+  }
+}
+
 function sha256(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
 }
@@ -200,7 +228,9 @@ try {
 // UTF-8 before any of them is written.
 let utf8;
 try {
-  utf8 = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  // ignoreBOM: a leading U+FEFF stays in the text, so line 1 is not JSON and
+  // the run stops instead of migrating a file whose first record may differ.
+  utf8 = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
 } catch {
   stop(`${OLD}: not valid UTF-8`);
 }
@@ -340,6 +370,9 @@ if (pr === undefined) {
 }
 
 // ---- write, then delete the old file ----
+
+// Only after every output passed: a run that stops in planning changes nothing.
+removeLeftovers();
 
 if (!existsSync(dirPath)) {
   try {

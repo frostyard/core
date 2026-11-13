@@ -203,23 +203,20 @@ test("2 runs on 2 equal fixtures give byte-equal trees", async () => {
   assert.deepEqual(snapshot(first), snapshot(second));
 });
 
-test("a rerun after a stop gives a tree byte-equal to a clean run", async () => {
+test("a rerun after a stop gives a complete tree byte-equal to a clean run", async () => {
   const clean = fixture();
   const partial = fixture();
   const objects = [record(), record("2026-11-05", { correction: "Second" }), record("2026-11-06", { correction: "Third" })];
   writeOld(clean, objects);
   writeOld(partial, objects);
-  // What a run that stopped after its first file would leave behind.
-  writeRecords(partial, {
-    "2026-11-04-legacy-0001.json": canonical(record()),
-    ".migrate-2026-11-05-legacy-0002.json.tmp": canonical(record("2026-11-05")),
-  });
+  // The real stop: 1 record written, the temp file of the next record still in
+  // .memory, and the old file not yet removed. Nothing is filtered out of the
+  // comparison: the temp file must be gone from the rerun's tree.
+  writeRecords(partial, { "2026-11-04-legacy-0001.json": canonical(record()) });
+  writeFileSync(path.join(partial, ".memory/.migrate-0123456789abcdef.tmp"), canonical(record("2026-11-05")));
   await run(partial);
   await run(clean);
-  // The leftover temp file of the stopped run is outside the output: compare
-  // the records and the old file, which must both be identical.
-  const withoutTemp = (entries) => entries.filter(([name]) => !name.endsWith(".tmp"));
-  assert.deepEqual(withoutTemp(snapshot(partial)), withoutTemp(snapshot(clean)));
+  assert.deepEqual(snapshot(partial), snapshot(clean));
 });
 
 test("the migration output passes the validator against the base with the old file", async () => {
@@ -427,6 +424,47 @@ test("--pr does not match a file whose slug only contains legacy-", async () => 
     readFileSync(path.join(root, ".memory/corrections/2026-11-04-pr-12-legacy-note.json")),
     canonical(record("2026-11-04", { correction: "Same key" })),
   );
+});
+
+test("a leftover temp file that is a link is removed, its target kept", async () => {
+  const root = fixture();
+  const outside = emptyDir();
+  const target = path.join(outside, "keep.txt");
+  writeFileSync(target, "keep me");
+  writeOld(root, [record()]);
+  symlinkSync(target, path.join(root, ".memory/.migrate-0123456789abcdef.tmp"));
+
+  const { stdout } = await run(root);
+  assert.equal(stdout, "migrated 1 records (1 new files, 0 unchanged, 0 promoted)\n");
+  assert.deepEqual(readdirSync(path.join(root, ".memory")).sort(), ["corrections"]);
+  assert.equal(readFileSync(target, "utf8"), "keep me");
+  assert.deepEqual(readdirSync(outside), ["keep.txt"]);
+});
+
+test("a leftover temp folder and another name are left alone", async () => {
+  const root = fixture();
+  writeOld(root, [record()]);
+  mkdirSync(path.join(root, ".memory/.migrate-0123456789abcdef.tmp"));
+  writeFileSync(path.join(root, ".memory/.migrate-NOTAHASH.tmp"), "keep");
+  await run(root);
+  assert.deepEqual(readdirSync(path.join(root, ".memory")).sort(), [
+    ".migrate-0123456789abcdef.tmp",
+    ".migrate-NOTAHASH.tmp",
+    "corrections",
+  ]);
+});
+
+test("a BOM at the start of the old file exits 1 and writes nothing", async () => {
+  const root = fixture();
+  // A default decoder would strip the BOM and accept the file; the BOM stays,
+  // so line 1 is not JSON and the run stops.
+  writeFileSync(path.join(root, ".memory/corrections.jsonl"), Buffer.concat([
+    Buffer.from([0xef, 0xbb, 0xbf]),
+    Buffer.from(jsonlText([record()]), "utf8"),
+  ]));
+  const before = snapshot(root);
+  await assert.rejects(run(root), (error) => error.code === 1 && error.stderr.includes(":1: invalid JSON"));
+  assert.deepEqual(snapshot(root), before);
 });
 
 // ------------------------------------------------------------------ usage --

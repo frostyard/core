@@ -400,7 +400,13 @@ test("--ref reads only the file at the ref, once per clone", async () => {
   const { stdout: trees } = await run(root, ["--json"]);
   const treeReport = JSON.parse(trees);
   assert.equal(treeReport.ref, null);
-  assert.equal(treeReport.lines, 3, "working trees count the branch and the uncommitted lines");
+  // Working trees count both branches, but line 1 is the same record in both,
+  // and line 2 of each checkout is line 2 of the old file: 1 record each.
+  assert.equal(treeReport.lines, 2);
+  assert.deepEqual(treeReport.repositories[0].pending.map((item) => [item.source, item.line]), [
+    [".memory/corrections.jsonl", 1],
+    [".memory/corrections.jsonl", 2],
+  ]);
 
   const { stdout } = await run(root, ["--ref", "origin/main", "--json"]);
   const report = JSON.parse(stdout);
@@ -549,6 +555,79 @@ test("--ref lists a checkout without the ref whose .memory folder is denied", { 
     [".memory/corrections", "ref not found: origin/main; cannot read: EACCES"],
     [".memory/corrections.jsonl", "ref not found: origin/main; cannot read: EACCES"],
   ]);
+});
+
+test("a promotion is not moved to another record that holds the same key", async () => {
+  const root = await fixture();
+  const shared = line("2026-11-04", "pr-20", "Same key", "check");
+  // Checkout A holds 1 promoted record; checkout B holds the same file
+  // pending and 1 more record with the same 4 key fields.
+  for (const [name, records] of [
+    ["repo-a", { "2026-11-04-pr-20-z.json": { ...shared, promoted_to: "AGENTS.md" } }],
+    ["repo-a-worktree", { "2026-11-04-pr-20-z.json": shared, "2026-11-04-pr-20-a.json": shared }],
+  ]) {
+    const repo = path.join(root, name);
+    mkdirSync(repo);
+    await initRepo(repo, "repo-a");
+    mkdirSync(path.join(repo, ".memory/corrections"), { recursive: true });
+    for (const [file, value] of Object.entries(records)) {
+      writeFileSync(path.join(repo, ".memory/corrections", file), canonical(value));
+    }
+    await commitAll(repo, "records");
+  }
+
+  for (const extra of [[], ["--ref", "HEAD"]]) {
+    const report = JSON.parse((await run(root, ["--json", ...extra])).stdout);
+    assert.equal(report.records, 2, extra.join(" "));
+    assert.equal(report.pending, 1);
+    assert.deepEqual(report.repositories[0].pending.map((item) => item.source), [
+      ".memory/corrections/2026-11-04-pr-20-a.json",
+    ]);
+  }
+});
+
+test("a migration and the old form are 1 record: line 3 and its legacy- file", async () => {
+  const root = await fixture();
+  const shared = line("2026-11-04", "agent", "Same key", "check");
+  // Checkout A still has the old file, line 3 pending; checkout B moved the
+  // file and its record was promoted since.
+  const old = path.join(root, "repo-a");
+  mkdirSync(old);
+  await initRepo(old, "repo-a");
+  writeJsonl(old, [
+    line("2026-11-01", "agent", "First"),
+    line("2026-11-02", "agent", "Second"),
+    shared,
+  ]);
+  await commitAll(old, "old form");
+  const migrated = path.join(root, "repo-a-worktree");
+  mkdirSync(migrated);
+  await initRepo(migrated, "repo-a");
+  mkdirSync(path.join(migrated, ".memory/corrections"), { recursive: true });
+  for (const [name, value] of [
+    ["2026-11-01-legacy-0001.json", line("2026-11-01", "agent", "First")],
+    ["2026-11-02-legacy-0002.json", line("2026-11-02", "agent", "Second")],
+    ["2026-11-04-legacy-0003.json", { ...shared, promoted_to: "AGENTS.md" }],
+  ]) {
+    writeFileSync(path.join(migrated, ".memory/corrections", name), canonical(value));
+  }
+  await commitAll(migrated, "migrated");
+
+  for (const extra of [[], ["--ref", "HEAD"]]) {
+    const report = JSON.parse((await run(root, ["--json", ...extra])).stdout);
+    // Line 3 of the old file and 2026-11-04-legacy-0003.json are 1 record, not
+    // 2: 3 records, not 4.
+    assert.equal(report.records, 3, extra.join(" "));
+    assert.equal(report.pending, 2);
+    assert.deepEqual(report.repositories[0].pending.map((item) => [item.source, item.line]), [
+      [".memory/corrections.jsonl", 1],
+      [".memory/corrections.jsonl", 2],
+    ]);
+    // The promoted copy of the third record is the one kept, with its source.
+    const group = report.repeated_in_repository.find((item) => item.scope === "agent");
+    assert.equal(group.lines, 3);
+    assert.equal(group.promoted, 1);
+  }
 });
 
 test("2 records with 1 key and different promoted_to stay 2 records", async () => {
