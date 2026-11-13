@@ -1,5 +1,22 @@
 # PR triage rollout: settings runbook
 
+**Status:** Rollout complete (3 of 3 steps), checked on 2026-11-13.
+`node scripts/required-checks-survey.mjs` over the 34 repositories of the
+[rollout check](#rollout-check-2026-11-09), read only at
+2026-11-13T20:15:46Z with core at `c896282`: each repository requires status
+checks, has 4 of 4 level labels and has a caller of `pr-triage.yml`. Both
+step 3 hand steps are done: frostyard/nsl requires only `verify` and
+`vulncheck`, and the frostyard/firn ruleset `frostyard: default branch`
+requires `Graphical installer gate`. This replaces the "Open" item of the
+2026-11-09 check. 3 repositories changed their required names after
+2026-11-09 and no longer match their comment on core#222: frostyard/chairlift
+no longer requires `E2E`; frostyard/frostmail requires `Desktop app (Linux
+e2e, cross-builds)` and `Windows app (installer, native e2e)` in place of
+`App shell (make app-build, app-test)` and `Windows app (installer, WebView2
+e2e)`; frostyard/frostnotes requires `Native
+desktop app (make desktop-smoke)` in place of `App shell (make app-build,
+app-test)`.
+
 Living document. Rationale:
 [ADR-0076](../adr/0076-require-status-checks-on-every-default-branch.md)
 (required status checks),

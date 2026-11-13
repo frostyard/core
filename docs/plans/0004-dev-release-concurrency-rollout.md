@@ -1,5 +1,11 @@
 # Dev Release Concurrency Rollout Implementation Plan
 
+**Status:** Done on 2026-08-13. [ADR-0034](../adr/0034-cancel-stale-rolling-dev-releases.md)
+is Accepted; chairlift#208 and pilothouse#197 merged on 2026-08-13. On
+2026-11-13, the `snapshot.yml` of both repositories at `main` has
+`group: goreleaser-nightly` with `cancel-in-progress: true`.
+[core#10](https://github.com/frostyard/core/issues/10) closed on 2026-08-24.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use
 > superpowers:subagent-driven-development (recommended) or
 > superpowers:executing-plans to implement this plan task-by-task. Steps use

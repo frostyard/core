@@ -1,5 +1,16 @@
 # Plan: Org docs-shape and skills rollout
 
+**Status:** Closed on 2026-11-13. Phases 1 to 3 are done (2026-08-11 and
+2026-08-12; the evidence is in each phase). Phase 4 is dropped:
+[core#16](https://github.com/frostyard/core/issues/16),
+[#17](https://github.com/frostyard/core/issues/17) and
+[#18](https://github.com/frostyard/core/issues/18) closed as not planned
+on 2026-08-24. Pinned, least-privilege actions are now row B5 of the
+[repository baseline](../specs/repository-baseline.md)
+([ADR-0021](../adr/0021-sha-pinned-actions-and-least-privilege-ci.md),
+[ADR-0071](../adr/0071-hold-every-code-repository-to-one-baseline.md)), and
+the weekly conformance sweep checks it.
+
 One paragraph: takes every frostyard repo from implicit conventions to the
 recorded state — core's four-category `docs/` shape
 ([ADR-0025](../adr/0025-consolidate-repository-docs-into-docs.md)) with
@@ -66,6 +77,8 @@ updex is the completed reference (updex#256, #257 merged).
   pilothouse overview split) merged 2026-08-12 — 63 repo-local ADRs live.
 
 ## Phase 4 — Supply-chain cleanup
+
+**Status:** Dropped on 2026-11-13. See the plan status above.
 
 - Work [core#16](https://github.com/frostyard/core/issues/16) (secret-bearing
   `publish-to-r2@main`), [#17](https://github.com/frostyard/core/issues/17)
