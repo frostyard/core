@@ -100,6 +100,7 @@ which baseline rows do not apply here.
 - [0079 — Exempt the homelab inventory wiki from the README spec](adr/0079-exempt-the-homelab-inventory-wiki-from-the-readme-spec.md)
 - [0080 — Document the snosi images on frostyard.org](adr/0080-document-the-snosi-images-on-frostyard-org.md)
 - [0081 — Store each correction in a file of its own](adr/0081-store-each-correction-in-a-file-of-its-own.md)
+- [0082 — Verify the build provenance of omarchy-apps](adr/0082-verify-the-build-provenance-of-omarchy-apps.md)
 
 ### Design
 

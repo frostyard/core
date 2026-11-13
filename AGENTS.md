@@ -133,6 +133,10 @@ Start from .agents/skills/TEMPLATE/SKILL.md. -->
   and consequences as facts. No narration of who asked, who was consulted, or
   the author's process; that belongs in the PR description
   ([ADR-0051](docs/adr/0051-adrs-state-facts-not-process.md)).
+- An ADR that amends another in part lists every statement of the old ADR
+  that its decision makes false, reasons and sub-items included, before it
+  says the rest stands
+  ([write-adr skill](.agents/skills/frostyard-write-adr/SKILL.md#amend-or-supersede-an-accepted-adr)).
 
 ## Code conventions (live — the code exists)
 
