@@ -186,3 +186,4 @@ against.
   (item 18, required status checks: row B18)
 - Amended in part by: [ADR-0080](0080-document-the-snosi-images-on-frostyard-org.md)
   (exemptions: snosi has no tool site, item 9)
+- Amended in part by: [ADR-0081](0081-store-each-correction-in-a-file-of-its-own.md)

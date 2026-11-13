@@ -72,3 +72,4 @@ Fleet-wide, every repo carries:
   (superseded), then [ADR-0025](0025-consolidate-repository-docs-into-docs.md) —
   the separate AI-docs tree is folded into `docs/`, and `.memory/` becomes
   the single learnings inbox
+- Amended in part by: [ADR-0081](0081-store-each-correction-in-a-file-of-its-own.md)
