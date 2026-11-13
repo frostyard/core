@@ -18,8 +18,9 @@ line to it ([design: quality loop](../design/quality-loop.md)).
 
 - On 2026-11-13, 36 repositories have the file, with 838 records in all.
   Every file passes core's `scripts/check-corrections.mjs`. 19 repositories
-  run a byte-equal copy of that validator in `make verify` and `make ci`
-  (with `--base`, which also checks that no line is removed or changed). 2
+  run a byte-equal copy of that validator in `make verify`, and in
+  `make ci` with `--base`, which also checks that no line is removed or
+  changed, except that an empty `promoted_to` is filled. 2
   repositories run their own port of its rules: frostread in Go and
   homebrew-tap in Python. 14 repositories run no check of the file.
 - Each new record goes to the end of the same file. 2 open pull requests
@@ -95,12 +96,22 @@ line to it ([design: quality loop](../design/quality-loop.md)).
     promotions of 1 record are an error.
 - **Validation.** Core's `scripts/check-corrections.mjs` checks the folder
   form (name, content, date, canonical form) and, during the cut-over, the
-  old file form. With `--base`, it refuses a removed or renamed record, a
-  changed record other than a filled empty `promoted_to`, a tree with both
-  forms, the old file at a head whose base has the folder, and a move that
-  does not keep every line of the base file as its `legacy-` record. A
-  repository whose gate runs that validator with `--base` enforces the
-  cut-over automatically.
+  old file form. It refuses a tree with both forms. With `--base`, it also
+  refuses:
+  - a removed or renamed record, and a changed record other than a filled
+    empty `promoted_to`;
+  - a removed folder, also a folder that held only `.gitkeep`, and a
+    removed old file with no folder at the head;
+  - the old file at a head whose base has the folder;
+  - a new `legacy-` file at a head whose base has the folder;
+  - a move that does not keep every line of the base file as its
+    `legacy-` record, or that adds a `legacy-` file with no line in the
+    base file.
+
+  A base reference that does not resolve, or a Git object that cannot be
+  read, is a failure, so the `--base` check never passes without a
+  comparison. A repository whose gate runs that validator with `--base`
+  enforces the cut-over automatically.
 - **This ADR amends ADR-0018 in part.** In its `.memory/` bullet, "an
   append-only `corrections.jsonl` with the fixed five-field schema" becomes
   "a folder `.memory/corrections/` with 1 file for each record, in the
@@ -126,9 +137,17 @@ line to it ([design: quality loop](../design/quality-loop.md)).
   report.
 - Harder: readers of the records read a folder instead of 1 file, and they
   read both forms while repositories move, and for old commits after that.
-  Core's validator, core's `scripts/corrections-report.mjs`, the
-  pi-pocket-team audit check Q1, the frostread and homebrew-tap ports and
-  bketelsen/agentic-template change before or with the first move.
+  The order of the change:
+  - Before the first move merges in any repository: core's validator and
+    `scripts/corrections-report.mjs` read both forms, the pi-pocket-team
+    audit check Q1 reads both forms and runs live, and the agent
+    instruction rules name both forms. The audit stores each result for
+    ever, so a result from the old reader on a moved repository is never
+    read again.
+  - bketelsen/agentic-template moves first of the 36 repositories, and its
+    diff is the pattern for the repositories made from it.
+  - The frostread and homebrew-tap ports, and each validator copy, change
+    in the move pull request of their own repository.
 - New obligations:
   - Core ships validator support for the folder form, a migration script
     that writes the `legacy-` files and the `pr-<N>-<k>` files from 1 old
