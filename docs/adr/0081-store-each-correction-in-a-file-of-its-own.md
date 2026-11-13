@@ -20,9 +20,10 @@ line to it ([design: quality loop](../design/quality-loop.md)).
   Every file passes core's `scripts/check-corrections.mjs`. The checks of
   the file at each default branch are:
   - 20 repositories run core's validator: core itself and 19 repositories
-    with a byte-equal copy. `make verify` runs it, and `make ci` runs it
-    with `--base`, which also checks that no line is removed or changed,
-    except that an empty `promoted_to` is filled.
+    with a byte-equal copy. `make verify` runs it in all 20. In the 19
+    copies, `make ci` also runs it with `--base`, which checks that no
+    line is removed or changed, except that an empty `promoted_to` is
+    filled. Core's own `make ci` runs it without `--base`.
   - 14 repositories run a port of its line rules in their own tests,
     without `--base`: 9 in Go (repogen, std, clix, frostmail, frostnotes,
     frostread, lodge, porter, trimlights), 2 in Python (flatpak-index,
@@ -193,8 +194,8 @@ line to it ([design: quality loop](../design/quality-loop.md)).
   - The text of all 838 existing records changes to the canonical form;
     every value stays. The validator's `--base` check on each move proves
     that no record is lost or changed.
-- Repositories without a `--base` gate (the 14 with a port and the 2
-  without a check) do not refuse the old file or a removed record
+- Repositories without a `--base` gate (core, the 14 with a port and the
+  2 without a check) do not refuse the old file or a removed record
   automatically. After its move, a port refuses a tree with both forms.
   There, the instruction rules, the cross-review and the weekly
   conformance sweep, which reads row B2 at each default branch, are the
