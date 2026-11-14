@@ -1,0 +1,7 @@
+{
+  "date": "2026-11-13",
+  "scope": "ci-gate",
+  "correction": "In the CI gate's shell reader, a quoted string is 1 argument word and never a command; only the bodies of $(...), backquotes and the string after -c are command lines, and npm scripts are found from those simple commands, each invocation with its own --ignore-scripts",
+  "evidence": "Re-review of frostyard/core#253 at 3ca376e: commandCalls started a command at each opening quote, so echo \"shellcheck is optional\" ran shellcheck; npmScripts searched raw text, so echo npm test reached the test script, and 1 --ignore-scripts hid a later npm test's pretest. Fixed in frostyard/core#253 with targeted tests",
+  "promoted_to": "test/ci-gate.test.mjs"
+}

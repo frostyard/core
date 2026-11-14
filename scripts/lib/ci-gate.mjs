@@ -204,7 +204,8 @@ function splitLines(text) {
 
 // The event names of the workflow's top-level `on:` key (also `"on":`,
 // `'on':` or `true:`): a scalar (`on: pull_request`), a flow list
-// (`[push, pull_request]`), a flow mapping, or a block of mapping keys or
+// (`[push, pull_request]`, also over several lines), the top-level keys of
+// a flow mapping, or a block of mapping keys or
 // list items (indented or indentless) at 1 indent. Nested values (branch
 // names, inputs) are not events.
 export function workflowEvents(workflowText) {
@@ -214,10 +215,13 @@ export function workflowEvents(workflowText) {
     const head = /^(?:on|"on"|'on'|true)\s*:(.*)$/.exec(stripYamlComment(lines[i]));
     if (!head) continue;
     const inline = head[1].trim();
+    if (inline !== "" && !/^[[{]/.test(inline)) return [unquote(inline)].filter(Boolean);
     if (inline !== "") {
-      const flow = /^[[{](.*)[\]}]$/.exec(inline);
-      const items = flow ? flow[1].split(",") : [inline];
-      return items.map((item) => unquote(item.split(":")[0])).filter(Boolean);
+      // A flow list or mapping, maybe over several lines: the items at its
+      // top level, and for a mapping the key of each item.
+      const flow = flowValue([inline, ...lines.slice(i + 1).map(stripYamlComment)].join("\n"));
+      const items = splitTopLevel(flow.slice(1, -1));
+      return items.map((item) => unquote(inline.startsWith("{") ? splitTopLevel(item, ":")[0] : item)).filter(Boolean);
     }
     const events = [];
     let childIndent = -1;
@@ -241,6 +245,50 @@ export function workflowEvents(workflowText) {
     return events.filter(Boolean);
   }
   return [];
+}
+
+// The text of the flow collection that starts the text, up to its matching
+// close bracket (quotes respected), or the whole text when it does not close.
+function flowValue(text) {
+  let depth = 0;
+  let quote = null;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (quote) {
+      if (c === quote) quote = null;
+    } else if (c === "'" || c === '"') quote = c;
+    else if (c === "[" || c === "{") depth += 1;
+    else if (c === "]" || c === "}") {
+      depth -= 1;
+      if (depth === 0) return text.slice(0, i + 1);
+    }
+  }
+  return text;
+}
+
+// The parts of a flow collection's body split at the separator at depth 0
+// (outside nested brackets and quotes), trimmed.
+function splitTopLevel(text, separator = ",") {
+  const parts = [];
+  let depth = 0;
+  let quote = null;
+  let current = "";
+  for (const c of text) {
+    if (quote) {
+      if (c === quote) quote = null;
+    } else if (c === "'" || c === '"') quote = c;
+    else if (c === "[" || c === "{") depth += 1;
+    else if (c === "]" || c === "}") depth -= 1;
+    else if (c === separator && depth === 0) {
+      parts.push(current.trim());
+      current = "";
+      if (separator === ":") return [...parts, text.slice(text.indexOf(":") + 1).trim()];
+      continue;
+    }
+    current += c;
+  }
+  parts.push(current.trim());
+  return parts;
 }
 
 // True when the workflow's events (workflowEvents) include `pull_request`
@@ -362,56 +410,114 @@ export function makeCalls(command) {
 }
 
 // Words before a command's name that run the command after them.
+// A wrapper's options: those in `valued` take the next word as their
+// value (`-n 1`), the others stand alone (`-0`, `--null`, `-n1`).
+const options = (valued) => `(?:\\s+(?:-[${valued}]\\s+\\S+|--[\\w-]+=\\S+|-\\S+))*`;
 const COMMAND_PREFIXES = [
   /^[@+-]+/,
-  /^(?:if|then|do|else|elif|while|until|!|time|exec|command|nice|nohup)\s+/,
-  /^sudo(?:\s+-\S+)*\s+/,
-  /^env(?:\s+-\S+)*\s+/,
+  /^(?:if|then|do|else|elif|while|until|!|exec|command|nohup)\s+/,
+  new RegExp(`^time${options("fo")}\\s+`),
+  new RegExp(`^nice${options("n")}\\s+`),
+  new RegExp(`^timeout${options("ks")}\\s+\\S+\\s+`),
+  new RegExp(`^sudo${options("ugChpUrtDR")}\\s+`),
+  new RegExp(`^env${options("uCS")}\\s+`),
   /^[A-Za-z_]\w*=\S*\s+/,
-  /^xargs(?:\s+-\S+)*\s+/,
+  new RegExp(`^xargs${options("nPLIdsEa")}\\s+`),
   /^(?:npx|bunx|uvx|pipx\s+run|npm\s+exec|pnpm\s+(?:exec|dlx)|yarn\s+dlx|go\s+run|go\s+tool|python3?\s+-m)(?:\s+-\S+)*\s+(?:--\s+)?/,
 ];
 
+// The index of the `)` that closes the `$(` before `start`, with nested
+// parentheses and quotes respected, or the text's length.
+function closeParen(text, start) {
+  let depth = 1;
+  let quote = null;
+  for (let i = start; i < text.length; i++) {
+    const c = text[i];
+    if (quote) {
+      if (c === quote) quote = null;
+      else if (quote === '"' && c === "\\") i += 1;
+    } else if (c === "'" || c === '"') quote = c;
+    else if (c === "\\") i += 1;
+    else if (c === "(") depth += 1;
+    else if (c === ")" && --depth === 0) return i;
+  }
+  return text.length;
+}
+
+// The command lines that a double-quoted string's body runs: each `$(...)`
+// and backquoted part.
+function substitutions(body) {
+  const found = [];
+  for (let i = 0; i < body.length; i++) {
+    if (body[i] === "\\") i += 1;
+    else if (body[i] === "$" && body[i + 1] === "(") {
+      const end = closeParen(body, i + 2);
+      found.push(body.slice(i + 2, end));
+      i = end;
+    } else if (body[i] === "`") {
+      const end = body.indexOf("`", i + 1);
+      found.push(body.slice(i + 1, end < 0 ? body.length : end));
+      i = end < 0 ? body.length : end;
+    }
+  }
+  return found;
+}
+
+// A quoted word, a substitution or another word that is not a command name
+// stands in the segment as this placeholder.
+const WORD = "\u0000";
+
 // The simple commands of a shell command line, each as its name (without
-// its directory or an `@version`) and its arguments. A command starts at
-// the start of the line and after `;`, `&`, `|`, `(`, `)`, a backquote, a
-// line break, `-exec`, and each opening quote (so that `sh -c 'x'` and
-// `"$(x)"` run `x`, also inside the quotes); the text after a closing quote
-// is arguments. A `#` comment ends the line. Make references that
-// are left (`$(GO)`) become `$GO`, and `$$` becomes `$`.
+// its directory or an `@version`) and its arguments. Commands are split at
+// `;`, `&`, `|`, `(`, `)`, a line break and `-exec`, outside quotes. A
+// quoted string is 1 argument word, never a command: only the body of
+// `$(...)` or backquotes (also inside double quotes), and the quoted string
+// after `-c` or a flag group that ends in c (`sh -c '...'`, `sh -lc '...'`),
+// are command lines of their own. A `#` comment
+// ends the line. Make references that are left (`$(GO)`) become `$GO`, and
+// `$$` becomes `$`. Not read: `eval`, shell functions, aliases, here-docs.
 export function commandCalls(line) {
   const text = line
     .replace(/\$\(([A-Za-z_][\w.]*)\)|\$\{([A-Za-z_][\w.]*)\}/g, (_, a, b) => `$${a ?? b}`)
     .replace(/\$\$/g, "$");
+  return callsIn(text, 0);
+}
+
+function callsIn(text, depth) {
+  if (depth > 4) return [];
   const segments = [];
+  const nested = [];
   let current = "";
-  let quote = null;
   for (let i = 0; i < text.length; i++) {
     const c = text[i];
-    if (quote === '"' && c === "\\") {
+    if (c === "#" && (i === 0 || /\s/.test(text[i - 1]))) break;
+    if (c === "\\") {
       current += text.slice(i, i + 2);
       i += 1;
-      continue;
-    }
-    if (!quote && c === "#" && (i === 0 || /\s/.test(text[i - 1]))) break;
-    if (c === "'" || c === '"') {
-      if (quote && quote !== c) {
-        current += c;
-        continue;
-      }
-      segments.push(current);
-      // After a closing quote the same command goes on: its next word is an
-      // argument, so the segment starts with a placeholder name.
-      current = quote ? "\u0000 " : "";
-      quote = quote ? null : c;
-      continue;
-    }
-    if (/[;&|()`\n]/.test(c)) {
+    } else if (c === "'" || c === '"') {
+      let end = i + 1;
+      while (end < text.length && text[end] !== c) end += c === '"' && text[end] === "\\" ? 2 : 1;
+      const body = text.slice(i + 1, end);
+      if (/(?:^|\s)-[A-Za-z]*c\s*$/.test(current)) nested.push(body);
+      else if (c === '"') nested.push(...substitutions(body));
+      current += ` ${WORD} `;
+      i = end;
+    } else if (c === "$" && text[i + 1] === "(") {
+      const end = closeParen(text, i + 2);
+      nested.push(text.slice(i + 2, end));
+      current += ` ${WORD} `;
+      i = end;
+    } else if (c === "`") {
+      const end = text.indexOf("`", i + 1);
+      nested.push(text.slice(i + 1, end < 0 ? text.length : end));
+      current += ` ${WORD} `;
+      i = end < 0 ? text.length : end;
+    } else if (/[;&|()\n]/.test(c)) {
       segments.push(current);
       current = "";
-      continue;
+    } else {
+      current += c;
     }
-    current += c;
   }
   segments.push(current);
   const calls = [];
@@ -424,10 +530,11 @@ export function commandCalls(line) {
         if (next !== segment) [segment, changed] = [next.trim(), true];
       }
     }
-    if (!segment) continue;
+    if (!segment || segment.startsWith(WORD)) continue;
     const [name, ...rest] = segment.split(/\s+/);
     calls.push([name.replace(/^.*\//, "").replace(/@.*$/, ""), ...rest].join(" "));
   }
+  for (const body of nested) calls.push(...callsIn(body, depth + 1));
   return calls;
 }
 
@@ -445,10 +552,13 @@ export function toolsCalled(lines) {
 }
 
 // What `make <target>` runs: the targets it reaches through prerequisites
-// and recipe calls, and their recipe commands. `found` is false when the
+// and recipe calls, and their recipe commands, with the Makefile's
+// variables expanded first (expandVariables), so `$(MAKE) $(LINT)` reaches
+// the target that LINT names. `found` is false when the
 // Makefile has no rule for the target.
 export function makeReach(makefileText, target) {
   const rules = makeRules(makefileText);
+  const variables = makeVariables(makefileText);
   const targets = new Set();
   const recipe = [];
   const queue = [target];
@@ -458,8 +568,8 @@ export function makeReach(makefileText, target) {
     targets.add(next);
     const rule = rules.get(next);
     if (!rule) continue;
-    queue.push(...rule.prerequisites);
-    for (const command of rule.recipe) {
+    queue.push(...expandVariables(rule.prerequisites.join(" "), variables).split(/\s+/).filter(Boolean));
+    for (const command of rule.recipe.map((line) => expandVariables(line, variables))) {
       recipe.push(command);
       queue.push(...makeCalls(command));
     }
@@ -477,22 +587,23 @@ export function npmScripts(commands, packageJsonText) {
   } catch {
     return [];
   }
-  const calls = (text) => {
-    const names = [];
-    for (const match of text.matchAll(/(?<![\w-])npm\s+(?:run|run-script)\s+([\w:.@/-]+)/g)) names.push(match[1]);
-    for (const _ of text.matchAll(/(?<![\w-])npm\s+(?:test|t|tst)(?![\w-])/g)) names.push("test");
-    return names;
-  };
-  // npm runs pre<name> and post<name> with <name>, unless --ignore-scripts.
-  const lifecycle = (text, names) =>
-    /(?<![\w-])--ignore-scripts(?![\w-])/.test(text) ? names : names.flatMap((name) => [`pre${name}`, name, `post${name}`]);
+  // Each npm invocation of a command (commandCalls: not in a message or a
+  // comment), with npm's pre<name> and post<name> scripts unless that
+  // invocation has --ignore-scripts.
+  const calls = (text) =>
+    commandCalls(text).flatMap((call) => {
+      const match = /^npm\s+(?:(?:run|run-script)\s+([\w:.@/-]+)|(?:test|t|tst)(?![\w-]))(.*)$/.exec(call);
+      if (!match) return [];
+      const name = match[1] ?? "test";
+      return /(?<![\w-])--ignore-scripts(?![\w-])/.test(match[2]) ? [name] : [`pre${name}`, name, `post${name}`];
+    });
   const reached = new Map();
-  const queue = commands.flatMap((command) => lifecycle(command, calls(command)));
+  const queue = commands.flatMap(calls);
   while (queue.length > 0) {
     const name = queue.shift();
     if (reached.has(name) || typeof scripts[name] !== "string") continue;
     reached.set(name, scripts[name]);
-    queue.push(...lifecycle(scripts[name], calls(scripts[name])));
+    queue.push(...calls(scripts[name]));
   }
   return [...reached].map(([name, command]) => ({ name, command }));
 }

@@ -109,10 +109,13 @@ the 3 targets.
 - Harder: `fleet-conventions` is a required check of core, so a change in
   an enabled repository that breaks B12 or B19 blocks core's pull
   requests until the repository is fixed. This is already true for B4.
-- Harder: the lint check knows only the listed tools and actions. A tool
-  outside `LINT_TOOLS`, or a script that `make ci` calls through a path
-  the reader does not follow, gives a false pass or a false gap; the list
-  grows with the fleet.
+- Harder: the lint check knows only the listed tools and actions, and it
+  reads workflows, Makefiles and shell commands with line readers, not a
+  YAML parser or a shell. A tool outside `LINT_TOOLS`, a script that
+  `make ci` calls through a path the reader does not follow, `eval`, a
+  shell function, an alias, a here-doc, a wrapper option outside the
+  reader's lists, or a pnpm or yarn script gives a false pass or a false
+  gap. The lists grow with the fleet.
 - Harder: a repository whose `make ci` must also run a lint job that CI
   runs in parallel either calls the same tools in a `make ci` target or
   makes CI's job call a target that `make ci` reaches.

@@ -1,0 +1,7 @@
+{
+  "date": "2026-11-13",
+  "scope": "ci-gate",
+  "correction": "The CI gate's readers must read a flow on: value to its matching bracket and split it at the top level only, skip the values of wrapper options (xargs -n 1, sudo -u root, env -u X), and expand Makefile variables before they follow prerequisites and recipe make calls",
+  "evidence": "Re-review of frostyard/core#253 at 3ca376e: workflowEvents missed a multiline [push,\\n pull_request] and read a nested pull_request input key as an event; xargs -P 4 shellcheck hid shellcheck; $(MAKE) $(LINT_TARGET) did not reach lint. Fixed in frostyard/core#253 with targeted tests",
+  "promoted_to": "test/ci-gate.test.mjs"
+}
