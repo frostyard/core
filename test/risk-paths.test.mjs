@@ -547,6 +547,7 @@ test("the categories of rule B are frozen", () => {
     "secrets and credentials",
     "rulesets and settings",
     "destructive operations",
+    "supply chain",
     "governance",
   ]);
 });
@@ -557,11 +558,16 @@ test("checkWhyCategories: each category alone or with a colon passes", () => {
   assert.deepEqual(checkWhyCategories(list([e("a", "  governance: padded  ")])), []);
 });
 
-test("checkWhyCategories: a v1 entry with no category fails, such as supply chain", () => {
-  const errors = checkWhyCategories(list([e(".github/risk-paths.json", "governance"), e("mise.toml", "supply chain: the tool pins that CI installs")]));
+test("checkWhyCategories: a v1 entry with no category fails, such as native code", () => {
+  const errors = checkWhyCategories(list([e(".github/risk-paths.json", "governance"), e("purego.go", "native code: purego")]));
   assert.equal(errors.length, 1);
-  assert.match(errors[0], /^paths\[1\]\.why: the glob mise\.toml is at L1, so its why must start with 1 category \(boot chain, /);
-  assert.ok(errors[0].endsWith(`it is "supply chain: the tool pins that CI installs"`));
+  assert.match(errors[0], /^paths\[1\]\.why: the glob purego\.go is at L1, so its why must start with 1 category \(boot chain, /);
+  assert.ok(errors[0].endsWith(`it is "native code: purego"`));
+});
+
+test("checkWhyCategories: supply chain passes at L1 for the tool pins that CI installs", () => {
+  assert.deepEqual(checkWhyCategories(list2([e2("mise.toml", "L1", "supply chain: the tool pins that CI installs")])), []);
+  assert.deepEqual(checkWhyCategories(list([e("go.sum", "supply chain")])), []);
 });
 
 test("checkWhyCategories: the category must start the why and end or meet a colon", () => {
@@ -571,6 +577,7 @@ test("checkWhyCategories: the category must start the why and end or meet a colo
     "governance, the list",
     "governance the list",
     "governances: the list",
+    "supply chains: x",
     "Governance: the list",
     "the list: governance",
     "sign: keys",
@@ -582,7 +589,7 @@ test("checkWhyCategories: the category must start the why and end or meet a colo
 
 test("checkWhyCategories: a v2 list checks L1 and L2 entries, never L3 or L4", () => {
   const value = list2([
-    e2("a", "L1", "supply chain: pins"),
+    e2("a", "L1", "toolchain: pins"),
     e2("b", "L2", "native code: purego"),
     e2("c", "L3", "free text"),
     e2("d", "L4", "how-to documentation"),
@@ -818,13 +825,19 @@ test("check-risk-paths fails on a v2 list with the caller at L3", async () => {
   );
 });
 
-test("check-risk-paths fails on an L1 why with no category, such as supply chain", async () => {
+test("check-risk-paths fails on an L1 why with no category, such as native code", async () => {
+  const root = await gateFixture(list2([...validList2().paths, e2("purego.go", "L1", "native code: purego")]));
+  await assert.rejects(runGate(root), (error) =>
+    error.stderr.includes("paths[3].why: the glob purego.go is at L1, so its why must start with 1 category"),
+  );
+});
+
+test("check-risk-paths passes an L1 supply chain why", async () => {
   const root = await gateFixture(
     list2([...validList2().paths, e2("mise.toml", "L1", "supply chain: the tool pins that CI installs")]),
   );
-  await assert.rejects(runGate(root), (error) =>
-    error.stderr.includes("paths[3].why: the glob mise.toml is at L1, so its why must start with 1 category"),
-  );
+  const { stdout } = await runGate(root);
+  assert.match(stdout, /ok {3}risk_paths: 4 entries/);
 });
 
 test("check-risk-paths checks the protected boundaries of the governance policy", async () => {
@@ -842,7 +855,7 @@ test("check-risk-paths checks the protected boundaries of the governance policy"
 });
 
 test("check-risk-paths fails on an unreadable governance policy and skips rule B", async () => {
-  const root = await gateFixture(list2([...validList2().paths, e2("a", "L1", "supply chain")]));
+  const root = await gateFixture(list2([...validList2().paths, e2("a", "L1", "native code")]));
   await mkdir(path.join(root, "policies"), { recursive: true });
   await writeFile(path.join(root, "policies/agent-governance.json"), '{"a":1,"a":2}');
   await assert.rejects(runGate(root), (error) => {

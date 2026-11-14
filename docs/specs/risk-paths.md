@@ -93,6 +93,7 @@ Each `why` of an entry at L1 or L2 (every entry of a version 1 list) MUST name 1
 - secrets and credentials
 - rulesets and settings
 - destructive operations (delete, prune, wipe, disk erase, migrate)
+- supply chain (the tool and dependency pins that CI installs, such as `mise.toml`, `mise.lock`, `go.mod`, `go.sum`)
 - governance (the list, the caller, policy files)
 
 Where the repository has a governance policy with protected boundaries, the `why` MUST name 1 protected-boundary identifier instead:
@@ -203,7 +204,7 @@ The floors are a constant (`ORG_FLOORS`) in `scripts/lib/risk-paths.mjs`. A list
 A repository moves its list to version 2 by this rule:
 
 - `default_level`: `L3`.
-- A version 1 glob whose `why` names boot chain, signing and keys, update verification, auth, publication, secrets and credentials, rulesets and settings, or destructive operations (or a protected boundary of those kinds): `L1`.
+- A version 1 glob whose `why` names boot chain, signing and keys, update verification, auth, publication, secrets and credentials, rulesets and settings, destructive operations, or supply chain (or a protected boundary of those kinds): `L1`.
 - A version 1 glob whose `why` names governance or workflows and permissions (the list, the caller, CI workflows, policy files): `L2`. When unsure: `L1`.
 - L4 globs are optional. An L4 glob never covers `docs/adr/**`, `docs/specs/**`, `AGENTS.md`, `policies/**` or the whole `docs/**`.
 
