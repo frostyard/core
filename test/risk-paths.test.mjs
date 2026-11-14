@@ -922,3 +922,22 @@ test("check-risk-paths fails when the pr-triage copy drifts", async () => {
     return true;
   });
 });
+
+test("check-risk-paths skips the sync check in a repository that vendors the library without pr-triage.yml", async () => {
+  const root = await gateFixture(validList2());
+  await mkdir(path.join(root, "scripts/lib"), { recursive: true });
+  await writeFile(path.join(root, "scripts/lib/risk-paths.mjs"), await readFile(libraryPath, "utf8"));
+  const { stdout, stderr } = await runGate(root);
+  assert.equal(stderr, "");
+  assert.match(stdout, /^ok {3}risk_paths: 3 entries, 2 at L1 or L2 name a category or boundary, workflow sync skipped \(no \.github\/workflows\/pr-triage\.yml\)$/m);
+  assert.doesNotMatch(stdout, /workflow in sync/);
+});
+
+test("check-risk-paths fails when pr-triage.yml exists but holds no embedded block", async () => {
+  const root = await driftFixture();
+  await writeFile(path.join(root, ".github/workflows/pr-triage.yml"), "name: pr-triage\non: workflow_call\n");
+  await assert.rejects(runGate(root), (error) => {
+    assert.ok(error.stderr.includes(".github/workflows/pr-triage.yml must hold exactly 1 block"));
+    return true;
+  });
+});
