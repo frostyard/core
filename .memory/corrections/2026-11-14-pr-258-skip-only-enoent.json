@@ -1,0 +1,7 @@
+{
+  "date": "2026-11-14",
+  "scope": "scripts",
+  "correction": "A gate that skips a check when a file is absent tests absence with an error code (lstat and ENOENT), never with existsSync: existsSync also returns false on EACCES, ENOTDIR and a symlink loop, so the gate passes when it cannot inspect the file",
+  "evidence": "Cross-review of frostyard/core#258 (openai/gpt-6.1-sol) at c285eae found that check-risk-paths skipped the workflow sync check on existsSync false, so a symlink loop or an unreadable parent passed the gate; fixed in frostyard/core#258 with tests for a symlink loop, a dangling symlink and ENOTDIR",
+  "promoted_to": "test/risk-paths.test.mjs"
+}

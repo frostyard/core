@@ -4,7 +4,7 @@
 // categories of rule B (the protected boundaries of the governance policy, when
 // it has any), the required entries (rule C), and, where the library and the
 // reusable workflow live, the embedded copies in that workflow.
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, lstatSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -90,12 +90,21 @@ if (!existsSync(absoluteFile)) {
 // (core). A repository that vendors the library has no pr-triage.yml: there
 // the check is skipped with a note. In core, test/risk-paths.test.mjs requires
 // "workflow in sync" on core's own run, so a missing workflow still fails.
+// Only ENOENT means absent: lstat does not follow a symlink, and any other
+// error (EACCES, ENOTDIR, a symlink loop on read) fails the gate.
 let synced = false;
 let skipNote = "";
 if (existsSync(resolve(root, LIBRARY_PATH))) {
-  if (!existsSync(resolve(root, WORKFLOW_PATH))) {
+  let workflow = "present";
+  try {
+    lstatSync(resolve(root, WORKFLOW_PATH));
+  } catch (error) {
+    workflow = error.code === "ENOENT" ? "absent" : "unreadable";
+    if (workflow === "unreadable") failures.push(`${WORKFLOW_PATH}: ${error.message}`);
+  }
+  if (workflow === "absent") {
     skipNote = `, workflow sync skipped (no ${WORKFLOW_PATH})`;
-  } else {
+  } else if (workflow === "present") {
     try {
       const problem = checkSync(root);
       if (problem) failures.push(problem);

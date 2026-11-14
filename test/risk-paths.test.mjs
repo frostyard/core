@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -941,3 +941,30 @@ test("check-risk-paths fails when pr-triage.yml exists but holds no embedded blo
     return true;
   });
 });
+
+// Only a missing workflow skips the sync check. A path that exists but cannot
+// be read, or that cannot be inspected, fails the gate.
+for (const [name, setup, code] of [
+  ["a symlink loop", (file) => symlink("pr-triage.yml", file), "ELOOP"],
+  ["a dangling symlink", (file) => symlink("missing.yml", file), "ENOENT"],
+  [
+    "a file where .github/workflows should be a directory",
+    async (file) => {
+      await rm(path.dirname(file), { recursive: true });
+      await writeFile(path.dirname(file), "not a directory\n");
+    },
+    "ENOTDIR",
+  ],
+]) {
+  test(`check-risk-paths fails when pr-triage.yml is ${name}`, async () => {
+    const root = await driftFixture();
+    const file = path.join(root, ".github/workflows/pr-triage.yml");
+    await rm(file);
+    await setup(file);
+    await assert.rejects(runGate(root), (error) => {
+      assert.ok(error.stderr.includes(code), error.stderr);
+      assert.doesNotMatch(error.stdout, /workflow sync skipped/);
+      return true;
+    });
+  });
+}
