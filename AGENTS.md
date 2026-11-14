@@ -137,6 +137,10 @@ Start from .agents/skills/TEMPLATE/SKILL.md. -->
   that its decision makes false, reasons and sub-items included, before it
   says the rest stands
   ([write-adr skill](.agents/skills/frostyard-write-adr/SKILL.md#amend-or-supersede-an-accepted-adr)).
+- A count in a PR body, a plan record or a doc names its source (a file,
+  a command or a query) and what it selects. Each label covers every item
+  counted under it, and items whose status the source does not state are
+  counted apart, not in the total they are unsure for.
 
 ## Code conventions (live — the code exists)
 
@@ -209,6 +213,23 @@ removed. -->
   [ADR-0081](docs/adr/0081-store-each-correction-in-a-file-of-its-own.md);
   `scripts/new-correction.mjs` writes one). Promote into this file, docs,
   or skills — never duplicate without setting `promoted_to`.
+- A script or test that reads Markdown, YAML or another text format by
+  hand (line scans, regular expressions, no real parser) gets its input
+  shapes tested before the first review, 1 case each, in the style of
+  `test/docs-integrity.test.mjs` (Markdown) and
+  `test/repository-baseline.test.mjs` (YAML). Markdown: fences of 3 or
+  more backticks or tildes, also inside blockquotes and lists; indented
+  code; code spans of 1 or more backticks, escaped backticks, a span
+  across a line break or a table cell; link destinations; tables; CR,
+  CRLF and U+00A0. YAML: comments and blank lines inside a block; quoted
+  and flow keys and values; folded (`>`) and literal (`|`) blocks;
+  indentless lists; a list item whose first key is not the scanned key;
+  the same key under another mapping (`env:`). Every file: an empty file,
+  no final newline, a BOM, invalid UTF-8, and a match inside a longer
+  word or a URL. When a review finds a gap, fix and test its whole class
+  of input, not only the reported line; when a 2nd round finds another
+  gap in the same reader, narrow what the check claims or use a real
+  parser instead of adding 1 more case.
 - Task runbooks live in [.github/prompts/](.github/prompts/README.md) as
   `*.prompt.md`; rules stay here.
 

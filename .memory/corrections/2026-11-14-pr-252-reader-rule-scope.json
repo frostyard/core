@@ -1,0 +1,7 @@
+{
+  "date": "2026-11-14",
+  "scope": "pr-template",
+  "correction": "A PR template checkbox that mirrors a rubric row and an AGENTS.md rule names the same scope as both: a checkbox for Markdown or YAML only let an author skip the tests that the rubric asks for another text format and for every file",
+  "evidence": "Cross-review of frostyard/core#252 (openai/gpt-6.1-sol) at 21d9f8f found the template checkbox narrower than the AGENTS.md rule and the rubric row; fixed in frostyard/core#252 with a test that compares the 3 texts",
+  "promoted_to": "test/reader-rule-mirror.test.mjs"
+}
