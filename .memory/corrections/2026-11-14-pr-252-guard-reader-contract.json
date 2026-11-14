@@ -1,7 +1,7 @@
 {
   "date": "2026-11-14",
   "scope": "tests",
-  "correction": "A test that finds a rule in a Markdown file is a hand-written reader too: give it a narrow contract that fails closed (the marker on exactly 1 line, at the start of the item, the item ends at the first line without its indent, a CR or a BOM fails) and test its rejected shapes, such as a full example in a fence beside a narrow rule",
-  "evidence": "Re-review 1 of frostyard/core#252 (openai/gpt-6.1-sol) at 00fde8b found that the guard took the first line holding a marker, so a fenced example could pass for the real checkbox; fixed in frostyard/core#252",
+  "correction": "A test that finds a rule in a Markdown file is a hand-written reader too, under the same rule: give it a narrow contract that fails closed (decode the bytes as fatal UTF-8, refuse a CR, a BOM and any fence line, the marker on exactly 1 line at column 0, the item ends at the first line without its indent) and test 1 case for each listed shape with its outcome under that contract",
+  "evidence": "Re-review 1 of frostyard/core#252 (openai/gpt-6.1-sol) at 00fde8b found that the guard took the first line holding a marker, so a fenced example could pass for the real checkbox; re-review 2 at 0904886 found no cases for tilde fences, fences in blockquotes and lists, multi-line code spans and invalid UTF-8; fixed in frostyard/core#252",
   "promoted_to": "test/reader-rule-mirror.test.mjs"
 }
