@@ -96,7 +96,8 @@ not apply to core, because core has no Go module and is not a user-facing tool:
   `go.mod` and makes no releases
   ([ADR-0012](adr/0012-svu-versioning-and-rolling-dev-prerelease.md),
   [ADR-0053](adr/0053-name-the-svu-config-svu-yml.md)).
-- **B9 (tool documentation site)** does not apply: core is not a user-facing
+- **B9 (tool documentation home)** does not apply: core is not a user-facing
   tool. It ships no command, application or service. Its user documentation is
   this [docs/](README.md) tree
-  ([ADR-0070](adr/0070-build-tool-docs-sites-with-materialx-on-github-pages.md)).
+  ([ADR-0070](adr/0070-build-tool-docs-sites-with-materialx-on-github-pages.md),
+  [ADR-0084](adr/0084-accept-a-tools-own-site-or-a-frostyard-org-guide-as-its-docs-home.md)).

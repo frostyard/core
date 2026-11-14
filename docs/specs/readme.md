@@ -196,7 +196,7 @@ most of them.
 
 | Content | Where it goes |
 | --- | --- |
-| User guides, the full install matrix, the CLI and configuration reference, troubleshooting | The documentation site (ADR-0070), or `docs/` when there is no site |
+| User guides, the full install matrix, the CLI and configuration reference, troubleshooting | The tool's documentation home: its site or its frostyard.org guide (ADR-0070, ADR-0084), or `docs/` when there is none |
 | Build internals, pipeline stages, how the parts fit | `docs/design/` (ADR-0025) |
 | Long check lists, test matrices, release and verification steps | `docs/` (a runbook, a design or a spec), or the skill that runs them |
 | Operations runbooks: deploy, update, roll back, recover | `docs/`, linked from `Deploy` |
@@ -243,6 +243,7 @@ most of them.
   [ADR-0079](../adr/0079-exempt-the-homelab-inventory-wiki-from-the-readme-spec.md),
   [ADR-0071](../adr/0071-hold-every-code-repository-to-one-baseline.md),
   [ADR-0070](../adr/0070-build-tool-docs-sites-with-materialx-on-github-pages.md),
+  [ADR-0084](../adr/0084-accept-a-tools-own-site-or-a-frostyard-org-guide-as-its-docs-home.md),
   [ADR-0025](../adr/0025-consolidate-repository-docs-into-docs.md)
 - Context: [design: quality loop](../design/quality-loop.md),
   [design: shared skills](../design/shared-skills.md)

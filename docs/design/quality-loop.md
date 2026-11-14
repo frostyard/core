@@ -85,8 +85,9 @@ PR template ──► review rubric ──► CI gates ──► corrections ─
   [repository baseline](../specs/repository-baseline.md) lists, as rows
   `B1` to `B19`, what every frostyard code repository carries
   ([ADR-0071](../adr/0071-hold-every-code-repository-to-one-baseline.md)),
-  including the tool docs site
-  ([ADR-0070](../adr/0070-build-tool-docs-sites-with-materialx-on-github-pages.md)),
+  including the tool documentation home
+  ([ADR-0070](../adr/0070-build-tool-docs-sites-with-materialx-on-github-pages.md),
+  [ADR-0084](../adr/0084-accept-a-tools-own-site-or-a-frostyard-org-guide-as-its-docs-home.md)),
   the fleet Go and golangci-lint versions, and the README
   ([ADR-0072](../adr/0072-write-every-readme-to-one-standard.md),
   [README spec](../specs/readme.md)), and the required status checks on
@@ -179,7 +180,8 @@ copy it as-is.
   [ADR-0077](../adr/0077-bind-ready-for-human-to-the-head-commit.md),
   [ADR-0078](../adr/0078-sort-pull-requests-by-levels-l1-to-l4.md),
   [ADR-0081](../adr/0081-store-each-correction-in-a-file-of-its-own.md),
-  [ADR-0083](../adr/0083-run-the-ci-gate-locally-as-make-ci.md)
+  [ADR-0083](../adr/0083-run-the-ci-gate-locally-as-make-ci.md),
+  [ADR-0084](../adr/0084-accept-a-tools-own-site-or-a-frostyard-org-guide-as-its-docs-home.md)
 - Contracts: [specs/pr-review-rubric.md](../specs/pr-review-rubric.md),
   [specs/pr-acceptance-metric.md](../specs/pr-acceptance-metric.md),
   [specs/risk-paths.md](../specs/risk-paths.md),

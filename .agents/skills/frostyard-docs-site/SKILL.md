@@ -15,9 +15,15 @@ and GitHub Pages serves it at `https://frostyard.github.io/PROJECT/`. The
 layout and its reasons are in frostyard/core:
 [ADR-0070](https://github.com/frostyard/core/blob/main/docs/adr/0070-build-tool-docs-sites-with-materialx-on-github-pages.md).
 
-- **Tool repositories get a site**: a CLI, a daemon, a suite app.
+- **A tool needs 1 user documentation home**: a CLI, a daemon, a suite app.
+  The home is its own site or a full guide on frostyard.org
+  ([ADR-0084](https://github.com/frostyard/core/blob/main/docs/adr/0084-accept-a-tools-own-site-or-a-frostyard-org-guide-as-its-docs-home.md)).
+  Apply this skill only to a tool that has no home and gets a new site.
+- **An existing site stays as it is**: a site that another generator
+  builds, or that is in another path, is not moved only for its layout.
 - **Libraries do not**: clix, std and snowkit use pkg.go.dev only.
-- **frostyard.org stays an Astro site** and links to each tool site.
+- **frostyard.org stays an Astro site.** It links to each tool site, or
+  holds the tool's full guide.
 - **frostyard/lab's Astro QA dashboard is exempt.**
 - **frostyard/snosi has no site**: frostyard.org documents its images and
   sysexts
