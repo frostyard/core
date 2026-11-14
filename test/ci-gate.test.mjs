@@ -453,3 +453,11 @@ test("quoted command names, quoted assignments and substituted paths still run t
   const makefile = 'ci:\n\tCGO_ENABLED="0" "golangci-lint" run\n\t$$(go env GOPATH)/bin/staticcheck ./...\n';
   assert.deepEqual(lintGaps({ makefile, workflows }), []);
 });
+
+test("a shell name in another command's arguments does not make text code", () => {
+  assert.deepEqual(toolsCalled(["echo sh -c 'shellcheck x.sh'", "printf '%s' bash -c 'shellcheck x'"]), []);
+  assert.deepEqual(toolsCalled(["sudo -u root bash -e -c 'shellcheck x.sh'"]), ["shellcheck"]);
+  const workflows = { "lint.yml": `${ON_PR}      - run: shellcheck x.sh\n` };
+  assert.deepEqual(lintGaps({ makefile: "ci:\n\t@echo sh -c 'shellcheck x.sh'\n", workflows }), ["shellcheck in lint.yml"]);
+  assert.deepEqual(lintGaps({ makefile: "ci:\n\t/bin/bash -ec 'shellcheck x.sh'\n", workflows }), []);
+});

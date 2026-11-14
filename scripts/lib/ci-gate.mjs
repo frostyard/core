@@ -517,9 +517,11 @@ const WORD = "\u0000";
 // quotes) is a command line of its own, with a placeholder in its word
 // (`$(go env GOPATH)/bin/staticcheck` runs `staticcheck`). Commands are
 // split at `;`, `&`, `|`, `(`, `)`, a line break and `-exec`, outside
-// quotes. The word after `-c` or a flag group that ends in c, after a shell
-// (`sh -c '...'`, `nsl run -m m sh -lc '...'`), is a command line too; the
-// argument of another command's `-c` (`grep -c 'x'`) is not. A `#` at the
+// quotes. The word after `-c` or a flag group that ends in c, when the
+// command itself is a shell (`sh -c '...'`, also `nsl run -m m sh -lc
+// '...'`), is a command line too; the argument of another command's `-c`
+// (`grep -c 'x'`) and a shell name in another command's arguments
+// (`echo sh -c 'x'`) are not. A `#` at the
 // start of a word ends the line. Make references that are left (`$(GO)`)
 // become `$GO`, and `$$` becomes `$`. Not read: `eval`, shell functions,
 // aliases, here-docs.
@@ -601,11 +603,18 @@ function callsIn(text, depth) {
   for (const words of commands) {
     const rest = stripPrefixes(words);
     if (rest.length === 0 || rest[0].value === "") continue;
-    // A shell, then -c (or -lc, -ec ...), then the code it runs.
-    const shell = rest.findIndex((w) => SHELLS.has(basename(w.value)));
+    // A shell in command position (or after `nsl run` and its options),
+    // then only options up to -c (or -lc, -ec ...), then the code it runs.
+    let shell = SHELLS.has(basename(rest[0].value)) ? 0 : -1;
+    if (shell < 0 && rest[0].value === "nsl" && rest[1]?.value === "run") {
+      let k = 2;
+      while (rest[k] && /^-/.test(rest[k].value)) k += /^-[m]$/.test(rest[k].value) ? 2 : 1;
+      if (rest[k] && SHELLS.has(basename(rest[k].value))) shell = k;
+    }
     if (shell >= 0) {
-      const flag = rest.findIndex((w, k) => k > shell && /^-[A-Za-z]*c$/.test(w.value));
-      if (flag >= 0 && rest[flag + 1]) nested.push(rest[flag + 1].raw.replace(/^(['"])([\s\S]*)\1$/, "$2"));
+      let k = shell + 1;
+      while (rest[k] && /^-/.test(rest[k].value) && !/^-[A-Za-z]*c$/.test(rest[k].value)) k += 1;
+      if (rest[k] && /^-[A-Za-z]*c$/.test(rest[k].value) && rest[k + 1]) nested.push(rest[k + 1].raw);
     }
     const name = basename(rest[0].value).replace(/@.*$/, "");
     calls.push([name, ...rest.slice(1).map((w) => w.value)].join(" "));
