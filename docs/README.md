@@ -102,6 +102,7 @@ which baseline rows do not apply here.
 - [0081 — Store each correction in a file of its own](adr/0081-store-each-correction-in-a-file-of-its-own.md)
 - [0082 — Verify the build provenance of omarchy-apps](adr/0082-verify-the-build-provenance-of-omarchy-apps.md)
 - [0083 — Run the CI gate locally as `make ci`](adr/0083-run-the-ci-gate-locally-as-make-ci.md)
+- [0084 — Accept a tool's own site or a frostyard.org guide as its docs home](adr/0084-accept-a-tools-own-site-or-a-frostyard-org-guide-as-its-docs-home.md)
 
 ### Design
 

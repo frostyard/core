@@ -73,3 +73,5 @@ A second site in snosi repeats the same pages, and the two copies drift.
 - Related: [ADR-0072](0072-write-every-readme-to-one-standard.md)
   ([spec: README](../specs/readme.md), the `image` kind)
 - Source: [frostyard/snosi#1239](https://github.com/frostyard/snosi/issues/1239)
+- Amended in part by: [ADR-0084](0084-accept-a-tools-own-site-or-a-frostyard-org-guide-as-its-docs-home.md)
+  (every other user-facing tool has 1 user documentation home)

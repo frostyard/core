@@ -125,3 +125,5 @@ pkg.go.dev from their module source.
 - Related: [ADR-0071](0071-hold-every-code-repository-to-one-baseline.md)
 - Amended in part by: [ADR-0080](0080-document-the-snosi-images-on-frostyard-org.md)
   (snosi has no tool site: frostyard.org documents its images and sysexts)
+- Amended in part by: [ADR-0084](0084-accept-a-tools-own-site-or-a-frostyard-org-guide-as-its-docs-home.md)
+  (a tool's own site or a full frostyard.org guide is its docs home)

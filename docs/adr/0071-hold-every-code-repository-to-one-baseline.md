@@ -189,3 +189,5 @@ against.
 - Amended in part by: [ADR-0081](0081-store-each-correction-in-a-file-of-its-own.md)
 - Amended in part by: [ADR-0083](0083-run-the-ci-gate-locally-as-make-ci.md)
   (the organization gate checks rows B12 and B19, not presence only)
+- Amended in part by: [ADR-0084](0084-accept-a-tools-own-site-or-a-frostyard-org-guide-as-its-docs-home.md)
+  (item 9: 1 user documentation home)
