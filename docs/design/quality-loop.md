@@ -88,24 +88,20 @@ PR template ──► review rubric ──► CI gates ──► corrections ─
   [.memory/corrections/](../../.memory/README.md), 1 file for each record
   (five-field schema, ADR-0018, [ADR-0081](../adr/0081-store-each-correction-in-a-file-of-its-own.md)),
   and are promoted into `AGENTS.md`, docs, or skills; promotion is the only
-  sanctioned duplication. A repository that has not moved yet still has
-  `.memory/corrections.jsonl`, 1 record for each line (append-only).
-  `scripts/check-corrections.mjs` (`npm run check:corrections`, part of
-  `make verify`) validates every record in either form; with `--base <ref>`
-  it also checks that no record is removed, renamed or changed (the only
-  allowed change is an empty `promoted_to` that is filled), that the old
-  file does not come back after the move, and that the move keeps every
-  line. `scripts/migrate-corrections.mjs` makes the move, and
-  `scripts/new-correction.mjs` writes 1 record file in canonical form.
+  sanctioned duplication. `scripts/check-corrections.mjs`
+  (`npm run check:corrections`, part of `make verify`) validates every
+  record; with `--base <ref>` it also checks that no record is removed,
+  renamed or changed (the only allowed change is an empty `promoted_to`
+  that is filled), and that the retired single-file form does not come
+  back. `scripts/new-correction.mjs` writes 1 record file in canonical
+  form.
   - **Blocker to guard.** When a review (cross-review, owner review, or a
     human) finds a blocking point, the PR that fixes it also adds a guard in
     the same PR: a targeted test that fails without the fix (preferred), or
     an `AGENTS.md` rule when no test can catch it. The same PR adds 1
     record file under `.memory/corrections/`
-    (`<date>-pr-<N>-<words>.json`); in a repository that still has
-    `.memory/corrections.jsonl`, it appends 1 line there instead.
-    `evidence` names the PR and the review, and `promoted_to` names the
-    test or the rule.
+    (`<date>-pr-<N>-<words>.json`). `evidence` names the PR and the
+    review, and `promoted_to` names the test or the rule.
   - **Lessons live in the repository.** A lesson about one repository goes
     into that repository by PR — a test, an `AGENTS.md` rule, or a
     corrections record — so other agents, other tools, and humans see it.
@@ -114,10 +110,9 @@ PR template ──► review rubric ──► CI gates ──► corrections ─
   - **Weekly promotion.** Each week (the Friday hygiene line) each owner runs
     `node scripts/corrections-report.mjs --root ~/projects --ref origin/main`
     against its local checkouts, after a `git fetch` in each. With `--ref` it
-    reads the records at that ref (the `.memory/corrections/` files or the
-    `.memory/corrections.jsonl` lines), once per clone, so a record on an
-    unmerged branch, an uncommitted edit, or a second worktree is not
-    counted; a checkout that has records but not the ref is listed as
+    reads the `.memory/corrections/` records at that ref, once per clone,
+    so a record on an unmerged branch, an uncommitted edit, or a second
+    worktree is not counted; a checkout that has records but not the ref is listed as
     unreadable. Without `--ref` it reads the working trees. It reads only
     and lists, per repository, the records with an empty `promoted_to`
     (each with its `source` path), and the scopes that repeat (2 or more

@@ -6,8 +6,10 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 // Repository baseline (ADR-0071, docs/specs/repository-baseline.md) applied to
-// core itself, 1 test per row. B2 lives in scripts/check-corrections.mjs; B6 in
-// test/risk-paths.test.mjs and scripts/check-risk-paths.mjs; B16 in
+// core itself, 1 test per row. B2's record rules live in
+// scripts/check-corrections.mjs and its tests; the B2 test here holds core's
+// tree to the folder form. B6 lives in test/risk-paths.test.mjs and
+// scripts/check-risk-paths.mjs; B16 in
 // test/no-leftover-agent-trees.test.mjs; B17 in test/readme-check.test.mjs. B8, B9 and B11 do not apply to core
 // (docs/org-adrs.md says why); B10 and B18 are checked by the sweep with gh api.
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -341,6 +343,24 @@ test("B1: AGENTS.md is a regular file and every alias is a symlink to it", () =>
     assert.equal(modes.get(alias), "120000", `${alias} must be a committed symlink`);
     assert.equal(realpathSync(path.join(root, alias)), canonical, `${alias} must resolve to AGENTS.md`);
   }
+});
+
+// B2 (ADR-0081): the corrections live only in .memory/corrections/. The
+// retired single file is not tracked, and core's validator reads the folder
+// form (its legacy-form line would say "lines (legacy form").
+test("B2: core keeps its corrections only as record files in .memory/corrections/", () => {
+  const files = lsFiles();
+  assert.ok(!files.includes(".memory/corrections.jsonl"), ".memory/corrections.jsonl is tracked");
+  const records = files.filter((file) => file.startsWith(".memory/corrections/"));
+  assert.ok(records.length > 0, ".memory/corrections/ has no tracked file");
+  for (const file of records) {
+    assert.match(file, /^\.memory\/corrections\/(\d{4}-\d{2}-\d{2}-[a-z0-9]+(?:-[a-z0-9]+)*\.json|\.gitkeep)$/, file);
+  }
+  const out = execFileSync(process.execPath, [path.join(root, "scripts/check-corrections.mjs"), "--root", root], {
+    cwd: root,
+    encoding: "utf8",
+  });
+  assert.match(out, /^ok {3}corrections: \d+ records\n$/);
 });
 
 test("B3: the docs shape is in the tree and docs/README.md links docs/org-adrs.md", () => {
