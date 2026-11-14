@@ -220,6 +220,10 @@ test("B12: a missing ci.yml, or a ci.yml that skips part of make ci, fails", asy
     "B12: .github/workflows/ci.yml missing",
   ]);
   const makefile = "verify:\n\t@true\ncheck:\n\t@true\nci: verify\n\tgo test -race ./...\n";
+  assert.deepEqual(
+    await checkOne({ ".github/workflows/ci.yml": "on:\n  push:\n    branches: [main]\njobs:\n  a:\n    steps:\n      - run: make ci\n" }),
+    ["B12: ci.yml does not run on pull_request"],
+  );
   const workflow = "on: [pull_request]\njobs:\n  a:\n    steps:\n      - run: make verify\n";
   assert.deepEqual(await checkOne({ Makefile: makefile, ".github/workflows/ci.yml": workflow }), [
     "B12: ci.yml does not run go test -race ./...",

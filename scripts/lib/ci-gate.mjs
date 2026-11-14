@@ -117,35 +117,38 @@ export function ciCoverageGaps(makefileText, workflowText) {
 // below find the lint and format checks that a pull-request workflow runs
 // and that `make ci` does not.
 
-// The lint and format tools that the check knows, as they appear in a shell
-// command. A tool outside this list is not checked. `coveredBy` lists the
-// other tools whose run in `make ci` also covers it.
+// The lint and format tools that the check knows. Each pattern matches the
+// start of 1 simple command, as commandCalls gives it: the command's name
+// without its directory, then its arguments. A tool outside this list is
+// not checked. `coveredBy` lists the other tools whose run in `make ci`
+// also covers it.
+const tool = (name) => new RegExp(`^${name}(?![\\w-])`);
 export const LINT_TOOLS = [
-  { tool: "golangci-lint", pattern: /(?<![\w-])golangci-lint(?![\w-])/ },
-  { tool: "gofmt", pattern: /(?<![\w-])(?:gofmt|go\s+fmt)(?![\w-])/, coveredBy: ["gofumpt"] },
-  { tool: "gofumpt", pattern: /(?<![\w-])gofumpt(?![\w-])/ },
-  { tool: "goimports", pattern: /(?<![\w-])goimports(?![\w-])/ },
-  { tool: "go vet", pattern: /(?<![\w-])go\s+vet(?![\w-])/, coveredBy: ["golangci-lint"] },
-  { tool: "staticcheck", pattern: /(?<![\w-])staticcheck(?![\w-])/, coveredBy: ["golangci-lint"] },
-  { tool: "shellcheck", pattern: /(?<![\w-])shellcheck(?![\w-])/ },
-  { tool: "shfmt", pattern: /(?<![\w-])shfmt(?![\w-])/ },
-  { tool: "eslint", pattern: /(?<![\w-])eslint(?![\w-])/ },
-  { tool: "prettier", pattern: /(?<![\w-])prettier(?![\w-])/ },
-  { tool: "biome", pattern: /(?<![\w-])biome(?![\w-])/ },
-  { tool: "ruff", pattern: /(?<![\w-])ruff(?![\w-])/ },
-  { tool: "black", pattern: /(?<![\w-])black(?![\w-])/ },
-  { tool: "flake8", pattern: /(?<![\w-])flake8(?![\w-])/ },
-  { tool: "ansible-lint", pattern: /(?<![\w-])ansible-lint(?![\w-])/ },
-  { tool: "yamllint", pattern: /(?<![\w-])yamllint(?![\w-])/ },
-  { tool: "markdownlint", pattern: /(?<![\w-])markdownlint(?:-cli2?)?(?![\w-])/ },
-  { tool: "actionlint", pattern: /(?<![\w-])actionlint(?![\w-])/ },
-  { tool: "hadolint", pattern: /(?<![\w-])hadolint(?![\w-])/ },
-  { tool: "rustfmt", pattern: /(?<![\w-])(?:rustfmt|cargo\s+fmt)(?![\w-])/ },
-  { tool: "clippy", pattern: /(?<![\w-])(?:cargo\s+clippy|clippy-driver)(?![\w-])/ },
-  { tool: "clang-format", pattern: /(?<![\w-])clang-format(?![\w-])/ },
+  { tool: "golangci-lint", pattern: tool("golangci-lint") },
+  { tool: "gofmt", pattern: /^(?:gofmt|go\s+fmt)(?![\w-])/, coveredBy: ["gofumpt"] },
+  { tool: "gofumpt", pattern: tool("gofumpt") },
+  { tool: "goimports", pattern: tool("goimports") },
+  { tool: "go vet", pattern: /^go\s+vet(?![\w-])/, coveredBy: ["golangci-lint"] },
+  { tool: "staticcheck", pattern: tool("staticcheck"), coveredBy: ["golangci-lint"] },
+  { tool: "shellcheck", pattern: tool("shellcheck") },
+  { tool: "shfmt", pattern: tool("shfmt") },
+  { tool: "eslint", pattern: tool("eslint") },
+  { tool: "prettier", pattern: tool("prettier") },
+  { tool: "biome", pattern: tool("biome") },
+  { tool: "ruff", pattern: tool("ruff") },
+  { tool: "black", pattern: tool("black") },
+  { tool: "flake8", pattern: tool("flake8") },
+  { tool: "ansible-lint", pattern: tool("ansible-lint") },
+  { tool: "yamllint", pattern: tool("yamllint") },
+  { tool: "markdownlint", pattern: /^markdownlint(?:-cli2?)?(?![\w-])/ },
+  { tool: "actionlint", pattern: tool("actionlint") },
+  { tool: "hadolint", pattern: tool("hadolint") },
+  { tool: "rustfmt", pattern: /^(?:rustfmt|cargo\s+(?:\+\S+\s+)?fmt)(?![\w-])/ },
+  { tool: "clippy", pattern: /^(?:cargo\s+(?:\+\S+\s+)?clippy|clippy-driver)(?![\w-])/ },
+  { tool: "clang-format", pattern: tool("clang-format") },
   {
     tool: "npm lint or format script",
-    pattern: /(?<![\w-])(?:npm|pnpm|yarn|bun)\s+(?:run(?:-script)?\s+)?(?:lint|format|fmt)(?::[\w:-]+)?(?![\w-])/,
+    pattern: /^(?:npm|pnpm|yarn|bun)\s+(?:run(?:-script)?\s+)?(?:lint|format|fmt)(?::[\w:-]+)?(?![\w-])/,
   },
 ];
 
@@ -199,32 +202,71 @@ function splitLines(text) {
   return text.replace(/^\uFEFF/, "").split(/\r?\n/);
 }
 
-// True when the workflow's top-level `on:` key (also `"on":`, `'on':` or
-// `true:`) names `pull_request` or `pull_request_target`, inline or in its
-// indented block. A mention elsewhere (an `if:` expression) does not count.
-export function runsOnPullRequest(workflowText) {
+// The event names of the workflow's top-level `on:` key (also `"on":`,
+// `'on':` or `true:`): a scalar (`on: pull_request`), a flow list
+// (`[push, pull_request]`), a flow mapping, or a block of mapping keys or
+// list items (indented or indentless) at 1 indent. Nested values (branch
+// names, inputs) are not events.
+export function workflowEvents(workflowText) {
   const lines = splitLines(workflowText);
+  const unquote = (word) => word.trim().replace(/^(["'])(.*)\1$/, "$2");
   for (let i = 0; i < lines.length; i++) {
     const head = /^(?:on|"on"|'on'|true)\s*:(.*)$/.exec(stripYamlComment(lines[i]));
     if (!head) continue;
-    const parts = [head[1]];
+    const inline = head[1].trim();
+    if (inline !== "") {
+      const flow = /^[[{](.*)[\]}]$/.exec(inline);
+      const items = flow ? flow[1].split(",") : [inline];
+      return items.map((item) => unquote(item.split(":")[0])).filter(Boolean);
+    }
+    const events = [];
+    let childIndent = -1;
+    let indentless = false;
     for (let j = i + 1; j < lines.length; j++) {
       const line = stripYamlComment(lines[j]);
       if (line.trim() === "") continue;
-      if (indentOf(line) === 0) break;
-      parts.push(line);
+      const indent = indentOf(line);
+      if (childIndent < 0) {
+        childIndent = indent;
+        indentless = indent === 0 && /^-\s/.test(line);
+        if (indent === 0 && !indentless) break;
+      }
+      if (indent === 0 && !(indentless && /^-\s/.test(line))) break;
+      if (indent !== childIndent) continue;
+      const item = /^\s*-\s+(.*)$/.exec(line);
+      const key = /^\s*(["']?[\w-]+["']?)\s*:/.exec(line);
+      if (item) events.push(unquote(item[1].split(":")[0]));
+      else if (key) events.push(unquote(key[1]));
     }
-    return /(?<![\w-])pull_request(?:_target)?(?![\w-])/.test(parts.join("\n"));
+    return events.filter(Boolean);
   }
-  return false;
+  return [];
 }
 
-// The `owner/name` of each `uses:` value in the workflow (lower case, no
+// True when the workflow's events (workflowEvents) include `pull_request`
+// or `pull_request_target`.
+export function runsOnPullRequest(workflowText) {
+  return workflowEvents(workflowText).some((event) => event === "pull_request" || event === "pull_request_target");
+}
+
+// The `owner/name` of each `uses:` key in the workflow (lower case, no
 // `@ref`, no sub-path). Local (`./`) and `docker://` values are left out.
+// The body of a block scalar (`run: |`, `script: >`) is text, not YAML, so
+// a `uses:` line inside it does not count.
 export function workflowActions(workflowText) {
   const actions = [];
+  let blockColumn = -1; // the key column of the block scalar being skipped
   for (const raw of splitLines(workflowText)) {
+    if (blockColumn >= 0) {
+      if (raw.trim() === "" || indentOf(raw) > blockColumn) continue;
+      blockColumn = -1;
+    }
     const line = stripYamlComment(raw);
+    const block = /^(\s*(?:-\s+)?)["']?[\w.-]+["']?\s*:\s*[|>][-+0-9]*\s*$/.exec(line);
+    if (block) {
+      blockColumn = block[1].length;
+      continue;
+    }
     const match = /^\s*(?:-\s+)?uses:\s*["']?([^"'\s]+)/.exec(line);
     if (!match) continue;
     const value = match[1];
@@ -284,23 +326,122 @@ export function makeRules(makefileText) {
   return rules;
 }
 
+// Quoted text blanked to spaces of the same length, so that offsets stay.
+function blankQuotes(command) {
+  return command.replace(/'[^']*'|"(?:[^"\\]|\\.)*"/g, (quoted) => " ".repeat(quoted.length));
+}
+
+// Shell words of a simple argument list, with their quotes removed.
+function shellWords(text) {
+  const words = [];
+  for (const match of text.matchAll(/(?:[^\s'"]+|'[^']*'|"(?:[^"\\]|\\.)*")+/g)) {
+    words.push(match[0].replace(/'([^']*)'|"((?:[^"\\]|\\.)*)"/g, (_, single, double) => single ?? double.replace(/\\(.)/g, "$1")));
+  }
+  return words;
+}
+
 // The targets that 1 shell command runs with `make`, `$(MAKE)` or
 // `${MAKE}` in command position: at the start, after `;`, `&&`, `||`, `|`,
 // `(`, `then`, `do` or `else` (a recipe's `@`, `-` or `+` prefix allowed),
-// and after `VAR=value` words. Quoted text is
-// not a command, so `echo "needs make"` calls nothing. A call with -C or -f
-// reads another Makefile and is left out.
+// and after `VAR=value` words. Quoted text is not a command, so
+// `echo "needs make"` calls nothing; a quoted argument of a call is a word
+// (`make 'ci'` runs `ci`). A call with -C or -f reads another Makefile and
+// is left out.
 export function makeCalls(command) {
-  const unquoted = command.replace(/'[^']*'|"(?:[^"\\]|\\.)*"/g, (quoted) => " ".repeat(quoted.length));
+  const blanked = blankQuotes(command);
   const targets = [];
   const pattern =
-    /(?:^|[;&|(]|(?<![\w-])(?:then|do|else)(?![\w-]))\s*[@+-]*(?:[A-Za-z_]\w*=\S*\s+)*(?:make|\$\(MAKE\)|\$\{MAKE\})(?![\w-])([^;&|()#]*)/g;
-  for (const match of unquoted.matchAll(pattern)) {
-    const words = match[1].trim().split(/\s+/).filter(Boolean);
+    /(?:^|[;&|(]|(?<![\w-])(?:then|do|else)(?![\w-]))\s*[@+-]*(?:[A-Za-z_]\w*=\S*\s+)*(?:make|\$\(MAKE\)|\$\{MAKE\})(?![\w-])([^;&|()#]*)/dg;
+  for (const match of blanked.matchAll(pattern)) {
+    const [start, end] = match.indices[1];
+    const words = shellWords(command.slice(start, end));
     if (words.some((word) => /^-(?:C|f)/.test(word) || /^--(?:directory|file|makefile)/.test(word))) continue;
-    for (const word of words) if (!word.startsWith("-") && !word.includes("=")) targets.push(word);
+    for (const word of words) if (word && !word.startsWith("-") && !word.includes("=")) targets.push(word);
   }
   return targets;
+}
+
+// Words before a command's name that run the command after them.
+const COMMAND_PREFIXES = [
+  /^[@+-]+/,
+  /^(?:if|then|do|else|elif|while|until|!|time|exec|command|nice|nohup)\s+/,
+  /^sudo(?:\s+-\S+)*\s+/,
+  /^env(?:\s+-\S+)*\s+/,
+  /^[A-Za-z_]\w*=\S*\s+/,
+  /^xargs(?:\s+-\S+)*\s+/,
+  /^(?:npx|bunx|uvx|pipx\s+run|npm\s+exec|pnpm\s+(?:exec|dlx)|yarn\s+dlx|go\s+run|go\s+tool|python3?\s+-m)(?:\s+-\S+)*\s+(?:--\s+)?/,
+];
+
+// The simple commands of a shell command line, each as its name (without
+// its directory or an `@version`) and its arguments. A command starts at
+// the start of the line and after `;`, `&`, `|`, `(`, `)`, a backquote, a
+// line break, `-exec`, and each opening quote (so that `sh -c 'x'` and
+// `"$(x)"` run `x`, also inside the quotes); the text after a closing quote
+// is arguments. A `#` comment ends the line. Make references that
+// are left (`$(GO)`) become `$GO`, and `$$` becomes `$`.
+export function commandCalls(line) {
+  const text = line
+    .replace(/\$\(([A-Za-z_][\w.]*)\)|\$\{([A-Za-z_][\w.]*)\}/g, (_, a, b) => `$${a ?? b}`)
+    .replace(/\$\$/g, "$");
+  const segments = [];
+  let current = "";
+  let quote = null;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (quote === '"' && c === "\\") {
+      current += text.slice(i, i + 2);
+      i += 1;
+      continue;
+    }
+    if (!quote && c === "#" && (i === 0 || /\s/.test(text[i - 1]))) break;
+    if (c === "'" || c === '"') {
+      if (quote && quote !== c) {
+        current += c;
+        continue;
+      }
+      segments.push(current);
+      // After a closing quote the same command goes on: its next word is an
+      // argument, so the segment starts with a placeholder name.
+      current = quote ? "\u0000 " : "";
+      quote = quote ? null : c;
+      continue;
+    }
+    if (/[;&|()`\n]/.test(c)) {
+      segments.push(current);
+      current = "";
+      continue;
+    }
+    current += c;
+  }
+  segments.push(current);
+  const calls = [];
+  for (const raw of segments.flatMap((segment) => segment.split(/\s-exec\s/))) {
+    let segment = raw.trim();
+    for (let changed = true; changed && segment; ) {
+      changed = false;
+      for (const prefix of COMMAND_PREFIXES) {
+        const next = segment.replace(prefix, "");
+        if (next !== segment) [segment, changed] = [next.trim(), true];
+      }
+    }
+    if (!segment) continue;
+    const [name, ...rest] = segment.split(/\s+/);
+    calls.push([name.replace(/^.*\//, "").replace(/@.*$/, ""), ...rest].join(" "));
+  }
+  return calls;
+}
+
+// True when 1 of the simple commands (commandCalls) of the lines runs the
+// tool. `pnpm x`, `yarn x` and `bun x` also run the binary `x`.
+function callsTool(lines, entry) {
+  return lines.some((line) =>
+    commandCalls(line).some((call) => entry.pattern.test(call) || entry.pattern.test(call.replace(/^(?:pnpm|yarn|bun)\s+/, ""))),
+  );
+}
+
+// The tools of LINT_TOOLS that the lines run.
+export function toolsCalled(lines) {
+  return LINT_TOOLS.filter((entry) => callsTool(lines, entry)).map((entry) => entry.tool);
 }
 
 // What `make <target>` runs: the targets it reaches through prerequisites
@@ -327,8 +468,8 @@ export function makeReach(makefileText, target) {
 }
 
 // The npm scripts that the commands run (`npm run X`, `npm run-script X`,
-// `npm test`), followed through the scripts' own npm calls. Each name comes
-// back with its command.
+// `npm test`) with their `pre` and `post` scripts, followed through the
+// scripts' own npm calls. Each name comes back with its command.
 export function npmScripts(commands, packageJsonText) {
   let scripts = {};
   try {
@@ -342,13 +483,16 @@ export function npmScripts(commands, packageJsonText) {
     for (const _ of text.matchAll(/(?<![\w-])npm\s+(?:test|t|tst)(?![\w-])/g)) names.push("test");
     return names;
   };
+  // npm runs pre<name> and post<name> with <name>, unless --ignore-scripts.
+  const lifecycle = (text, names) =>
+    /(?<![\w-])--ignore-scripts(?![\w-])/.test(text) ? names : names.flatMap((name) => [`pre${name}`, name, `post${name}`]);
   const reached = new Map();
-  const queue = commands.flatMap(calls);
+  const queue = commands.flatMap((command) => lifecycle(command, calls(command)));
   while (queue.length > 0) {
     const name = queue.shift();
     if (reached.has(name) || typeof scripts[name] !== "string") continue;
     reached.set(name, scripts[name]);
-    queue.push(...calls(scripts[name]));
+    queue.push(...lifecycle(scripts[name], calls(scripts[name])));
   }
   return [...reached].map(([name, command]) => ({ name, command }));
 }
@@ -371,20 +515,50 @@ export function scriptPaths(commands) {
   return [...paths];
 }
 
-// The text that `make <target>` runs: its reached recipe commands, the
-// Makefile's variable assignments (a recipe can call a tool through a
-// variable), the npm scripts it reaches, and the given script files.
-// `targets` is the set of reached targets; `paths` are the script files the
-// text names.
+// The Makefile's variables: name -> value. `?=` sets a variable only when
+// it has no value yet; `+=` appends; `=`, `:=`, `::=`, `:::=` and `!=` set.
+export function makeVariables(makefileText) {
+  const variables = new Map();
+  for (const line of splitLines(makefileText)) {
+    const match = /^\s*(?:export\s+|override\s+)*([A-Za-z_][\w.]*)\s*(:{1,3}|\?|\+|!)?=\s*(.*)$/.exec(line);
+    if (!match || line.startsWith("\t")) continue;
+    const [, name, op, value] = match;
+    if (op === "?" && variables.has(name)) continue;
+    variables.set(name, op === "+" && variables.has(name) ? `${variables.get(name)} ${value}` : value.replace(/\s+#.*$/, ""));
+  }
+  return variables;
+}
+
+// A command with each `$(NAME)` and `${NAME}` that the Makefile defines
+// replaced by its value, 5 levels deep. Other references stay.
+export function expandVariables(command, variables) {
+  let text = command;
+  for (let depth = 0; depth < 5; depth++) {
+    const next = text.replace(/\$\(([A-Za-z_][\w.]*)\)|\$\{([A-Za-z_][\w.]*)\}/g, (whole, a, b) => variables.get(a ?? b) ?? whole);
+    if (next === text) break;
+    text = next;
+  }
+  return text;
+}
+
+// What `make <target>` runs: its reached recipe commands with the
+// Makefile's variables expanded, the commands of the npm scripts it
+// reaches, and the lines of the given script files (without comment
+// lines). `targets` is the set of reached targets; `paths` are the script
+// files the commands name.
 export function makeTargetText(makefileText, target, packageJsonText, files = {}) {
   const reach = makeReach(makefileText, target);
-  const assignments = splitLines(makefileText).filter((line) => /^\s*(?:export\s+)?[A-Za-z_][\w.]*\s*(?::{1,3}|\?|\+|!)?=/.test(line));
-  const scripts = npmScripts(reach.recipe, packageJsonText);
-  const commands = [...reach.recipe, ...scripts.map((script) => script.command)];
+  const variables = makeVariables(makefileText);
+  const recipe = reach.recipe.map((command) => expandVariables(command, variables));
+  const scripts = npmScripts(recipe, packageJsonText);
+  const commands = [...recipe, ...scripts.map((script) => script.command)];
   const paths = scriptPaths(commands);
-  const parts = [...commands, ...assignments, ...scripts.map((script) => `npm run ${script.name}`)];
-  for (const filePath of paths) if (typeof files[filePath] === "string") parts.push(files[filePath]);
-  return { found: reach.found, targets: reach.targets, text: parts.join("\n"), paths };
+  const lines = [...commands];
+  for (const filePath of paths) {
+    if (typeof files[filePath] !== "string") continue;
+    lines.push(...splitLines(files[filePath]).filter((line) => !/^\s*(?:#|\/\/)/.test(line)));
+  }
+  return { found: reach.found, targets: reach.targets, lines, paths };
 }
 
 export function makeCiText(makefileText, packageJsonText, files = {}) {
@@ -392,14 +566,14 @@ export function makeCiText(makefileText, packageJsonText, files = {}) {
 }
 
 // The lint and format checks of 1 workflow: each tool that a `run:` command
-// calls (LINT_TOOLS), each lint action that a `uses:` names (LINT_ACTIONS),
+// runs (LINT_TOOLS, by commandCalls), each lint action that a `uses:` names (LINT_ACTIONS),
 // and each `make <target>` command whose target name says lint, fmt, format
 // or vet.
 export function workflowLintChecks(workflowText) {
   const checks = [];
   const commands = workflowCommands(workflowText);
   for (const command of commands) {
-    for (const { tool } of LINT_TOOLS.filter(({ pattern }) => pattern.test(command))) checks.push({ tool });
+    for (const tool of toolsCalled([command])) checks.push({ tool });
     for (const target of makeCalls(command)) if (LINT_TARGET.test(target)) checks.push({ target });
   }
   for (const action of workflowActions(workflowText)) {
@@ -432,7 +606,8 @@ export function lintScriptPaths({ makefile, packageJson = null, workflows = {} }
 // B19 (ADR-0083): the lint and format checks that a pull-request workflow
 // runs and `make ci` does not. `workflows` maps a file name to its text;
 // `files` holds the script files that lintScriptPaths names. A tool counts
-// as run when the text of `make ci` calls it (or a tool in its `coveredBy`).
+// as run when a simple command of `make ci` (commandCalls) runs it, or a
+// tool in its `coveredBy`.
 // A `make <target>` lint check counts as run when `make ci` reaches the
 // target, or when the target calls known tools and `make ci` runs each of
 // them. Without a `ci` target there is nothing to compare (row B4 reports
@@ -445,7 +620,7 @@ export function lintGaps({ makefile, packageJson = null, workflows = {}, files =
     const entry = LINT_TOOLS.find((candidate) => candidate.tool === tool);
     if (!entry) return false; // a tool with no pattern (super-linter) cannot run in make ci here
     const names = [tool, ...(entry.coveredBy ?? [])];
-    return names.some((name) => LINT_TOOLS.find((candidate) => candidate.tool === name).pattern.test(ci.text));
+    return names.some((name) => callsTool(ci.lines, LINT_TOOLS.find((candidate) => candidate.tool === name)));
   };
   const gaps = new Set();
   for (const name of Object.keys(workflows).sort()) {
@@ -454,7 +629,7 @@ export function lintGaps({ makefile, packageJson = null, workflows = {}, files =
       if (check.target !== undefined) {
         if (ci.targets.has(check.target)) continue;
         const other = makeTargetText(makefile, check.target, packageJson, files);
-        const tools = LINT_TOOLS.filter(({ pattern }) => pattern.test(other.text)).map(({ tool }) => tool);
+        const tools = toolsCalled(other.lines);
         if (!other.found || tools.length === 0) gaps.add(`make ${check.target} in ${name}`);
         else for (const tool of tools.filter((candidate) => !runs(candidate))) gaps.add(`make ${check.target} (${tool}) in ${name}`);
       } else if (!runs(check.tool)) {

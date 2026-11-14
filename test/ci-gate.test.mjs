@@ -4,17 +4,22 @@ import test from "node:test";
 import {
   LINT_ACTIONS,
   LINT_TOOLS,
+  commandCalls,
+  expandVariables,
   lintGaps,
   lintScriptPaths,
   makeCalls,
   makeCiText,
   makeReach,
   makeRules,
+  makeVariables,
   namesMakeCi,
   npmScripts,
   runsOnPullRequest,
   scriptPaths,
+  toolsCalled,
   workflowActions,
+  workflowEvents,
   workflowLintChecks,
 } from "../scripts/lib/ci-gate.mjs";
 
@@ -264,4 +269,116 @@ test("namesMakeCi matches make ci as a whole command name", () => {
   for (const text of ["", null, "make ci-local", "make cid", "cmake ci", "make  verify", "remake ci"]) {
     assert.equal(namesMakeCi(text), false, String(text));
   }
+});
+
+// Review findings of core#253, round 1: 1 guard each.
+
+test("workflowEvents reads event names at 1 level only, also from indentless lists and flow mappings", () => {
+  assert.deepEqual(workflowEvents("on:\n- push\n- pull_request\njobs: {}\n"), ["push", "pull_request"]);
+  assert.equal(runsOnPullRequest("on:\n- push\n- pull_request\n"), true);
+  assert.equal(runsOnPullRequest("on:\n  push:\n    branches: [pull_request]\n"), false);
+  assert.equal(runsOnPullRequest("on:\n  workflow_dispatch:\n    inputs:\n      pull_request:\n        type: string\n"), false);
+  assert.deepEqual(workflowEvents("on: {push: {branches: [main]}, pull_request: {}}\n").includes("pull_request"), true);
+  assert.deepEqual(workflowEvents("on:\n  'pull_request':\n  push:\n"), ["pull_request", "push"]);
+  assert.deepEqual(workflowEvents("on: [push]\n"), ["push"]);
+  assert.deepEqual(workflowEvents("name: x\n"), []);
+});
+
+test("workflowActions skips the body of a block scalar, such as a heredoc in run: |", () => {
+  const text = [
+    "on: [pull_request]",
+    "jobs:",
+    "  a:",
+    "    steps:",
+    "      - run: |",
+    "          cat <<'EOF'",
+    "          uses: astral-sh/ruff-action@v3",
+    "          EOF",
+    "        env:",
+    "          X: 1",
+    "      - uses: golangci/golangci-lint-action@0123",
+    "      - name: note",
+    "        run: >-",
+    "          uses: wearerequired/lint-action@v2",
+  ].join("\n");
+  assert.deepEqual(workflowActions(text), ["golangci/golangci-lint-action"]);
+  assert.deepEqual(lintGaps({ makefile: "ci:\n\tgolangci-lint run\n", workflows: { "ci.yml": text } }), []);
+});
+
+test("makeCalls keeps quoted targets of a make call", () => {
+  assert.deepEqual(makeCalls("make 'ci'"), ["ci"]);
+  assert.deepEqual(makeCalls('$(MAKE) "lint" V=1'), ["lint"]);
+  assert.deepEqual(makeCalls("echo 'make fmt' && make \"vet\""), ["vet"]);
+  assert.deepEqual(workflowLintChecks('on: [pull_request]\njobs:\n  a:\n    steps:\n      - run: make "lint"\n'), [{ target: "lint" }]);
+  assert.deepEqual(makeReach('ci:\n\t$(MAKE) "lint"\nlint:\n\tshfmt -d .\n', "ci").recipe, ['$(MAKE) "lint"', "shfmt -d ."]);
+});
+
+test("commandCalls splits a line into simple commands and drops prefixes, paths and comments", () => {
+  const calls = (line) => commandCalls(line).filter((call) => call !== "$" && call !== "\u0000");
+  assert.deepEqual(calls('test -z "$(gofmt -l .)"'), ["test -z", "gofmt -l ."]);
+  assert.deepEqual(calls("sh -c 'shellcheck x.sh'"), ["sh -c", "shellcheck x.sh"]);
+  assert.deepEqual(calls("echo start; ./bin/golangci-lint run && sudo -E env A=1 shfmt -d . # shellcheck"), [
+    "echo start",
+    "golangci-lint run",
+    "shfmt -d .",
+  ]);
+  assert.deepEqual(calls("find . -name '*.sh' -exec shellcheck {} +"), ["find . -name", "*.sh", "shellcheck {} +"]);
+  assert.deepEqual(calls("npx --yes eslint . | xargs -0 prettier -c"), ["eslint .", "prettier -c"]);
+  assert.deepEqual(calls("go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.1.0 run"), ["golangci-lint run"]);
+  assert.deepEqual(calls("$(GO) vet ./... && $$(go env GOPATH)/bin/staticcheck"), ["$GO vet ./...", "go env GOPATH", "staticcheck"]);
+  // After a closing quote, the next word is an argument, not a command.
+  assert.deepEqual(calls("printf '%s\\n' shellcheck"), ["printf", "%s\\n", "\u0000 shellcheck"]);
+  assert.deepEqual(commandCalls(""), []);
+});
+
+test("toolsCalled counts a tool only in command position, not in a message, a comment or an installer's arguments", () => {
+  const none = [
+    'echo "Install shellcheck"',
+    "echo Install shellcheck && true",
+    "true # shellcheck later",
+    "printf '%s\\n' shellcheck",
+    "rustup toolchain install stable --profile minimal --component clippy,rustfmt",
+    "go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.1.0",
+    "sudo apt-get install -y shellcheck shfmt",
+    'msg="run shellcheck first"',
+  ];
+  for (const line of none) assert.deepEqual(toolsCalled([line]), [], line);
+  assert.deepEqual(toolsCalled(['test -z "$(gofmt -l .)"']), ["gofmt"]);
+  assert.deepEqual(toolsCalled(["sh -c 'cd web && cargo fmt --check && cargo clippy -- -D warnings'"]), ["rustfmt", "clippy"]);
+  assert.deepEqual(toolsCalled(["pnpm biome check ."]), ["biome"]);
+  assert.deepEqual(toolsCalled(["pnpm run lint:md"]), ["npm lint or format script"]);
+  assert.deepEqual(toolsCalled(["python3 -m black --check ."]), ["black"]);
+});
+
+test("lintGaps does not count a tool that make ci only names in a message, comment or script comment", () => {
+  const workflows = { "lint.yml": `${ON_PR}      - run: shellcheck x.sh\n      - run: echo "Install golangci-lint"\n` };
+  const message = "ci:\n\t@echo \"Install shellcheck\" # shellcheck\n\t./scripts/check.sh\n";
+  const files = { "scripts/check.sh": "#!/bin/sh\n# shellcheck is optional\ntrue\n" };
+  assert.deepEqual(lintGaps({ makefile: message, workflows, files }), ["shellcheck in lint.yml"]);
+  const real = { "scripts/check.sh": "#!/bin/sh\nshellcheck x.sh\n" };
+  assert.deepEqual(lintGaps({ makefile: message, workflows, files: real }), []);
+});
+
+test("lintGaps counts only the Makefile variables that make ci uses", () => {
+  const makefile = "LINTER := golangci-lint\nci:\n\ttrue\nlint:\n\t$(LINTER) run\n";
+  assert.deepEqual(makeVariables(makefile).get("LINTER"), "golangci-lint");
+  assert.equal(expandVariables("$(LINTER) run ${LINTER}", makeVariables(makefile)), "golangci-lint run golangci-lint");
+  const workflows = { "ci.yml": `${ON_PR}      - run: make lint\n      - uses: golangci/golangci-lint-action@0123\n` };
+  assert.deepEqual(lintGaps({ makefile, workflows }), [
+    "make lint (golangci-lint) in ci.yml",
+    "golangci/golangci-lint-action (golangci-lint) in ci.yml",
+  ]);
+  const used = "LINTER ?= golangci-lint\nLINTER ?= other\nci:\n\t$(LINTER) run\nlint:\n\t$(LINTER) run\n";
+  assert.deepEqual(lintGaps({ makefile: used, workflows }), []);
+});
+
+test("npmScripts follows the pre and post scripts that npm runs, unless --ignore-scripts", () => {
+  const pkg = JSON.stringify({ scripts: { pretest: "eslint .", test: "node --test", posttest: "prettier -c .", prelint: "true" } });
+  assert.deepEqual(
+    npmScripts(["npm test"], pkg).map(({ name }) => name),
+    ["pretest", "test", "posttest"],
+  );
+  assert.deepEqual(npmScripts(["npm test --ignore-scripts"], pkg).map(({ name }) => name), ["test"]);
+  const workflows = { "lint.yml": `${ON_PR}      - run: npx eslint .\n` };
+  assert.deepEqual(lintGaps({ makefile: "ci:\n\tnpm test\n", packageJson: pkg, workflows }), []);
 });

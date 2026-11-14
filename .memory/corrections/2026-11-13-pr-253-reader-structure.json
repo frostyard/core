@@ -1,0 +1,7 @@
+{
+  "date": "2026-11-13",
+  "scope": "ci-gate",
+  "correction": "The workflow and shell readers of scripts/lib/ci-gate.mjs must read structure, not matching lines: on: events only at 1 level (indentless lists too, never branch names or inputs), uses: never inside a block scalar body, and a quoted make argument as a target",
+  "evidence": "Cross-review of frostyard/core#253 at 754e01f: runsOnPullRequest missed 'on:' with an indentless list and matched 'branches: [pull_request]'; workflowActions read 'uses:' in a run: | heredoc; makeCalls dropped 'make \"lint\"'. Fixed in frostyard/core#253 with 1 targeted test each",
+  "promoted_to": "test/ci-gate.test.mjs"
+}

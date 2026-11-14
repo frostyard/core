@@ -396,6 +396,8 @@ test("B12: ciCoverageGaps counts each target of 1 make call (ADR-0083)", () => {
     "on: [pull_request]\njobs:\n  a:\n    steps:\n      - run: make verify\n      - run: make ui-check IN_NSL='sh -c'\n      - run: make desktop-build desktop-build-windows\n      - run: go test -race ./...\n";
   assert.deepEqual(ciCoverageGaps(makefile, workflow), []);
   assert.deepEqual(ciCoverageGaps(makefile, workflow.replace(" desktop-build-windows\n", "\n")), ["make desktop-build-windows"]);
+  // A quoted target is a target.
+  assert.deepEqual(ciCoverageGaps(makefile, "on: [pull_request]\njobs:\n  a:\n    steps:\n      - run: make 'ci'\n"), []);
   // An echo that names make is not a make call.
   assert.deepEqual(ciCoverageGaps("ci: verify\n", "on: [pull_request]\njobs:\n  a:\n    steps:\n      - run: echo 'run make ci'\n"), ["make verify"]);
 });

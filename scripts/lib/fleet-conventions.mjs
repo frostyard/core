@@ -1,7 +1,7 @@
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 
-import { ciCoverageGaps, lintGaps, lintScriptPaths, namesMakeCi } from "./ci-gate.mjs";
+import { ciCoverageGaps, lintGaps, lintScriptPaths, namesMakeCi, runsOnPullRequest } from "./ci-gate.mjs";
 
 const CONTENTS_API = "https://api.github.com/repos";
 
@@ -127,6 +127,8 @@ async function checkCiGate(fetchImpl, owner, name, makefile) {
   const workflows = await fetchWorkflows(fetchImpl, owner, name);
   if (workflows["ci.yml"] === undefined) {
     failures.push("B12: .github/workflows/ci.yml missing");
+  } else if (!runsOnPullRequest(workflows["ci.yml"])) {
+    failures.push("B12: ci.yml does not run on pull_request");
   } else if (makefile !== null) {
     const gaps = ciCoverageGaps(makefile, workflows["ci.yml"]);
     if (gaps.length > 0 && !gaps[0].startsWith("a ci target")) {

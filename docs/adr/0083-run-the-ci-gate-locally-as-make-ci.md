@@ -70,9 +70,13 @@ the 3 targets.
   part of B4, with the readers in `scripts/lib/ci-gate.mjs`. It reads the
   enabled declarations, or the repositories given as `OWNER/REPO`
   arguments. The lint check knows the tools in `LINT_TOOLS` and the
-  actions in `LINT_ACTIONS` of that file and follows `make ci` through
-  prerequisites, recipe `make` calls, Makefile variables, npm scripts and
-  the script files that a recipe names.
+  actions in `LINT_ACTIONS` of that file. A tool counts as run only when
+  a simple command calls it, not when a message, a comment or an
+  installer argument names it. The check follows `make ci` through
+  prerequisites, recipe `make` calls, the Makefile variables its
+  commands use, npm scripts with their `pre` and `post` scripts, and the
+  script files that a recipe names. Row B12 also needs `ci.yml` to run on
+  `pull_request`.
 - **This ADR amends ADR-0071 in part.** These statements of ADR-0071 are
   no longer true:
   - "The organization gate (`npm run check:fleet`) still checks presence
