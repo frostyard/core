@@ -1,0 +1,7 @@
+{
+  "date": "2026-11-13",
+  "scope": "ci-gate",
+  "correction": "The CI gate's shell reader must split a line into shell words first (quotes join their word, a substitution keeps its place in the word) and must read a -c argument as code only when the command itself is a shell such as sh or bash (or nsl run ... sh), never after grep -c or echo sh -c",
+  "evidence": "Re-review of frostyard/core#253 at 9e2d63b: grep -c 'shellcheck' Makefile counted as a shellcheck run, and \"golangci-lint\" run, CGO_ENABLED=\"0\" golangci-lint run and $(go env GOPATH)/bin/staticcheck lost their tool; re-review at f18e0eb: echo sh -c 'shellcheck x.sh' still counted. Fixed in frostyard/core#253 with targeted tests",
+  "promoted_to": "test/ci-gate.test.mjs"
+}

@@ -6,12 +6,14 @@ The weekly conformance sweep reads this spec at core's `origin/main` and
 checks each repository it sweeps against every row that applies; a row
 that fails is a `sweep` finding with the row's ID in its key. Owners and
 reviewers use the same rows. The organization gate
-(`npm run check:fleet`) stays narrower: it checks only the presence part of
-B4 (ADR-0043 and ADR-0044), and only for enabled repositories.
+(`npm run check:fleet`) stays narrower: it checks the presence part of B4
+(ADR-0043 and ADR-0044), row B12 and the mechanical part of row B19
+([ADR-0083](../adr/0083-run-the-ci-gate-locally-as-make-ci.md)), for the
+enabled repositories or for the `OWNER/REPO` arguments it gets.
 
 ## Interface
 
-Each row has an ID (`B1` to `B18`), the rule, its source, and a read-only
+Each row has an ID (`B1` to `B19`), the rule, its source, and a read-only
 check. Run each check in a clone of the repository at the commit you read
 (`git ls-tree`, `git show <commit>:<path>`, or `gh api`); nothing writes.
 
@@ -28,13 +30,14 @@ check. Run each check in a clone of the repository at the commit you read
 | B9 | Tool documentation site | A user-facing tool has `site/properdocs.yml`, `site/content/`, `site/requirements.in`, a hashed `site/requirements.txt`, `make site` and `make site-serve`, and `.github/workflows/site.yml` that builds in strict mode on pull requests and deploys to GitHub Pages from `main`. `README.md` links `https://frostyard.github.io/<repo>/`. | [ADR-0070](../adr/0070-build-tool-docs-sites-with-materialx-on-github-pages.md) | The paths are in the tree; `site/requirements.txt` has `--hash=` lines; the `site` recipe runs `properdocs build --strict`; `curl -sI https://frostyard.github.io/<repo>/` answers 200. |
 | B10 | License | A public repository has `LICENSE`: MIT, or GPL-3.0 where the repository inherits it or already uses it. | ADR-0071 | `gh api repos/frostyard/<repo> --jq .license.spdx_id` is `MIT` or `GPL-3.0`, and `LICENSE` is in the tree. Not a finding: an existing GPL-3.0 license, a file-level SPDX header that differs from the root `LICENSE`, or an upstream notice on a vendored file. |
 | B11 | Go toolchain | `go.mod` has `go 1.<minor>.<patch>` with the minor named in the `frostyard-go-repo` skill's "Fleet toolchain" section; `mise.toml` pins the golangci-lint version named there; no other file pins a different golangci-lint version. | ADR-0071, [ADR-0043](../adr/0043-pin-repository-tools-in-mise-and-name-the-verify-gate.md), [frostyard-go-repo](../../.agents/skills/frostyard-go-repo/SKILL.md#fleet-toolchain) | Compare `git show <commit>:go.mod`, `git show <commit>:mise.toml` and `git grep -n 'golangci-lint' <commit> -- Makefile .github/workflows` with the skill at core's `origin/main`. |
-| B12 | CI entry | `.github/workflows/ci.yml` runs `make ci` on pull requests: in 1 job, or as separate jobs that together run each prerequisite of the `ci` target as `make <target>` and each command of its recipe. | ADR-0071, [ADR-0073](../adr/0073-let-ci-run-the-make-ci-targets-as-separate-jobs.md) | The file is in the tree and runs on `pull_request`. Only the commands of `run:` steps count, not comments or step names. A `run:` command is `make ci`; or, for each prerequisite of `ci:` in `git show <commit>:Makefile`, a `run:` command is `make <target>` (extra variables allowed), and each command of the `ci` recipe (blank lines and comments do not end it) is exactly a `run:` command. A part of `make ci` that no job runs is the finding. A `test.yml` that runs `make ci` is a low-severity finding: rename it only with another change, and keep its job names. |
+| B12 | CI entry | `.github/workflows/ci.yml` runs `make ci` on pull requests: in 1 job, or as separate jobs that together run each prerequisite of the `ci` target as `make <target>` and each command of its recipe. | ADR-0071, [ADR-0073](../adr/0073-let-ci-run-the-make-ci-targets-as-separate-jobs.md), [ADR-0083](../adr/0083-run-the-ci-gate-locally-as-make-ci.md) | The file is in the tree and runs on `pull_request`. Only the commands of `run:` steps count, not comments or step names. A `run:` command is `make ci`; or, for each prerequisite of `ci:` in `git show <commit>:Makefile`, a `run:` command is `make <target>` (extra variables allowed; `make a b` runs both targets), and each command of the `ci` recipe (blank lines and comments do not end it) is exactly a `run:` command. A part of `make ci` that no job runs is the finding. A `test.yml` that runs `make ci` is a low-severity finding: rename it only with another change, and keep its job names. |
 | B13 | Dependabot | `.github/dependabot.yml` has an entry for `github-actions` and an entry for each other Dependabot ecosystem with a manifest in the repository (`gomod` for `go.mod`, `npm` for `package.json`, `cargo` for `Cargo.toml`, `docker` for a `Dockerfile` or `Containerfile`). Each entry has a `groups` entry with exactly 1 group, whose `patterns` is `["*"]`, so it makes at most 1 version-update pull request for each run; that group has no `applies-to: security-updates`, so security updates stay ungrouped. | ADR-0071, [ADR-0075](../adr/0075-batch-routine-pull-requests.md) | Compare the `package-ecosystem` values with the manifests in `git ls-tree -r --name-only <commit>`. `site/requirements.txt` needs no entry. In `git show <commit>:.github/dependabot.yml`, each `package-ecosystem` entry has `groups` with exactly 1 group, whose `patterns` is `["*"]` (a flow list, or a block list with the 1 item `- "*"`) and which has no `applies-to: security-updates`. An entry without that 1 group, or with a second group beside it, is the finding; a file whose entries cannot be read is a finding too (core's `ungroupedEntries` in `test/repository-baseline.test.mjs` reads the file this way and fails closed). |
 | B14 | Security policy | `SECURITY.md` (at the root or in `.github/`) names GitHub private vulnerability reporting for the repository and says which versions get fixes. | ADR-0071, [ADR-0040](../adr/0040-publish-the-repository-settings-contract.md) | The file is in the tree and links `https://github.com/frostyard/<repo>/security`. |
 | B15 | No CODEOWNERS | No `CODEOWNERS` file at the root, in `.github/` or in `docs/`. | ADR-0071 | `git ls-tree <commit> CODEOWNERS .github/CODEOWNERS docs/CODEOWNERS` prints nothing. |
 | B16 | No leftover agent-framework trees | None of `docs/superpowers/`, `.planning/`, `.cursor/rules/`, `.gaai/`, `yeti/` or `cairn/` at the root. `.claude/` holds only `settings.json`, `skills` and `session-summary.md`. | ADR-0071, [ADR-0025](../adr/0025-consolidate-repository-docs-into-docs.md), [ADR-0029](../adr/0029-acmm-conformance-via-canonical-aliases.md) | `git ls-tree --name-only <commit> docs/superpowers .planning .cursor/rules .gaai yeti cairn` prints nothing, and `git ls-tree --name-only <commit> .claude/` prints no other name. Skill payloads under `.agents/skills/` are not the root. |
 | B17 | README | The root `README.md` follows the [README spec](readme.md) for the kind that its marker declares: rules R1 to R12 (kind marker, title and lead, status line, documentation line, badges, the kind's sections, `Develop` and `Where to go next`, at most 1000 words, nothing that belongs in `docs/`). | [ADR-0072](../adr/0072-write-every-readme-to-one-standard.md) | From a core checkout at `origin/main`: `node .agents/skills/frostyard-readme/scripts/check-readme.mjs --ref <commit> <clone>` prints `ok`. Each `FAIL R<n>` line is 1 part of the finding. |
 | B18 | Required status checks | The default branch has at least 1 required status check. The names cover the repository's acceptance gate and meet rules N1 to N5 of ADR-0076; the row checks presence only. | [ADR-0076](../adr/0076-require-status-checks-on-every-default-branch.md) | `gh api repos/frostyard/<repo>/rules/branches/<default branch> --jq '[.[]\|select(.type=="required_status_checks")\|.parameters.required_status_checks[]]\|length'` prints a number greater than 0. It counts check entries from every ruleset that applies, not rules. `node scripts/required-checks-survey.mjs frostyard/<repo>` in a core checkout shows the names. |
+| B19 | Local CI gate | `make ci` runs every check that `ci.yml` runs on pull requests, lint and format included; only a check that needs network access or a credential when it runs (a vulnerability database, a GitHub API read, a package install inside the test) stays outside it, in a job of its own. No workflow that runs on pull requests runs a lint or format check that `make ci` does not run. `AGENTS.md` names `make ci` as the command to run before a push. | [ADR-0083](../adr/0083-run-the-ci-gate-locally-as-make-ci.md) | From a core checkout at `origin/main`: `node scripts/check-fleet-conventions.mjs frostyard/<repo>` prints no `B19:` part (each `B19:` part is 1 part of the finding; its `B12:` parts belong to row B12). It reads the default branch, not `<commit>`. Then compare each other `run:` command of `ci.yml` with what `make ci` runs: a check outside `make ci` that needs neither network access nor a credential is the judgment part of the finding. |
 
 ## Rules
 
@@ -56,6 +59,13 @@ check. Run each check in a clone of the repository at the commit you read
 - An archived repository is not a code repository: no row applies to it,
   and it needs no exemption. frostyard/first-setup (archived) and
   frostyard/frostyard-ai (archived on 2026-11-09) are out of scope.
+
+- Row B19 outside the baseline: ADR-0083 also holds the bketelsen
+  repositories fleet, trimlights, truenas-mcp, pi-pocket-team,
+  pi-pocket-dune and agentic-template to row B19. The sweep does not read
+  them; their owners run
+  `node scripts/check-fleet-conventions.mjs bketelsen/<repo>` in a core
+  checkout.
 
 - Row B18 outside the baseline: ADR-0076 also holds the bketelsen
   repositories fleet, trimlights, truenas-mcp, pi-pocket-team,
@@ -97,6 +107,7 @@ check. Run each check in a clone of the repository at the commit you read
   [ADR-0075](../adr/0075-batch-routine-pull-requests.md) (row B13),
   [ADR-0076](../adr/0076-require-status-checks-on-every-default-branch.md) (row B18),
   [ADR-0080](../adr/0080-document-the-snosi-images-on-frostyard-org.md) (snosi, row B9),
-  [ADR-0081](../adr/0081-store-each-correction-in-a-file-of-its-own.md) (row B2)
+  [ADR-0081](../adr/0081-store-each-correction-in-a-file-of-its-own.md) (row B2),
+  [ADR-0083](../adr/0083-run-the-ci-gate-locally-as-make-ci.md) (row B19, and row B12 in the organization gate)
 - Row B17's contract: [spec: README](readme.md)
 - Context: [design: quality loop](../design/quality-loop.md)

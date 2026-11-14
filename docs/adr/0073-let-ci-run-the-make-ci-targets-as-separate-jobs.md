@@ -66,3 +66,5 @@ parallel and the ruleset requires each job by name.
 - Builds on: [ADR-0071](0071-hold-every-code-repository-to-one-baseline.md),
   [ADR-0044](0044-expose-the-make-gate-triad-in-every-repository.md),
   [ADR-0038](0038-scope-the-test-name-filter-to-chairlift.md)
+- Amended in part by: [ADR-0083](0083-run-the-ci-gate-locally-as-make-ci.md)
+  (`ciCoverageGaps` lives in `scripts/lib/ci-gate.mjs`; `make a b` runs both targets)

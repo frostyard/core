@@ -88,3 +88,5 @@ different entry point — only their scripts happen to live in
   (Phase 6)
 - Builds on: [ADR-0022](0022-make-ci-gate-and-test-naming-filter.md),
   [ADR-0043](0043-pin-repository-tools-in-mise-and-name-the-verify-gate.md)
+- Amended in part by: [ADR-0083](0083-run-the-ci-gate-locally-as-make-ci.md)
+  (the organization gate also checks rows B12 and B19)

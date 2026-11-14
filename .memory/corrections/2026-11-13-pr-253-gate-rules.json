@@ -1,0 +1,7 @@
+{
+  "date": "2026-11-13",
+  "scope": "fleet-conventions",
+  "correction": "The organization gate must check that ci.yml runs on pull_request before it accepts its make ci coverage (row B12), and must follow the pre and post scripts that npm runs with a script, unless --ignore-scripts",
+  "evidence": "Cross-review of frostyard/core#253 at 754e01f: a push-only ci.yml with 'make ci' passed B12, and a pretest eslint script that make ci runs through 'npm test' was reported outside make ci. Fixed in frostyard/core#253 with a fleet-level test and an npmScripts test",
+  "promoted_to": "test/fleet-conventions.test.mjs"
+}

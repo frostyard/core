@@ -1,0 +1,7 @@
+{
+  "date": "2026-11-13",
+  "scope": "ci-gate",
+  "correction": "A lint tool counts as run by make ci only when a simple command that make ci reaches calls it, after the Makefile variables its commands use are expanded; a variable that make ci never uses, a message, a comment or an installer argument that names the tool does not count",
+  "evidence": "Cross-review of frostyard/core#253 at 754e01f: makeTargetText added every variable assignment and every mention of a tool name to the text that stood for executed commands, so 'LINTER := golangci-lint' and 'echo \"Install shellcheck\"' gave false passes. Fixed in frostyard/core#253 (commandCalls, expandVariables) with targeted tests",
+  "promoted_to": "test/ci-gate.test.mjs"
+}
