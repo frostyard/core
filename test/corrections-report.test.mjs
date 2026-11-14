@@ -822,10 +822,12 @@ const fixtureFolder = {
   "2026-11-05-beta.json": { date: "2026-11-05", scope: "agent", correction: "Name a record by its date and slug", evidence: "review 413", promoted_to: "" },
   "2026-11-06-gamma.json": { date: "2026-11-06", scope: "docs", correction: "Write the canonical bytes", evidence: "review 414", promoted_to: "AGENTS.md" },
 };
+// The dates decrease on purpose: the report keeps the line order of the old
+// file, not a date order.
 const fixtureLegacy = [
-  { date: "2026-11-01", scope: "Agent", correction: "Read both forms", evidence: "review 412", promoted_to: "" },
+  { date: "2026-11-03", scope: "Agent", correction: "Read both forms", evidence: "review 412", promoted_to: "" },
   { date: "2026-11-02", scope: "agent", correction: "Keep the old reader", evidence: "review 413", promoted_to: "" },
-  { date: "2026-11-03", scope: "docs", correction: "Promote the rule", evidence: "review 414", promoted_to: "AGENTS.md" },
+  { date: "2026-11-01", scope: "docs", correction: "Promote the rule", evidence: "review 414", promoted_to: "AGENTS.md" },
 ];
 
 function canonical(value) {
@@ -898,7 +900,7 @@ test("the legacy fixture is the exact report in the working tree and at a ref", 
   assert.equal(normaliseJson(atRef, root, "HEAD"), expected);
 
   const { stdout } = await run(root);
-  assert.match(stdout, /- 2026-11-01 \[Agent\] Read both forms — evidence: review 412 \(\.memory\/corrections\.jsonl:1\)/);
+  assert.match(stdout, /- 2026-11-03 \[Agent\] Read both forms — evidence: review 412 \(\.memory\/corrections\.jsonl:1\)\n- 2026-11-02 \[agent\] Keep the old reader — evidence: review 413 \(\.memory\/corrections\.jsonl:2\)/);
 });
 
 test("a folder record has no line and names its file as its source", async () => {
@@ -958,6 +960,58 @@ test("a checkout with both forms reads both", async () => {
     assert.deepEqual(report.repositories[0].pending.map((item) => [item.source, item.line]), [
       [".memory/corrections.jsonl", 1],
       [".memory/corrections/2026-11-05-one.json", null],
+    ]);
+  }
+});
+
+// The report orders the old file by line number and record files by file
+// name, never by date: the old file is append-only, so a later line can have
+// an earlier date and still comes after the lines before it.
+test("old-file records keep their line order when the dates decrease", async () => {
+  const root = await fixture();
+  const repo = path.join(root, "repo-a");
+  mkdirSync(repo);
+  await initRepo(repo, "repo-a");
+  writeJsonl(repo, [
+    line("2026-11-05", "Agent", "Fifth"),
+    line("2026-11-01", "agent", "First"),
+    line("2026-11-03", "Agent", "Third"),
+    line("2026-11-02", "agent", "Second"),
+  ]);
+  await commitAll(repo, "records");
+
+  for (const extra of [[], ["--ref", "HEAD"]]) {
+    const report = JSON.parse((await run(root, ["--json", ...extra])).stdout);
+    const order = [[".memory/corrections.jsonl", 1], [".memory/corrections.jsonl", 2], [".memory/corrections.jsonl", 3], [".memory/corrections.jsonl", 4]];
+    assert.deepEqual(report.repositories[0].pending.map((item) => [item.source, item.line]), order);
+    assert.deepEqual(report.repeated_in_repository[0].pending.map((item) => [item.source, item.line]), order);
+  }
+  const { stdout } = await run(root);
+  assert.match(stdout, /- 2026-11-05 \[Agent\] Fifth[^\n]*:1\)\n- 2026-11-01 \[agent\] First[^\n]*:2\)\n- 2026-11-03 \[Agent\] Third[^\n]*:3\)\n- 2026-11-02 \[agent\] Second[^\n]*:4\)/);
+});
+
+test("record files are in file-name byte order", async () => {
+  const root = await fixture();
+  const repo = path.join(root, "repo-a");
+  mkdirSync(repo);
+  await initRepo(repo, "repo-a");
+  mkdirSync(path.join(repo, ".memory/corrections"), { recursive: true });
+  const files = {
+    "2026-11-04-b-two.json": line("2026-11-04", "Scope", "A text that sorts first"),
+    "2026-11-04-a-one.json": line("2026-11-04", "Scope", "Z text that sorts last"),
+    "2026-11-03-z.json": line("2026-11-03", "Scope", "M text"),
+  };
+  for (const [name, value] of Object.entries(files)) {
+    writeFileSync(path.join(repo, ".memory/corrections", name), canonical(value));
+  }
+  await commitAll(repo, "records");
+
+  for (const extra of [[], ["--ref", "HEAD"]]) {
+    const report = JSON.parse((await run(root, ["--json", ...extra])).stdout);
+    assert.deepEqual(report.repositories[0].pending.map((item) => item.source), [
+      ".memory/corrections/2026-11-03-z.json",
+      ".memory/corrections/2026-11-04-a-one.json",
+      ".memory/corrections/2026-11-04-b-two.json",
     ]);
   }
 });

@@ -29,16 +29,23 @@ function compareText(a, b) {
   return a < b ? -1 : a > b ? 1 : 0;
 }
 
-// The order of the records: by date, then by the path each record comes from
-// (byte order), then by line (a folder record has no line, counted as 0).
+// The order of the records: records of the old file by line number, then record files by file
+// name in byte order. The date is not the first key: the old file is
+// append-only, so its line order is the order the records came in, also where
+// a later line has an earlier date. The date, the checkout path and the text
+// only break ties between 2 different records at 1 line in 2 checkouts.
 function compareSource(a, b) {
   return Buffer.compare(Buffer.from(a ?? "", "utf8"), Buffer.from(b ?? "", "utf8"));
 }
 
 function compareLines(a, b) {
-  return compareText(a.date, b.date)
-    || compareSource(a.source, b.source)
+  const aLegacy = a.source === OLD ? 0 : 1;
+  const bLegacy = b.source === OLD ? 0 : 1;
+  return aLegacy - bLegacy
     || (a.line ?? 0) - (b.line ?? 0)
+    || compareSource(a.source, b.source)
+    || compareText(a.date, b.date)
+    || compareText(a.path ?? "", b.path ?? "")
     || compareText(a.correction, b.correction)
     || compareText(a.evidence, b.evidence);
 }
