@@ -137,6 +137,10 @@ Start from .agents/skills/TEMPLATE/SKILL.md. -->
   that its decision makes false, reasons and sub-items included, before it
   says the rest stands
   ([write-adr skill](.agents/skills/frostyard-write-adr/SKILL.md#amend-or-supersede-an-accepted-adr)).
+- A count in a PR body, a plan record or a doc names its source (a file,
+  a command or a query) and what it selects. Each label covers every item
+  counted under it, and items whose status the source does not state are
+  counted apart, not in the total they are unsure for.
 
 ## Code conventions (live — the code exists)
 
