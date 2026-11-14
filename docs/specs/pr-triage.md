@@ -64,7 +64,8 @@ The step computes the level of the PR and sets the level label by the ratchet, w
 ### D. The `readiness` step: check evaluation
 
 - The step reads all pages of `GET /repos/{owner}/{repo}/commits/{head}/check-runs?filter=latest&per_page=100` (the `check_runs` array) and of `GET /repos/{owner}/{repo}/commits/{head}/status?per_page=100` (the `statuses` array).
-- The step counts the latest run of each check name (`filter=latest`), as GitHub's checks rollup and merge gate do. An older failed run that a re-run of the same check replaced does not count. The `statuses` array likewise holds the latest status of each context.
+- `filter=latest` gives the latest run of each check name in each check suite. Each workflow run is a check suite of its own, so the list can hold more than 1 run of the same check name, for example a run that a newer workflow run of the same check cancelled ([frostyard/updex#515](https://github.com/frostyard/updex/pull/515)).
+- The step counts only the newest run of each check name and app. The app is `app.id`, else `app.slug`. The newest run is the run with the highest `id`. An older run that a newer run of the same check replaced does not count, also when it failed or was cancelled. A newest run that is cancelled, failed or not completed counts as not green. When a run of a group has no `id` that is a safe integer, every run of that group counts. The `statuses` array holds the latest status of each context.
 - The step does not use the combined `state`: it is `pending` when the commit has 0 statuses.
 - The step leaves out check runs whose `name` starts with `pr-triage`.
 - A check run is not green when its `status` is not `completed`, or its `conclusion` is not `success`, `neutral` or `skipped`.

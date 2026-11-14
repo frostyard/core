@@ -1,0 +1,7 @@
+{
+  "date": "2026-11-13",
+  "scope": "pr-triage",
+  "correction": "The readiness step must count only the newest check run of each check name and app at the head: check-runs?filter=latest gives the latest run per check suite, and each workflow run is its own check suite, so a cancelled run that a newer run replaced stays in the list",
+  "evidence": "frostyard/updex#515 at bb9c272: all checks green, run 43530255879 removed ready-for-human for a cancelled Conventional PR title run (id 132237066225) beside its green successor 132237129379; fixed in frostyard/core#246 with newestCheckRuns",
+  "promoted_to": "test/pr-triage.test.mjs"
+}
