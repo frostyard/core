@@ -528,6 +528,7 @@ export const WHY_CATEGORIES = Object.freeze([
   "secrets and credentials",
   "rulesets and settings",
   "destructive operations",
+  "supply chain",
   "governance",
 ]);
 
