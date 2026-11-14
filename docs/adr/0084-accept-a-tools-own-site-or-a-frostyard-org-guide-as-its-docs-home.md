@@ -61,14 +61,19 @@ snosi.
 - **Row B9 checks the home, not the `site/` paths.** The baseline spec
   states the check for each form of home.
 
-This decision makes these statements of ADR-0070 false:
+This decision makes these statements of ADR-0070 false. Each now holds
+only for a site in ADR-0070's layout, or changes as stated:
 
 - "A user-facing tool has one documentation site, in `site/`, built with
   ProperDocs and the MaterialX theme." The layout applies to a new site
-  only; an existing site of another generator, or a full frostyard.org
-  guide, also meets the rule.
-- "GitHub Pages hosts the site at `https://frostyard.github.io/<repo>/`"
-  holds for a new site only. An existing site keeps its host and URL.
+  only; an existing site of another generator or in another path, or a
+  full frostyard.org guide, also meets the rule.
+- "GitHub Pages hosts the site at `https://frostyard.github.io/<repo>/`",
+  "`.github/workflows/site.yml` builds the site in strict mode on every
+  pull request that touches it, and builds and deploys it from `main`"
+  and "The repository's Pages source is GitHub Actions": these hold for a
+  site in the layout. An existing site keeps its own build workflow, host
+  and URL; row B9 does not require it to build on pull requests.
 - "The site holds installation, guides, concepts and reference", "A
   change to user-visible behavior updates the affected site pages in the
   same pull request" and "`README.md` links to the site", for a tool whose
@@ -77,13 +82,22 @@ This decision makes these statements of ADR-0070 false:
   frostyard/frostyard-org, and `README.md` links the guide.
 - "frostyard.org ... describes each tool briefly and links to the tool's
   site": frostyard.org can also hold a tool's full guide.
+- In its consequences, "every tool site has the same layout, build,
+  preview command and URL pattern", "A broken link or anchor fails the
+  pull request", "Hosting needs no secret and no account outside GitHub",
+  "a site change and a code change land in the same pull request" and "a
+  repository with a site needs Python 3 and its own workflow": these hold
+  for a site in the layout, not for every tool's home.
 - In its consequences, "intuneme moves to the pinned `site/` layout" and
   "chairlift, updex, repogen and firn get sites; igloo gets one when it
   has user documentation": intuneme keeps its site, and a tool without a
   home gets a site or a full frostyard.org guide.
-- In its consequences, "every tool site has the same layout, build,
-  preview command and URL pattern": this holds for the sites that use the
-  layout, not for every tool's home.
+- In its consequences, "pilothouse moves from Astro to MaterialX" and
+  "Repositories that applied the Astro scaffold keep a working copy until
+  they move": an Astro site that the repository builds and that answers
+  at a public URL meets the rule and does not have to move. A site that
+  is not deployed is no home; ADR-0070 records pilothouse's site as never
+  deployed on 2026-11-05.
 
 This decision makes this statement of ADR-0071 false:
 
@@ -92,10 +106,13 @@ This decision makes this statement of ADR-0071 false:
   has 1 user documentation home, as this ADR defines it, and `README.md`
   links it.
 
-This decision makes this statement of ADR-0080 false:
+This decision makes these statements of ADR-0080 false:
 
 - "every other user-facing tool has its own site". Every other
   user-facing tool has 1 user documentation home, as this ADR defines it.
+- "frostyard/firn ... keeps its own tool site under ADR-0070": firn's
+  home is its own site or a full frostyard.org guide, as for every other
+  tool. ADR-0080's snosi exemption still does not cover firn.
 
 The rest of ADR-0070, ADR-0071 and ADR-0080 stays as it is: the layout,
 the hash lock, the strict build and the `site.yml` workflow of a new site;

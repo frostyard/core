@@ -183,7 +183,7 @@ Documentation line targets:
 
 | Kind | Link |
 | --- | --- |
-| A user-facing tool (baseline B9) | `https://frostyard.github.io/<repo>/` |
+| A user-facing tool (baseline B9) | its user documentation home: its own site (`https://frostyard.github.io/<repo>/` for a site in `site/`), or its full guide on frostyard.org ([ADR-0084](../adr/0084-accept-a-tools-own-site-or-a-frostyard-org-guide-as-its-docs-home.md)) |
 | `library` | `https://pkg.go.dev/github.com/frostyard/<repo>` |
 | `website` | the live site |
 | `image` | the image's user documentation (frostyard.org/docs for snosi), or `docs/README.md` |

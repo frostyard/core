@@ -8,8 +8,9 @@ user-invocable: true
 
 ## Purpose and scope
 
-A frostyard repository whose product people install gets a documentation site
-at `site/`, next to the source, so that pages change in the same pull request
+A frostyard repository whose product people install, and that has no user
+documentation home yet, can get a documentation site at `site/`, next to the
+source, so that pages change in the same pull request
 as the behavior they describe. ProperDocs builds it with the MaterialX theme,
 and GitHub Pages serves it at `https://frostyard.github.io/PROJECT/`. The
 layout and its reasons are in frostyard/core:
@@ -21,7 +22,7 @@ layout and its reasons are in frostyard/core:
   Apply this skill only to a tool that has no home and gets a new site.
 - **An existing site stays as it is**: a site that another generator
   builds, or that is in another path, is not moved only for its layout.
-- **Libraries do not**: clix, std and snowkit use pkg.go.dev only.
+- **Libraries need no site**: clix, std and snowkit use pkg.go.dev only.
 - **frostyard.org stays an Astro site.** It links to each tool site, or
   holds the tool's full guide.
 - **frostyard/lab's Astro QA dashboard is exempt.**
