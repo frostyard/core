@@ -58,10 +58,10 @@ as untrue in the pull request.
      `in production`, `maintenance` or `deprecated`, and at most 1 more
      sentence. No history and no milestones.
    - The documentation line links the docs home for a user-facing tool or
-     app: its own site (`https://frostyard.github.io/<repo>/` for a site in
-     `site/`) or its full guide on frostyard.org (core ADR-0084);
-     pkg.go.dev for a library,
-     the live site for a website, and `docs/README.md` otherwise.
+     app: its own site at its URL (`https://frostyard.github.io/<repo>/` for
+     a site in core ADR-0070's layout) or its full guide on frostyard.org
+     (core ADR-0084); pkg.go.dev for a library, the live site for a
+     website, and `docs/README.md` otherwise.
    - Add an optional section only when it has content (`Requirements`,
      `How it works`, `Problem records`, `Privacy`, `Limits`, `Credits`, and
      the kind's own, from the spec). Keep `Develop` and `Where to go next`
