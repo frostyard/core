@@ -409,22 +409,66 @@ export function makeCalls(command) {
   return targets;
 }
 
-// Words before a command's name that run the command after them.
-// A wrapper's options: those in `valued` take the next word as their
-// value (`-n 1`), the others stand alone (`-0`, `--null`, `-n1`).
-const options = (valued) => `(?:\\s+(?:-[${valued}]\\s+\\S+|--[\\w-]+=\\S+|-\\S+))*`;
-const COMMAND_PREFIXES = [
-  /^[@+-]+/,
-  /^(?:if|then|do|else|elif|while|until|!|exec|command|nohup)\s+/,
-  new RegExp(`^time${options("fo")}\\s+`),
-  new RegExp(`^nice${options("n")}\\s+`),
-  new RegExp(`^timeout${options("ks")}\\s+\\S+\\s+`),
-  new RegExp(`^sudo${options("ugChpUrtDR")}\\s+`),
-  new RegExp(`^env${options("uCS")}\\s+`),
-  /^[A-Za-z_]\w*=\S*\s+/,
-  new RegExp(`^xargs${options("nPLIdsEa")}\\s+`),
-  /^(?:npx|bunx|uvx|pipx\s+run|npm\s+exec|pnpm\s+(?:exec|dlx)|yarn\s+dlx|go\s+run|go\s+tool|python3?\s+-m)(?:\s+-\S+)*\s+(?:--\s+)?/,
+// Words before a command's name that run the command after them, and the
+// options of each that take the next word as their value.
+const KEYWORDS = new Set(["if", "then", "do", "else", "elif", "while", "until", "!", "exec", "command", "nohup"]);
+const WRAPPERS = new Map([
+  ["time", "fo"],
+  ["nice", "n"],
+  ["timeout", "ks"],
+  ["sudo", "ugChpUrtDR"],
+  ["env", "uCS"],
+  ["xargs", "nPLIdsEa"],
+  ["npx", "p"],
+  ["bunx", "p"],
+  ["uvx", "p"],
+]);
+const LAUNCHERS = [
+  ["pipx", "run"],
+  ["npm", "exec"],
+  ["pnpm", "exec"],
+  ["pnpm", "dlx"],
+  ["yarn", "dlx"],
+  ["go", "run"],
+  ["go", "tool"],
+  ["python", "-m"],
+  ["python3", "-m"],
 ];
+const SHELLS = new Set(["sh", "bash", "dash", "zsh", "ksh", "ash"]);
+const basename = (word) => word.replace(/^.*\//, "");
+
+// The words of 1 simple command without the words before its name
+// (KEYWORDS, `VAR=value`, WRAPPERS and LAUNCHERS with their options).
+function stripPrefixes(words) {
+  let rest = [...words];
+  if (rest.length > 0) rest[0] = { ...rest[0], value: rest[0].value.replace(/^[@+-]+/, "") };
+  const dropOptions = (valued) => {
+    while (rest.length > 0 && /^-/.test(rest[0].value)) {
+      const option = rest.shift().value;
+      if (option === "--") break;
+      if (new RegExp(`^-[${valued}]$`).test(option)) rest.shift();
+    }
+  };
+  for (let changed = true; changed && rest.length > 0; ) {
+    changed = false;
+    const first = rest[0].value;
+    const launcher = LAUNCHERS.find(([a, b]) => first === a && rest[1]?.value === b);
+    if (first === "" || KEYWORDS.has(first) || /^[A-Za-z_]\w*=/.test(first)) {
+      rest.shift();
+      changed = true;
+    } else if (WRAPPERS.has(first)) {
+      rest.shift();
+      dropOptions(WRAPPERS.get(first));
+      if (first === "timeout") rest.shift(); // the duration
+      changed = true;
+    } else if (launcher) {
+      rest = rest.slice(2);
+      dropOptions("");
+      changed = true;
+    }
+  }
+  return rest;
+}
 
 // The index of the `)` that closes the `$(` before `start`, with nested
 // parentheses and quotes respected, or the text's length.
@@ -463,19 +507,22 @@ function substitutions(body) {
   return found;
 }
 
-// A quoted word, a substitution or another word that is not a command name
-// stands in the segment as this placeholder.
+// A substitution stands in its word as this placeholder.
 const WORD = "\u0000";
 
 // The simple commands of a shell command line, each as its name (without
-// its directory or an `@version`) and its arguments. Commands are split at
-// `;`, `&`, `|`, `(`, `)`, a line break and `-exec`, outside quotes. A
-// quoted string is 1 argument word, never a command: only the body of
-// `$(...)` or backquotes (also inside double quotes), and the quoted string
-// after `-c` or a flag group that ends in c (`sh -c '...'`, `sh -lc '...'`),
-// are command lines of their own. A `#` comment
-// ends the line. Make references that are left (`$(GO)`) become `$GO`, and
-// `$$` becomes `$`. Not read: `eval`, shell functions, aliases, here-docs.
+// its directory or an `@version`) and its arguments. The line is split into
+// shell words: quotes join into their word (`"golangci-lint"`,
+// `CGO_ENABLED="0"`), and a `$(...)` or backquoted part (also inside double
+// quotes) is a command line of its own, with a placeholder in its word
+// (`$(go env GOPATH)/bin/staticcheck` runs `staticcheck`). Commands are
+// split at `;`, `&`, `|`, `(`, `)`, a line break and `-exec`, outside
+// quotes. The word after `-c` or a flag group that ends in c, after a shell
+// (`sh -c '...'`, `nsl run -m m sh -lc '...'`), is a command line too; the
+// argument of another command's `-c` (`grep -c 'x'`) is not. A `#` at the
+// start of a word ends the line. Make references that are left (`$(GO)`)
+// become `$GO`, and `$$` becomes `$`. Not read: `eval`, shell functions,
+// aliases, here-docs.
 export function commandCalls(line) {
   const text = line
     .replace(/\$\(([A-Za-z_][\w.]*)\)|\$\{([A-Za-z_][\w.]*)\}/g, (_, a, b) => `$${a ?? b}`)
@@ -485,54 +532,83 @@ export function commandCalls(line) {
 
 function callsIn(text, depth) {
   if (depth > 4) return [];
-  const segments = [];
   const nested = [];
-  let current = "";
+  const segments = [[]];
+  let word = null; // { value, raw }
+  const endWord = () => {
+    if (word !== null) segments.at(-1).push(word);
+    word = null;
+  };
+  const add = (value, raw = value) => {
+    word ??= { value: "", raw: "" };
+    word.value += value;
+    word.raw += raw;
+  };
   for (let i = 0; i < text.length; i++) {
     const c = text[i];
-    if (c === "#" && (i === 0 || /\s/.test(text[i - 1]))) break;
+    if (c === "#" && word === null) break;
     if (c === "\\") {
-      current += text.slice(i, i + 2);
+      add(text[i + 1] ?? "", text.slice(i, i + 2));
       i += 1;
-    } else if (c === "'" || c === '"') {
+    } else if (c === "'") {
+      let end = text.indexOf("'", i + 1);
+      if (end < 0) end = text.length;
+      add(text.slice(i + 1, end));
+      i = end;
+    } else if (c === '"') {
       let end = i + 1;
-      while (end < text.length && text[end] !== c) end += c === '"' && text[end] === "\\" ? 2 : 1;
+      while (end < text.length && text[end] !== '"') end += text[end] === "\\" ? 2 : 1;
       const body = text.slice(i + 1, end);
-      if (/(?:^|\s)-[A-Za-z]*c\s*$/.test(current)) nested.push(body);
-      else if (c === '"') nested.push(...substitutions(body));
-      current += ` ${WORD} `;
+      const found = substitutions(body);
+      nested.push(...found);
+      let value = body;
+      for (const part of found) value = value.replace(part, WORD);
+      add(value.replace(/\$\(\u0000\)|`\u0000`/g, WORD), body);
       i = end;
     } else if (c === "$" && text[i + 1] === "(") {
       const end = closeParen(text, i + 2);
       nested.push(text.slice(i + 2, end));
-      current += ` ${WORD} `;
+      add(WORD, text.slice(i, end + 1));
       i = end;
     } else if (c === "`") {
-      const end = text.indexOf("`", i + 1);
-      nested.push(text.slice(i + 1, end < 0 ? text.length : end));
-      current += ` ${WORD} `;
-      i = end < 0 ? text.length : end;
+      let end = text.indexOf("`", i + 1);
+      if (end < 0) end = text.length;
+      nested.push(text.slice(i + 1, end));
+      add(WORD, text.slice(i, end + 1));
+      i = end;
     } else if (/[;&|()\n]/.test(c)) {
-      segments.push(current);
-      current = "";
+      endWord();
+      segments.push([]);
+    } else if (/\s/.test(c)) {
+      endWord();
     } else {
-      current += c;
+      add(c);
     }
   }
-  segments.push(current);
-  const calls = [];
-  for (const raw of segments.flatMap((segment) => segment.split(/\s-exec\s/))) {
-    let segment = raw.trim();
-    for (let changed = true; changed && segment; ) {
-      changed = false;
-      for (const prefix of COMMAND_PREFIXES) {
-        const next = segment.replace(prefix, "");
-        if (next !== segment) [segment, changed] = [next.trim(), true];
-      }
+  endWord();
+  const commands = [];
+  for (const segment of segments) {
+    let current = [];
+    for (const w of segment) {
+      if (w.value === "-exec") {
+        commands.push(current);
+        current = [];
+      } else current.push(w);
     }
-    if (!segment || segment.startsWith(WORD)) continue;
-    const [name, ...rest] = segment.split(/\s+/);
-    calls.push([name.replace(/^.*\//, "").replace(/@.*$/, ""), ...rest].join(" "));
+    commands.push(current);
+  }
+  const calls = [];
+  for (const words of commands) {
+    const rest = stripPrefixes(words);
+    if (rest.length === 0 || rest[0].value === "") continue;
+    // A shell, then -c (or -lc, -ec ...), then the code it runs.
+    const shell = rest.findIndex((w) => SHELLS.has(basename(w.value)));
+    if (shell >= 0) {
+      const flag = rest.findIndex((w, k) => k > shell && /^-[A-Za-z]*c$/.test(w.value));
+      if (flag >= 0 && rest[flag + 1]) nested.push(rest[flag + 1].raw.replace(/^(['"])([\s\S]*)\1$/, "$2"));
+    }
+    const name = basename(rest[0].value).replace(/@.*$/, "");
+    calls.push([name, ...rest.slice(1).map((w) => w.value)].join(" "));
   }
   for (const body of nested) calls.push(...callsIn(body, depth + 1));
   return calls;

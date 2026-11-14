@@ -313,23 +313,24 @@ test("makeCalls keeps quoted targets of a make call", () => {
   assert.deepEqual(makeReach('ci:\n\t$(MAKE) "lint"\nlint:\n\tshfmt -d .\n', "ci").recipe, ['$(MAKE) "lint"', "shfmt -d ."]);
 });
 
-test("commandCalls splits a line into simple commands and drops prefixes, paths and comments", () => {
+test("commandCalls splits a line into shell words and simple commands, and drops prefixes, paths and comments", () => {
   const W = "\u0000";
   assert.deepEqual(commandCalls('test -z "$(gofmt -l .)"'), [`test -z ${W}`, "gofmt -l ."]);
   assert.deepEqual(commandCalls("test -z `gofmt -l .`"), [`test -z ${W}`, "gofmt -l ."]);
-  assert.deepEqual(commandCalls("sh -c 'shellcheck x.sh'"), [`sh -c ${W}`, "shellcheck x.sh"]);
+  assert.deepEqual(commandCalls("sh -c 'shellcheck x.sh'"), ["sh -c shellcheck x.sh", "shellcheck x.sh"]);
   assert.deepEqual(commandCalls("echo start; ./bin/golangci-lint run && sudo -E env A=1 shfmt -d . # shellcheck"), [
     "echo start",
     "golangci-lint run",
     "shfmt -d .",
   ]);
-  assert.deepEqual(commandCalls("find . -name '*.sh' -exec shellcheck {} +"), [`find . -name ${W}`, "shellcheck {} +"]);
+  assert.deepEqual(commandCalls("find . -name '*.sh' -exec shellcheck {} +"), ["find . -name *.sh", "shellcheck {} +"]);
   assert.deepEqual(commandCalls("npx --yes eslint . | xargs -0 prettier -c"), ["eslint .", "prettier -c"]);
   assert.deepEqual(commandCalls("go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.1.0 run"), ["golangci-lint run"]);
-  assert.deepEqual(commandCalls("$(GO) vet ./... && $$(go env GOPATH)/bin/staticcheck"), ["$GO vet ./...", "go env GOPATH"]);
-  // A quoted string is 1 argument word: never a command, even after it.
-  assert.deepEqual(commandCalls("printf '%s\\n' shellcheck"), [`printf ${W} shellcheck`]);
+  assert.deepEqual(commandCalls("$(GO) vet ./... && $$(go env GOPATH)/bin/staticcheck"), ["$GO vet ./...", "staticcheck", "go env GOPATH"]);
+  // A quoted string is part of its word: an argument stays an argument.
+  assert.deepEqual(commandCalls("printf '%s\\n' shellcheck"), ["printf %s\\n shellcheck"]);
   assert.deepEqual(commandCalls('msg="run shellcheck first"'), []);
+  assert.deepEqual(commandCalls("a\\ b c"), ["a b c"]);
   assert.deepEqual(commandCalls(""), []);
 });
 
@@ -430,5 +431,25 @@ test("makeReach expands variables before it follows prerequisites and recipe mak
   const makefile = "LINT_TARGET := lint\nDEPS = vet\nci: $(DEPS)\n\t$(MAKE) $(LINT_TARGET)\nlint:\n\tshellcheck x.sh\nvet:\n\tgo vet ./...\n";
   assert.deepEqual([...makeReach(makefile, "ci").targets].sort(), ["ci", "lint", "vet"]);
   const workflows = { "lint.yml": `${ON_PR}      - run: shellcheck x.sh\n      - run: make lint\n` };
+  assert.deepEqual(lintGaps({ makefile, workflows }), []);
+});
+
+// Review findings of core#253, round 3: 1 guard each.
+
+test("only a shell's -c argument is code: grep -c 'shellcheck' runs grep", () => {
+  assert.deepEqual(toolsCalled(["grep -c 'shellcheck' Makefile", "wc -c 'shellcheck.txt'"]), []);
+  assert.deepEqual(toolsCalled(["/bin/bash -ec 'shellcheck x.sh'"]), ["shellcheck"]);
+  assert.deepEqual(toolsCalled(["nsl run -m m sh -lc 'cd x && shellcheck y'"]), ["shellcheck"]);
+  const workflows = { "lint.yml": `${ON_PR}      - run: shellcheck x.sh\n` };
+  assert.deepEqual(lintGaps({ makefile: "ci:\n\tgrep -c 'shellcheck' Makefile\n", workflows }), ["shellcheck in lint.yml"]);
+});
+
+test("quoted command names, quoted assignments and substituted paths still run their tool", () => {
+  assert.deepEqual(toolsCalled(['"golangci-lint" run']), ["golangci-lint"]);
+  assert.deepEqual(toolsCalled(['CGO_ENABLED="0" golangci-lint run']), ["golangci-lint"]);
+  assert.deepEqual(toolsCalled(["$(go env GOPATH)/bin/staticcheck ./..."]), ["staticcheck"]);
+  assert.deepEqual(npmScripts(['npm run "check"'], JSON.stringify({ scripts: { check: "eslint ." } })), [{ name: "check", command: "eslint ." }]);
+  const workflows = { "lint.yml": `${ON_PR}      - run: golangci-lint run\n      - run: staticcheck ./...\n` };
+  const makefile = 'ci:\n\tCGO_ENABLED="0" "golangci-lint" run\n\t$$(go env GOPATH)/bin/staticcheck ./...\n';
   assert.deepEqual(lintGaps({ makefile, workflows }), []);
 });
