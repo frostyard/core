@@ -96,6 +96,8 @@ const cases = [
   ["the checkbox after an escaped backtick", utf8(`\\\`${FULL_LINE} every file\n`), /does not start/],
   // A list item interrupts a paragraph, so an open code span cannot run across it: the item is real.
   ["a code span opened on the line before", utf8(`Text with \`an open span\n${FULL}`), null],
+  ["a closed code span across a line break", utf8(`Use \`prefix\ncontinued ${FULL_LINE} every file\` here.\n`), /does not start/],
+  ["a backtick pair across a table cell boundary", utf8(`| a | b |\n| --- | --- |\n| \`x | ${FULL_LINE} every file\` |\n`), /does not start/],
   ["the checkbox in a table cell", utf8(`| a | b |\n| --- | --- |\n| x | ${FULL_LINE} every file |\n`), /does not start/],
   ["the checkbox in a link destination", utf8(`[x](${FULL_LINE.replace(/ /g, "%20")}) every file\n`), /0 lines hold/],
   ["the checkbox in link text", utf8(`[${FULL_LINE}](x.md) every file\n`), /does not start/],
