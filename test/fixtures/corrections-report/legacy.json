@@ -16,7 +16,7 @@
       "lines": 3,
       "pending": [
         {
-          "date": "2026-11-01",
+          "date": "2026-11-03",
           "scope": "Agent",
           "correction": "Read both forms",
           "evidence": "review 412",
@@ -44,7 +44,7 @@
       "promoted": 0,
       "pending": [
         {
-          "date": "2026-11-01",
+          "date": "2026-11-03",
           "correction": "Read both forms",
           "evidence": "review 412",
           "path": "repo-a",

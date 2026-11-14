@@ -1,0 +1,7 @@
+{
+  "date": "2026-11-14",
+  "scope": "corrections-report",
+  "correction": "The corrections report must order old-file records by line number and record files by file name, never by date first: the old file is append-only, so a later line can carry an earlier date",
+  "evidence": "Whole-plan verification of the corrections move found compareLines in scripts/corrections-report.mjs sorting by date, then source, then line; fixed in frostyard/core#248 with a legacy fixture of decreasing dates",
+  "promoted_to": "test/corrections-report.test.mjs"
+}
