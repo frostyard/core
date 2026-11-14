@@ -38,4 +38,11 @@ for (const { label, failures } of results) {
   }
 }
 
+// A gate that read no repository proves nothing.
+console.log(`${results.length} repositories checked`);
+if (results.length === 0) {
+  console.log("FAIL no repository to check");
+  failed = true;
+}
+
 if (failed) process.exitCode = 1;
