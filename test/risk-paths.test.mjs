@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -922,3 +922,49 @@ test("check-risk-paths fails when the pr-triage copy drifts", async () => {
     return true;
   });
 });
+
+test("check-risk-paths skips the sync check in a repository that vendors the library without pr-triage.yml", async () => {
+  const root = await gateFixture(validList2());
+  await mkdir(path.join(root, "scripts/lib"), { recursive: true });
+  await writeFile(path.join(root, "scripts/lib/risk-paths.mjs"), await readFile(libraryPath, "utf8"));
+  const { stdout, stderr } = await runGate(root);
+  assert.equal(stderr, "");
+  assert.match(stdout, /^ok {3}risk_paths: 3 entries, 2 at L1 or L2 name a category or boundary, workflow sync skipped \(no \.github\/workflows\/pr-triage\.yml\)$/m);
+  assert.doesNotMatch(stdout, /workflow in sync/);
+});
+
+test("check-risk-paths fails when pr-triage.yml exists but holds no embedded block", async () => {
+  const root = await driftFixture();
+  await writeFile(path.join(root, ".github/workflows/pr-triage.yml"), "name: pr-triage\non: workflow_call\n");
+  await assert.rejects(runGate(root), (error) => {
+    assert.ok(error.stderr.includes(".github/workflows/pr-triage.yml must hold exactly 1 block"));
+    return true;
+  });
+});
+
+// Only a missing workflow skips the sync check. A path that exists but cannot
+// be read, or that cannot be inspected, fails the gate.
+for (const [name, setup, code] of [
+  ["a symlink loop", (file) => symlink("pr-triage.yml", file), "ELOOP"],
+  ["a dangling symlink", (file) => symlink("missing.yml", file), "ENOENT"],
+  [
+    "a file where .github/workflows should be a directory",
+    async (file) => {
+      await rm(path.dirname(file), { recursive: true });
+      await writeFile(path.dirname(file), "not a directory\n");
+    },
+    "ENOTDIR",
+  ],
+]) {
+  test(`check-risk-paths fails when pr-triage.yml is ${name}`, async () => {
+    const root = await driftFixture();
+    const file = path.join(root, ".github/workflows/pr-triage.yml");
+    await rm(file);
+    await setup(file);
+    await assert.rejects(runGate(root), (error) => {
+      assert.ok(error.stderr.includes(code), error.stderr);
+      assert.doesNotMatch(error.stdout, /workflow sync skipped/);
+      return true;
+    });
+  });
+}

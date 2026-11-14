@@ -157,7 +157,7 @@ The reusable workflow is `frostyard/core/.github/workflows/pr-triage.yml`, with 
 - The workflow has top-level `permissions: {}`.
 - The job has `contents: read` and `pull-requests: write`. It has no other permission.
 - Actions are SHA-pinned.
-- The job checks out nothing. The reusable workflow embeds `scripts/lib/risk-paths.mjs` and `scripts/lib/pr-triage.mjs` verbatim in 2 heredocs, writes them to files, and runs `pr-triage.mjs` with Node. `npm run check:risk-paths` fails when an embedded copy differs from its library.
+- The job checks out nothing. The reusable workflow embeds `scripts/lib/risk-paths.mjs` and `scripts/lib/pr-triage.mjs` verbatim in 2 heredocs, writes them to files, and runs `pr-triage.mjs` with Node. `npm run check:risk-paths` fails when an embedded copy differs from its library. Under a `--root` that has `scripts/lib/risk-paths.mjs` but no `.github/workflows/pr-triage.yml` (a repository that vendors the library), the gate skips this check, and its ok line says `workflow sync skipped` instead of `workflow in sync`. Only a missing path (`ENOENT` from `lstat`) skips it: any other error on that path, such as a symlink loop, a dangling symlink or a file in place of `.github/workflows`, fails the gate. Core's own run MUST say `workflow in sync`; `test/risk-paths.test.mjs` checks it.
 - Code that the job runs comes only from `frostyard/core` at a pinned commit, never from the PR's repository.
 - The job reads `.github/risk-paths.json` at `github.event.pull_request.base.sha`.
 - The job MUST NOT check out, read as code or run anything from the PR head or the merge ref.

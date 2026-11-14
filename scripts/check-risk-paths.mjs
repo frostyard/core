@@ -2,9 +2,9 @@
 // Risk-path list gate (ADR-0068, docs/specs/risk-paths.md): strict JSON and
 // the field table of .github/risk-paths.json (versions 1 and 2, ADR-0078), the
 // categories of rule B (the protected boundaries of the governance policy, when
-// it has any), the required entries (rule C), and, where the library lives, the
-// embedded copy in the reusable workflow.
-import { existsSync, readFileSync } from "node:fs";
+// it has any), the required entries (rule C), and, where the library and the
+// reusable workflow live, the embedded copies in that workflow.
+import { existsSync, lstatSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -15,7 +15,7 @@ import {
   protectedBoundaryIds,
   validateRiskPaths,
 } from "./lib/risk-paths.mjs";
-import { LIBRARY_PATH, checkSync } from "./sync-risk-paths-workflow.mjs";
+import { LIBRARY_PATH, WORKFLOW_PATH, checkSync } from "./sync-risk-paths-workflow.mjs";
 
 const scriptRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const usage = "Usage: node scripts/check-risk-paths.mjs [--root DIR] [--file PATH] [--caller PATH] [--policy PATH]";
@@ -86,15 +86,32 @@ if (!existsSync(absoluteFile)) {
   }
 }
 
-// The sync check applies where the library lives (core).
+// The sync check applies where the library and the reusable workflow live
+// (core). A repository that vendors the library has no pr-triage.yml: there
+// the check is skipped with a note. In core, test/risk-paths.test.mjs requires
+// "workflow in sync" on core's own run, so a missing workflow still fails.
+// Only ENOENT means absent: lstat does not follow a symlink, and any other
+// error (EACCES, ENOTDIR, a symlink loop on read) fails the gate.
 let synced = false;
+let skipNote = "";
 if (existsSync(resolve(root, LIBRARY_PATH))) {
+  let workflow = "present";
   try {
-    const problem = checkSync(root);
-    if (problem) failures.push(problem);
-    else synced = true;
+    lstatSync(resolve(root, WORKFLOW_PATH));
   } catch (error) {
-    failures.push(error.message);
+    workflow = error.code === "ENOENT" ? "absent" : "unreadable";
+    if (workflow === "unreadable") failures.push(`${WORKFLOW_PATH}: ${error.message}`);
+  }
+  if (workflow === "absent") {
+    skipNote = `, workflow sync skipped (no ${WORKFLOW_PATH})`;
+  } else if (workflow === "present") {
+    try {
+      const problem = checkSync(root);
+      if (problem) failures.push(problem);
+      else synced = true;
+    } catch (error) {
+      failures.push(error.message);
+    }
   }
 }
 
@@ -104,4 +121,4 @@ if (failures.length > 0) {
   process.exit(1);
 }
 const kind = named === 0 ? "" : `, ${named} at L1 or L2 name a category or boundary`;
-console.log(`ok   risk_paths: ${entries} entries${kind}${synced ? ", workflow in sync" : ""}`);
+console.log(`ok   risk_paths: ${entries} entries${kind}${synced ? ", workflow in sync" : skipNote}`);
