@@ -134,14 +134,24 @@ test("an empty scope, correction or evidence exits 1 and writes nothing", async 
   assert.deepEqual(tree(root), []);
 });
 
-test("a repository that still has the old file is refused with the rule", async () => {
+// Every repository moved to the folder (ADR-0081), so the helper writes only
+// the folder form. A stale tree that still has the retired single file gets
+// the record file too, and the validator then refuses the tree with both
+// forms: the refusal lives in 1 place, the gate.
+test("the helper writes only the folder form; the validator refuses a tree that still has the old file", async () => {
   const root = fixture();
   mkdirSync(path.join(root, ".memory"), { recursive: true });
   writeFileSync(path.join(root, ".memory/corrections.jsonl"), "");
-  await assert.rejects(run(root), (error) =>
-    error.code === 1 && error.stderr.includes("this repository still has .memory/corrections.jsonl: add 1 line there")
+  await run(root);
+  assert.deepEqual(tree(root), [
+    ".memory",
+    ".memory/corrections",
+    ".memory/corrections.jsonl",
+    ".memory/corrections/2026-11-13-agent-scope-rule-3f9a.json",
+  ]);
+  await assert.rejects(execFileAsync(process.execPath, [check, "--root", root]), (error) =>
+    error.code === 1 && error.stderr.includes("both .memory/corrections.jsonl and .memory/corrections/ exist; finish the migration")
   );
-  assert.deepEqual(tree(root), [".memory", ".memory/corrections.jsonl"]);
 });
 
 test("an existing record name exits 1 and does not change the file", async () => {

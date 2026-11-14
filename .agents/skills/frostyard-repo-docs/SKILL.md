@@ -85,9 +85,7 @@ If the repo lacks the shape, or still has a `yeti/`/`cairn/` tree:
 5. **Drain the inbox.** `.memory/` entries (corrections, learnings) are
    seeds, not archives: fold each into the right doc — or into `AGENTS.md`
    when it is a rule of engagement. A correction record (1 file under
-   `.memory/corrections/`, or 1 line of `.memory/corrections.jsonl` in a
-   repository that has not moved yet) is permanent: set its empty
-   `promoted_to` to the target path, never delete or rename it (core
+   `.memory/corrections/`) is permanent: set its empty `promoted_to` to the target path, never delete or rename it (core
    ADR-0081). Other learnings are deleted once folded. The pending records
    (empty `promoted_to`) must trend toward none.
 6. Mine merged PRs and closed issues since the last docs commit for

@@ -20,8 +20,8 @@ each add a record add 2 different files, so they do not conflict.
     different words.
   - A record with no pull request: 2 to 5 words and 4 random hexadecimal
     characters, for example `2026-11-13-agent-scope-rule-3f9a.json`.
-  - The slug prefix `legacy-` is reserved for the move from the old file
-    (below).
+  - The slug prefix `legacy-` is reserved for the records moved from the
+    old file (below).
 - **Content:** 1 JSON object with exactly 5 string fields, in this order:
   `date` (a real `YYYY-MM-DD` date), `scope`, `correction`, `evidence` (not
   empty), and `promoted_to` (`""`, or the path the record was promoted to).
@@ -51,30 +51,30 @@ each add a record add 2 different files, so they do not conflict.
 - A blocking review point adds a record in the PR that fixes it
   ([quality loop](../docs/design/quality-loop.md), Learn station).
 
-## The old file during the rollout
+## The retired single file
 
-Until its move PR merges, a repository keeps `.memory/corrections.jsonl`:
-1 JSON object for each line, the same 5 fields, append-only. There, a new
-record is 1 line at the end of that file. Core moved to the folder. A
-repository has the old file or the folder, never both; after the folder
-exists, the old file does not come back.
+Before ADR-0081, the records were the lines of 1 file,
+`.memory/corrections.jsonl`. Every repository that had it moved its lines
+into this folder by 2026-11-13; the old file does not come back. A branch from
+before the move that still adds lines to the old file merges `main` and
+runs `scripts/migrate-corrections.mjs --pr <N>` (below).
 
 ## Tools
 
-- `scripts/check-corrections.mjs` (in `make verify`) checks either form.
+- `scripts/check-corrections.mjs` (in `make verify`) checks every record.
   With `--base origin/main` it also checks that no record is removed,
-  renamed or changed except a filled empty `promoted_to`, that the old file
-  does not come back after the move, and that a move keeps every line of
-  the old file as its `legacy-` record.
+  renamed or changed except a filled empty `promoted_to`, and that the old
+  file does not come back. It still reads the old form, for old commits.
 - `scripts/new-correction.mjs --root . --date YYYY-MM-DD --slug pr-412-cache-key --scope … --correction … --evidence … [--promoted-to PATH]`
   writes 1 record file in canonical form. Its use is optional: the validator
   checks a file written by hand the same way.
-- `scripts/migrate-corrections.mjs --root .` moves the old file into the
-  folder: line `N` becomes `<date>-legacy-<NNNN>.json`, and the old file is
-  deleted. An open PR that still added lines to the old file merges `main`,
-  keeps its own version of the old file, and runs it with `--pr <N>`: its
-  new lines become `<date>-pr-<N>-<k>.json` files.
+- `scripts/migrate-corrections.mjs --root .` made the move: line `N`
+  became `<date>-legacy-<NNNN>.json`, and the old file was deleted. A
+  branch that still adds lines to the old file merges `main`, keeps its own
+  version of the old file, and runs it with `--pr <N>`: its new lines
+  become `<date>-pr-<N>-<k>.json` files.
 - `scripts/corrections-report.mjs` is the weekly promotion report for local
   checkouts ([quality loop](../docs/design/quality-loop.md), Learn station);
-  it reads both forms, and `--ref origin/main` reads them at that ref, once
-  per clone, not in the working trees.
+  it reads both forms (old commits keep the old file), and
+  `--ref origin/main` reads them at that ref, once per clone, not in the
+  working trees.

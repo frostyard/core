@@ -1,15 +1,13 @@
 #!/usr/bin/env node
 // Write 1 correction record as 1 file in .memory/corrections/ (ADR-0081): the
 // canonical bytes, under the name <date>-<slug>.json, never over an existing
-// record. A repository that still has .memory/corrections.jsonl gets a line
-// there instead, so this helper refuses it.
-import { existsSync, lstatSync, mkdirSync, writeFileSync } from "node:fs";
+// record.
+import { lstatSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const scriptRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const usage = "Usage: node scripts/new-correction.mjs --root DIR --date YYYY-MM-DD --slug SLUG --scope S --correction C --evidence E [--promoted-to PATH]";
-const OLD = ".memory/corrections.jsonl";
 const DIR = ".memory/corrections";
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const SLUG_MAX = 60;
@@ -58,12 +56,10 @@ function validDate(value) {
 if (!validDate(date)) fail(`invalid --date: ${date} (want a real YYYY-MM-DD date)`);
 if (!SLUG.test(slug)) fail(`invalid --slug: ${slug} (want lowercase words joined by -)`);
 if (slug.length > SLUG_MAX) fail(`invalid --slug: ${slug} is longer than ${SLUG_MAX} characters`);
-if (slug.startsWith("legacy-")) fail(`invalid --slug: ${slug} (legacy- is reserved for the move from ${OLD})`);
+if (slug.startsWith("legacy-")) fail(`invalid --slug: ${slug} (legacy- is reserved for migrated records)`);
 for (const key of ["scope", "correction", "evidence"]) {
   if (options[key].trim() === "") fail(`--${key} is empty`);
 }
-
-if (existsSync(resolve(root, OLD))) fail(`this repository still has ${OLD}: add 1 line there`);
 
 const record = {
   date,
