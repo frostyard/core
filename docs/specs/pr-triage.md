@@ -41,6 +41,7 @@ A step after `levels` uses `!cancelled()` in its `if:`, so that it runs after an
 - The caller's job id is `pr-triage`. The check is named `pr-triage / pr-triage`. The `readiness` step leaves out check runs whose name starts with `pr-triage`.
 - The caller has no `merge_group` trigger.
 - The caller is not a required check.
+- A PR that a workflow opens or pushes with `GITHUB_TOKEN` starts no workflow ([GitHub](https://docs.github.com/en/actions/using-workflows/triggering-a-workflow#triggering-a-workflow-from-a-workflow)): the caller and CI do not run on it, so the PR gets no level label, no readiness check and no required check until a person or another token pushes to it or sends another event.
 - [Risk-paths rule C](risk-paths.md#c-required-entries) still covers the caller: the list has a glob that matches `.github/workflows/risk-paths-caller.yml`.
 - The workflow embeds 2 libraries verbatim, each in 1 heredoc of the step "Write the triage scripts". The step writes them to `$RUNNER_TEMP/pr-triage/`. `risk-paths.mjs` has no trailer. `pr-triage.mjs` has the trailer line `await main(process.env);`. `pr-triage.mjs` imports `./risk-paths.mjs`.
 - `npm run check:risk-paths` fails when 1 embedded copy differs from its library, and names the library. `npm run sync:risk-paths-workflow` rewrites both copies.

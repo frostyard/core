@@ -102,7 +102,9 @@ Where the repository has a governance policy with protected boundaries, the `why
 
 For an entry at L3 or L4, `why` is free text, such as `how-to documentation`.
 
-The validator checks the constraints of the field table (a string, non-empty after trim, at most 200 characters). A review checks the category or boundary name.
+The validator checks the constraints of the field table (a string, non-empty after trim, at most 200 characters).
+
+The gates check the category or boundary name, not `validateRiskPaths`: `checkWhyCategories(list, boundaries)` gives 1 error string for each entry at L1 or L2 (each entry of a version 1 list) whose `why`, trimmed, is not a name and does not start with a name and a colon, such as `governance: the list`. Names are case-sensitive. `boundaries` comes from `protectedBoundaryIds(policy)`, which reads `protected_boundaries[].id` and `protectedBoundaries[]`; when it is empty, the names are the categories above (`WHY_CATEGORIES`). Core's `scripts/check-risk-paths.mjs` reads the policy at `policies/agent-governance.json` (`--policy PATH` names another file). A gate of a repository that vendors the library can call `checkWhyCategories` too. A review checks that the named category fits the path.
 
 ### C. Required entries
 
@@ -211,9 +213,9 @@ The PR that converts the list changes the list, so it is at least L2 (rule G), a
 
 | Artifact | Derivation |
 | --- | --- |
-| Core validator and matcher (`scripts/lib/risk-paths.mjs`) | Implement this interface and validation contract (`validateRiskPaths`, `matchGlob`, `parseStrictJson`, `matchFiles`), the levels (`LEVELS`, `levelOfFile`, `levelOfPullRequest`), the floors (`ORG_FLOORS`, rule G) and rule C (`checkRequiredPaths`) |
+| Core validator and matcher (`scripts/lib/risk-paths.mjs`) | Implement this interface and validation contract (`validateRiskPaths`, `matchGlob`, `parseStrictJson`, `matchFiles`), the levels (`LEVELS`, `levelOfFile`, `levelOfPullRequest`), the floors (`ORG_FLOORS`, rule G), rule B (`WHY_CATEGORIES`, `protectedBoundaryIds`, `checkWhyCategories`) and rule C (`checkRequiredPaths`) |
 | PR triage library (`scripts/lib/pr-triage.mjs`) | Pick the step, and run the `levels` step (rule E), the readiness step and the Dependabot shadow step ([PR triage spec](pr-triage.md)) |
-| Gate (`scripts/check-risk-paths.mjs`, `npm run check:risk-paths`) | Validate a list and rule C (with the level check of version 2), and fail when an embedded copy of a library in the reusable workflow drifts |
+| Gate (`scripts/check-risk-paths.mjs`, `npm run check:risk-paths`) | Validate a list, rule B (with the protected boundaries of `policies/agent-governance.json` when it has any) and rule C (with the level check of version 2), and fail when an embedded copy of a library in the reusable workflow drifts |
 | Reusable workflow (`.github/workflows/pr-triage.yml`) | Embed `scripts/lib/risk-paths.mjs` (no trailer) and `scripts/lib/pr-triage.mjs` (with the trailer `await main(process.env);`) verbatim, run with Node with no checkout, and add labels |
 | Sync (`scripts/sync-risk-paths-workflow.mjs`, `npm run sync:risk-paths-workflow`) | Rewrite the 2 embedded copies from the libraries |
 | Caller in each repository | Run `pull_request_target` with the pinned reusable workflow |

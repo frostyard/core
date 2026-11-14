@@ -568,6 +568,65 @@ jobs:
             return errors;
           }
 
+          // ---- Categories (rule B) --------------------------------------------------
+
+          // Rule B: each why of an entry at L1 or L2 (every entry of a version 1 list)
+          // names 1 of these categories, when the repository has no protected boundaries.
+          export const WHY_CATEGORIES = Object.freeze([
+            "boot chain",
+            "signing and keys",
+            "update verification",
+            "auth",
+            "publication",
+            "secrets and credentials",
+            "rulesets and settings",
+            "destructive operations",
+            "governance",
+          ]);
+
+          // The protected-boundary identifiers of a parsed governance policy:
+          // protected_boundaries[].id (core) and protectedBoundaries[] (snosi). Gives []
+          // when the policy has none.
+          export function protectedBoundaryIds(policy) {
+            if (!isPlainObject(policy)) return [];
+            const ids = [];
+            if (Array.isArray(policy.protected_boundaries)) {
+              for (const boundary of policy.protected_boundaries) {
+                if (isPlainObject(boundary) && typeof boundary.id === "string" && boundary.id.trim() !== "") ids.push(boundary.id);
+              }
+            }
+            if (Array.isArray(policy.protectedBoundaries)) {
+              for (const boundary of policy.protectedBoundaries) {
+                if (typeof boundary === "string" && boundary.trim() !== "") ids.push(boundary);
+              }
+            }
+            return ids;
+          }
+
+          // Rule B for the gates, on a valid list: each why of an entry at L1 or L2
+          // (every entry of a version 1 list) names 1 category of WHY_CATEGORIES, or 1
+          // of boundaries when boundaries is not empty. A why names a name when the
+          // trimmed why is the name, or starts with the name and a colon. Returns error
+          // strings.
+          export function checkWhyCategories(list, boundaries = []) {
+            const useBoundaries = Array.isArray(boundaries) && boundaries.length > 0;
+            const names = useBoundaries ? boundaries : WHY_CATEGORIES;
+            const kind = useBoundaries ? "protected-boundary identifier" : "category";
+            const v2 = list.schema_version === 2;
+            const errors = [];
+            list.paths.forEach((entry, index) => {
+              if (v2 && entry.level !== "L1" && entry.level !== "L2") return;
+              const why = entry.why.trim();
+              if (names.some((name) => why === name || why.startsWith(`${name}:`))) return;
+              const level = v2 ? entry.level : "L1";
+              errors.push(
+                `paths[${index}].why: the glob ${entry.glob} is at ${level}, so its why must start with 1 ${kind} ` +
+                  `(${names.join(", ")}) and then end or a colon; it is ${JSON.stringify(entry.why)}`,
+              );
+            });
+            return errors;
+          }
+
           // ---- GitHub API -----------------------------------------------------------
 
           export function createGitHubApi({ token, apiUrl = "https://api.github.com", fetch }) {

@@ -10,13 +10,16 @@ import {
   FILE_LIST_LIMIT,
   LEVELS,
   ORG_FLOORS,
+  WHY_CATEGORIES,
   checkRequiredPaths,
+  checkWhyCategories,
   createGitHubApi,
   levelOfFile,
   levelOfPullRequest,
   matchFiles,
   matchGlob,
   parseStrictJson,
+  protectedBoundaryIds,
   validateGlob,
   validateRiskPaths,
 } from "../scripts/lib/risk-paths.mjs";
@@ -247,7 +250,11 @@ function list2(paths, defaultLevel = "L3") {
 const e2 = (glob, level, why = "x") => ({ glob, level, why });
 
 function validList2() {
-  return list2([e2(".github/risk-paths.json", "L2", "quality"), e2(".github/workflows/**", "L2", "workflows"), e2("docs/**", "L4", "docs")]);
+  return list2([
+    e2(".github/risk-paths.json", "L2", "governance: the list"),
+    e2(".github/workflows/**", "L2", "governance: the caller"),
+    e2("docs/**", "L4", "docs"),
+  ]);
 }
 
 test("a valid v2 list passes", () => {
@@ -527,6 +534,92 @@ test("checkRequiredPaths: a v2 glob at L3 or L4 on a required path fails", () =>
   assert.deepEqual(checkRequiredPaths(list2([e2("zzz", "L1")]), [CALLER]), [`no glob matches the required path ${CALLER}`]);
 });
 
+// ---- Categories (rule B) --------------------------------------------------
+
+test("the categories of rule B are frozen", () => {
+  assert.ok(Object.isFrozen(WHY_CATEGORIES));
+  assert.deepEqual(WHY_CATEGORIES, [
+    "boot chain",
+    "signing and keys",
+    "update verification",
+    "auth",
+    "publication",
+    "secrets and credentials",
+    "rulesets and settings",
+    "destructive operations",
+    "governance",
+  ]);
+});
+
+test("checkWhyCategories: each category alone or with a colon passes", () => {
+  const paths = WHY_CATEGORIES.flatMap((name, index) => [e(`a${index}`, name), e(`b${index}`, `${name}: why it matters`)]);
+  assert.deepEqual(checkWhyCategories(list(paths)), []);
+  assert.deepEqual(checkWhyCategories(list([e("a", "  governance: padded  ")])), []);
+});
+
+test("checkWhyCategories: a v1 entry with no category fails, such as supply chain", () => {
+  const errors = checkWhyCategories(list([e(".github/risk-paths.json", "governance"), e("mise.toml", "supply chain: the tool pins that CI installs")]));
+  assert.equal(errors.length, 1);
+  assert.match(errors[0], /^paths\[1\]\.why: the glob mise\.toml is at L1, so its why must start with 1 category \(boot chain, /);
+  assert.ok(errors[0].endsWith(`it is "supply chain: the tool pins that CI installs"`));
+});
+
+test("checkWhyCategories: the category must start the why and end or meet a colon", () => {
+  for (const why of [
+    "security: the allow-lists",
+    "filesystem and destructive operations: uploads",
+    "governance, the list",
+    "governance the list",
+    "governances: the list",
+    "Governance: the list",
+    "the list: governance",
+    "sign: keys",
+    "x",
+  ]) {
+    assert.equal(checkWhyCategories(list([e("a", why)])).length, 1, why);
+  }
+});
+
+test("checkWhyCategories: a v2 list checks L1 and L2 entries, never L3 or L4", () => {
+  const value = list2([
+    e2("a", "L1", "supply chain: pins"),
+    e2("b", "L2", "native code: purego"),
+    e2("c", "L3", "free text"),
+    e2("d", "L4", "how-to documentation"),
+    e2("e", "L1", "signing and keys"),
+  ]);
+  const errors = checkWhyCategories(value);
+  assert.equal(errors.length, 2);
+  assert.match(errors[0], /^paths\[0\]\.why: the glob a is at L1, /);
+  assert.match(errors[1], /^paths\[1\]\.why: the glob b is at L2, /);
+});
+
+test("checkWhyCategories: with protected boundaries, the why names a boundary instead of a category", () => {
+  const value = list2([e2("a", "L1", "quality-gates: the gate"), e2("b", "L2", "governance: the list"), e2("c", "L2", "release")]);
+  const errors = checkWhyCategories(value, ["quality-gates", "release"]);
+  assert.deepEqual(errors, [
+    `paths[1].why: the glob b is at L2, so its why must start with 1 protected-boundary identifier (quality-gates, release) and then end or a colon; it is "governance: the list"`,
+  ]);
+  assert.deepEqual(checkWhyCategories(list2([e2("b", "L2", "governance: the list")]), []), []);
+});
+
+test("protectedBoundaryIds reads core's and snosi's policy shapes and skips bad entries", () => {
+  assert.deepEqual(protectedBoundaryIds({ protected_boundaries: [{ id: "quality-gates" }, { id: "" }, { name: "x" }, "y", null] }), ["quality-gates"]);
+  assert.deepEqual(protectedBoundaryIds({ protectedBoundaries: ["secure-boot", "", 3, { id: "z" }] }), ["secure-boot"]);
+  assert.deepEqual(protectedBoundaryIds({ protected_boundaries: "x", protectedBoundaries: {} }), []);
+  assert.deepEqual(protectedBoundaryIds({}), []);
+  assert.deepEqual(protectedBoundaryIds(null), []);
+  assert.deepEqual(protectedBoundaryIds([]), []);
+});
+
+test("core's list names a protected boundary of core's policy in each L1 and L2 why", async () => {
+  const value = parseStrictJson(await readFile(path.join(repoRoot, ".github/risk-paths.json"), "utf8"));
+  const policy = parseStrictJson(await readFile(path.join(repoRoot, "policies/agent-governance.json"), "utf8"));
+  const boundaries = protectedBoundaryIds(policy);
+  assert.ok(boundaries.length > 0);
+  assert.deepEqual(checkWhyCategories(value, boundaries), []);
+});
+
 // ---- GitHub API client ----------------------------------------------------
 
 function response(status, body, headers = {}) {
@@ -681,7 +774,7 @@ function runGate(root) {
 
 test("check-risk-paths passes on the repository", async () => {
   const { stdout } = await runGate(repoRoot);
-  assert.match(stdout, /ok {3}risk_paths: \d+ entries, workflow in sync/);
+  assert.match(stdout, /ok {3}risk_paths: \d+ entries, \d+ at L1 or L2 name a category or boundary, workflow in sync/);
 });
 
 test("core's list puts each administrative script (rulesets, settings, cross-repository writes) at L1", async () => {
@@ -711,7 +804,7 @@ test("check-risk-paths passes on a valid fixture list", async () => {
 test("check-risk-paths passes on a v2 fixture list", async () => {
   const root = await gateFixture(validList2());
   const { stdout } = await runGate(root);
-  assert.match(stdout, /ok {3}risk_paths: 3 entries/);
+  assert.match(stdout, /ok {3}risk_paths: 3 entries, 2 at L1 or L2 name a category or boundary$/m);
 });
 
 test("check-risk-paths fails on a v2 list with the caller at L3", async () => {
@@ -723,6 +816,41 @@ test("check-risk-paths fails on a v2 list with the caller at L3", async () => {
       `the glob .github/workflows/** matches the required path .github/workflows/risk-paths-caller.yml at level L3; it must be L1 or L2`,
     ),
   );
+});
+
+test("check-risk-paths fails on an L1 why with no category, such as supply chain", async () => {
+  const root = await gateFixture(
+    list2([...validList2().paths, e2("mise.toml", "L1", "supply chain: the tool pins that CI installs")]),
+  );
+  await assert.rejects(runGate(root), (error) =>
+    error.stderr.includes("paths[3].why: the glob mise.toml is at L1, so its why must start with 1 category"),
+  );
+});
+
+test("check-risk-paths checks the protected boundaries of the governance policy", async () => {
+  const root = await gateFixture(validList2());
+  await mkdir(path.join(root, "policies"), { recursive: true });
+  await writeFile(path.join(root, "policies/agent-governance.json"), JSON.stringify({ protected_boundaries: [{ id: "quality-gates" }] }));
+  await assert.rejects(runGate(root), (error) => {
+    assert.ok(error.stderr.includes("paths[0].why: the glob .github/risk-paths.json is at L2, so its why must start with 1 protected-boundary identifier (quality-gates)"));
+    assert.ok(error.stderr.includes("paths[1].why"));
+    return true;
+  });
+  await writeFile(path.join(root, "policies/agent-governance.json"), JSON.stringify({ protected_boundaries: [] }));
+  const { stdout } = await runGate(root);
+  assert.match(stdout, /ok {3}risk_paths: 3 entries/);
+});
+
+test("check-risk-paths fails on an unreadable governance policy and skips rule B", async () => {
+  const root = await gateFixture(list2([...validList2().paths, e2("a", "L1", "supply chain")]));
+  await mkdir(path.join(root, "policies"), { recursive: true });
+  await writeFile(path.join(root, "policies/agent-governance.json"), '{"a":1,"a":2}');
+  await assert.rejects(runGate(root), (error) => {
+    assert.ok(error.stderr.includes("policies/agent-governance.json: "));
+    assert.ok(error.stderr.includes("duplicate key"));
+    assert.ok(!error.stderr.includes(".why:"));
+    return true;
+  });
 });
 
 test("check-risk-paths fails on an invalid list", async () => {
