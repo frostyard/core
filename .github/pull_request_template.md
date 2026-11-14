@@ -37,8 +37,9 @@ Risk tier: 1 — <!-- justification -->
 - [ ] `node scripts/check-docs.mjs` green
 - [ ] Docs-site skill changed? `node --test
       .agents/skills/frostyard-docs-site/tests/*.test.mjs` green
-- [ ] Script or test reads Markdown or YAML by hand? 1 test case for each
-      input shape that AGENTS.md lists (fences, code spans, comments,
-      quoting, folded blocks, CR, BOM, empty file, no final newline)
+- [ ] Script or test reads Markdown, YAML or another text format by hand?
+      1 test case for each input shape that AGENTS.md lists for that format
+      and for every file (fences, code spans, comments, quoting, folded
+      blocks, CR, BOM, empty file, no final newline)
 - [ ] Workflows changed? Every action SHA-pinned (40 chars + `# vX.Y.Z`),
       `permissions: {}`, `persist-credentials: false` (ADR-0021)

@@ -1,0 +1,7 @@
+{
+  "date": "2026-11-14",
+  "scope": "pr-evidence",
+  "correction": "A cause table in a PR body labels each group by everything its rows hold, and a count of review rounds uses only rows whose round the record states; rows with an unknown round or blocking status are reported apart",
+  "evidence": "Cross-review of frostyard/core#252 (openai/gpt-6.1-sol) at 21d9f8f found a reader-gap total that held a schema bound and a number precision row, and a re-review count that held 8 rows with no stated round; fixed in the frostyard/core#252 body",
+  "promoted_to": ""
+}
