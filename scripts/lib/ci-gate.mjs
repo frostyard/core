@@ -437,6 +437,30 @@ const LAUNCHERS = [
 const SHELLS = new Set(["sh", "bash", "dash", "zsh", "ksh", "ash"]);
 const basename = (word) => word.replace(/^.*\//, "");
 
+// The word that a shell runs as code, from the words after the shell's
+// name: with `-c` among its options (also in a group: `-lc`, `-ec`), the
+// first word after the options. `-o` and `-O` (also `+o`, `+O`, and in a
+// group: `-eo pipefail`) take the next word as their value, and so do
+// `--rcfile` and `--init-file`; `-` or `--` ends the options.
+function shellCode(words) {
+  let k = 0;
+  let code = false;
+  while (words[k]) {
+    const option = words[k].value;
+    if (option === "-" || option === "--") {
+      k += 1;
+      break;
+    }
+    if (option === "--rcfile" || option === "--init-file") k += 2;
+    else if (/^--/.test(option)) k += 1;
+    else if (/^[-+][A-Za-z]+$/.test(option)) {
+      if (option[0] === "-" && option.includes("c")) code = true;
+      k += 1 + (option.match(/[oO]/g)?.length ?? 0);
+    } else break;
+  }
+  return code ? words[k] : undefined;
+}
+
 // The words of 1 simple command without the words before its name
 // (KEYWORDS, `VAR=value`, WRAPPERS and LAUNCHERS with their options).
 function stripPrefixes(words) {
@@ -604,7 +628,7 @@ function callsIn(text, depth) {
     const rest = stripPrefixes(words);
     if (rest.length === 0 || rest[0].value === "") continue;
     // A shell in command position (or after `nsl run` and its options),
-    // then only options up to -c (or -lc, -ec ...), then the code it runs.
+    // then its options with -c among them, then the code it runs.
     let shell = SHELLS.has(basename(rest[0].value)) ? 0 : -1;
     if (shell < 0 && rest[0].value === "nsl" && rest[1]?.value === "run") {
       let k = 2;
@@ -612,9 +636,8 @@ function callsIn(text, depth) {
       if (rest[k] && SHELLS.has(basename(rest[k].value))) shell = k;
     }
     if (shell >= 0) {
-      let k = shell + 1;
-      while (rest[k] && /^-/.test(rest[k].value) && !/^-[A-Za-z]*c$/.test(rest[k].value)) k += 1;
-      if (rest[k] && /^-[A-Za-z]*c$/.test(rest[k].value) && rest[k + 1]) nested.push(rest[k + 1].raw);
+      const code = shellCode(rest.slice(shell + 1));
+      if (code) nested.push(code.raw);
     }
     const name = basename(rest[0].value).replace(/@.*$/, "");
     calls.push([name, ...rest.slice(1).map((w) => w.value)].join(" "));

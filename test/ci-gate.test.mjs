@@ -461,3 +461,21 @@ test("a shell name in another command's arguments does not make text code", () =
   assert.deepEqual(lintGaps({ makefile: "ci:\n\t@echo sh -c 'shellcheck x.sh'\n", workflows }), ["shellcheck in lint.yml"]);
   assert.deepEqual(lintGaps({ makefile: "ci:\n\t/bin/bash -ec 'shellcheck x.sh'\n", workflows }), []);
 });
+
+// Review finding of core#253, round 4: 1 guard.
+
+test("a shell's option values do not hide its -c code", () => {
+  for (const line of [
+    "bash -o pipefail -c 'shellcheck x.sh'",
+    "bash -eo pipefail -c 'shellcheck x.sh'",
+    "bash +o posix -O extglob -c 'shellcheck x.sh'",
+    "bash -c -o pipefail 'shellcheck x.sh'",
+    "bash --norc --rcfile /dev/null -ec 'shellcheck x.sh'",
+  ]) {
+    assert.deepEqual(toolsCalled([line]), ["shellcheck"], line);
+  }
+  assert.deepEqual(toolsCalled(["bash -o pipefail 'shellcheck.sh'", "bash -- -c"]), []);
+  const workflows = { "lint.yml": `${ON_PR}      - run: shellcheck x.sh\n` };
+  assert.deepEqual(lintGaps({ makefile: "ci:\n\tbash -o pipefail -c 'shellcheck x.sh'\n", workflows }), []);
+  assert.deepEqual(lintGaps({ makefile: "ci:\n\t@echo bash -o pipefail -c 'shellcheck x.sh'\n", workflows }), ["shellcheck in lint.yml"]);
+});

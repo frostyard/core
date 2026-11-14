@@ -1,0 +1,7 @@
+{
+  "date": "2026-11-13",
+  "scope": "ci-gate",
+  "correction": "The CI gate's shell reader must parse a shell's options before its -c code: -o, -O, +o, +O (also in a group such as -eo), --rcfile and --init-file take the next word as their value, and the code is the first word after the options",
+  "evidence": "Re-review of frostyard/core#253 at 28f4bb7: the reader skipped option words but not their values, so bash -o pipefail -c 'shellcheck x.sh' ran no tool and a conformant make ci got a false B19 gap. Fixed in frostyard/core#253 with a targeted test",
+  "promoted_to": "test/ci-gate.test.mjs"
+}
