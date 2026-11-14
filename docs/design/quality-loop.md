@@ -67,9 +67,23 @@ PR template ──► review rubric ──► CI gates ──► corrections ─
   the organization gate checks presence, never versions, via
   `scripts/check-fleet-conventions.mjs` (`npm run check:fleet`) and CI's
   `fleet-conventions` job.
+- **Local CI gate (every code repository)** — `make ci` is the 1 local
+  entry point to the CI gate
+  ([ADR-0083](../adr/0083-run-the-ci-gate-locally-as-make-ci.md)): it runs
+  every check that `ci.yml` runs on pull requests, lint and format
+  included, apart from checks that need network access or a credential;
+  no pull-request workflow lints or formats outside it; and `AGENTS.md`
+  names it. The organization gate checks the mechanical part (baseline
+  rows B12 and B19) with the readers in `scripts/lib/ci-gate.mjs`; with
+  `OWNER/REPO` arguments, `node scripts/check-fleet-conventions.mjs`
+  checks any repository, not only the enabled ones.
+  - **Rollouts.** A change rolled out to many repositories runs
+    `make ci` in each clone before it pushes there. A pass in 1
+    repository proves nothing for another, and a push that CI fails costs
+    a second push and a cancelled run.
 - **Sweep (every code repository)** — the
   [repository baseline](../specs/repository-baseline.md) lists, as rows
-  `B1` to `B18`, what every frostyard code repository carries
+  `B1` to `B19`, what every frostyard code repository carries
   ([ADR-0071](../adr/0071-hold-every-code-repository-to-one-baseline.md)),
   including the tool docs site
   ([ADR-0070](../adr/0070-build-tool-docs-sites-with-materialx-on-github-pages.md)),
@@ -83,7 +97,7 @@ PR template ──► review rubric ──► CI gates ──► corrections ─
   The weekly conformance sweep
   reads it at core's `origin/main` and files one `sweep` issue for each
   failed row; owners fix the gaps in normal work. The organization gate
-  stays the presence check above.
+  stays the presence check and the local CI gate check above.
 - **Learn** — corrections land in
   [.memory/corrections/](../../.memory/README.md), 1 file for each record
   (five-field schema, ADR-0018, [ADR-0081](../adr/0081-store-each-correction-in-a-file-of-its-own.md)),
@@ -164,7 +178,8 @@ copy it as-is.
   [ADR-0072](../adr/0072-write-every-readme-to-one-standard.md),
   [ADR-0077](../adr/0077-bind-ready-for-human-to-the-head-commit.md),
   [ADR-0078](../adr/0078-sort-pull-requests-by-levels-l1-to-l4.md),
-  [ADR-0081](../adr/0081-store-each-correction-in-a-file-of-its-own.md)
+  [ADR-0081](../adr/0081-store-each-correction-in-a-file-of-its-own.md),
+  [ADR-0083](../adr/0083-run-the-ci-gate-locally-as-make-ci.md)
 - Contracts: [specs/pr-review-rubric.md](../specs/pr-review-rubric.md),
   [specs/pr-acceptance-metric.md](../specs/pr-acceptance-metric.md),
   [specs/risk-paths.md](../specs/risk-paths.md),

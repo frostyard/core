@@ -1,6 +1,8 @@
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 
+import { ciCoverageGaps, lintGaps, lintScriptPaths, namesMakeCi } from "./ci-gate.mjs";
+
 const CONTENTS_API = "https://api.github.com/repos";
 
 export class FleetConventionsError extends Error {}
@@ -30,9 +32,9 @@ export async function collectEnabledRepositories(repositoriesRoot) {
   return repositories;
 }
 
-async function fetchFile(fetchImpl, owner, name, filePath) {
+async function fetchFile(fetchImpl, owner, name, filePath, accept = "application/vnd.github.raw+json") {
   const url = `${CONTENTS_API}/${owner}/${name}/contents/${filePath}`;
-  const headers = { Accept: "application/vnd.github.raw+json" };
+  const headers = { Accept: accept };
   if (process.env.GITHUB_TOKEN) {
     headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
   }
@@ -86,11 +88,70 @@ export async function checkRepository(fetchImpl, owner, name) {
     }
   }
 
+  failures.push(...(await checkCiGate(fetchImpl, owner, name, makefile)));
+
   return { label, failures };
 }
 
-export async function checkFleetConventions(fetchImpl, repositoriesRoot) {
-  const repositories = await collectEnabledRepositories(repositoriesRoot);
+// The workflow files of the repository's default branch: name -> text. A
+// repository with no .github/workflows directory has none.
+async function fetchWorkflows(fetchImpl, owner, name) {
+  const listing = await fetchFile(fetchImpl, owner, name, ".github/workflows", "application/vnd.github+json");
+  if (listing === null) return {};
+  let entries;
+  try {
+    entries = JSON.parse(listing);
+  } catch {
+    throw new FleetConventionsError(`${owner}/${name}: .github/workflows listing is not JSON`);
+  }
+  if (!Array.isArray(entries)) return {};
+  const workflows = {};
+  for (const entry of entries) {
+    if (entry.type !== "file" || !/\.ya?ml$/.test(entry.name)) continue;
+    const text = await fetchFile(fetchImpl, owner, name, `.github/workflows/${entry.name}`);
+    if (text !== null) workflows[entry.name] = text;
+  }
+  return workflows;
+}
+
+// ADR-0083: `make ci` is the 1 local entry point to the CI gate. Row B12:
+// ci.yml runs every part of `make ci`. Row B19: AGENTS.md names `make ci`,
+// and no pull-request workflow runs a lint or format check that `make ci`
+// does not run.
+async function checkCiGate(fetchImpl, owner, name, makefile) {
+  const failures = [];
+  const agents = await fetchFile(fetchImpl, owner, name, "AGENTS.md");
+  if (agents === null) failures.push("B19: AGENTS.md missing");
+  else if (!namesMakeCi(agents)) failures.push("B19: AGENTS.md does not name make ci");
+
+  const workflows = await fetchWorkflows(fetchImpl, owner, name);
+  if (workflows["ci.yml"] === undefined) {
+    failures.push("B12: .github/workflows/ci.yml missing");
+  } else if (makefile !== null) {
+    const gaps = ciCoverageGaps(makefile, workflows["ci.yml"]);
+    if (gaps.length > 0 && !gaps[0].startsWith("a ci target")) {
+      failures.push(`B12: ci.yml does not run ${gaps.join(", ")}`);
+    }
+  }
+
+  if (makefile !== null) {
+    const packageJson = await fetchFile(fetchImpl, owner, name, "package.json");
+    const files = {};
+    for (const filePath of lintScriptPaths({ makefile, packageJson, workflows })) {
+      const text = await fetchFile(fetchImpl, owner, name, filePath);
+      if (text !== null) files[filePath] = text;
+    }
+    for (const gap of lintGaps({ makefile, packageJson, workflows, files })) {
+      failures.push(`B19: lint or format outside make ci: ${gap}`);
+    }
+  }
+  return failures;
+}
+
+// Check the enabled declarations, or the given repositories
+// ([{ owner, name }]) when the list is not empty.
+export async function checkFleetConventions(fetchImpl, repositoriesRoot, only = []) {
+  const repositories = only.length > 0 ? only : await collectEnabledRepositories(repositoriesRoot);
   const results = [];
   for (const { owner, name } of repositories) {
     try {

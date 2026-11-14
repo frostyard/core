@@ -112,14 +112,15 @@ Start from .agents/skills/TEMPLATE/SKILL.md. -->
   ([ADR-0019](docs/adr/0019-governance-as-code-and-risk-tiers.md)).
 - Every frostyard code repository carries the
   [repository baseline](docs/specs/repository-baseline.md) (rows `B1` to
-  `B18`: instruction surface, corrections inbox, docs shape, make gate,
+  `B19`: instruction surface, corrections inbox, docs shape, make gate,
   pinned actions, risk paths, PR template, svu, tool docs site, license,
   fleet Go toolchain, `ci.yml`, Dependabot, `SECURITY.md`, no `CODEOWNERS`,
-  no leftover agent-framework trees, README, required status checks), with
-  its named exemptions
+  no leftover agent-framework trees, README, required status checks, local
+  CI gate), with its named exemptions
   ([ADR-0071](docs/adr/0071-hold-every-code-repository-to-one-baseline.md),
   [ADR-0072](docs/adr/0072-write-every-readme-to-one-standard.md),
-  [ADR-0076](docs/adr/0076-require-status-checks-on-every-default-branch.md)).
+  [ADR-0076](docs/adr/0076-require-status-checks-on-every-default-branch.md),
+  [ADR-0083](docs/adr/0083-run-the-ci-gate-locally-as-make-ci.md)).
   `scripts/apply-triage-settings.sh` drafts the required-checks ruleset
   (dry run by default; an admin runs `--apply`), and
   `scripts/required-checks-survey.mjs` reads the live state, read only.
@@ -129,6 +130,10 @@ Start from .agents/skills/TEMPLATE/SKILL.md. -->
   does); narrowing a row needs an ADR that amends the cited one.
   `test/no-leftover-agent-trees.test.mjs` holds core itself to row B16, and
   `test/readme-check.test.mjs` holds core's `README.md` to row B17.
+- A change rolled out to many repositories runs `make ci` in each clone
+  before it pushes there: `make ci` is each repository's local CI gate,
+  lint and format included, and a pass in 1 repository proves nothing for
+  another ([ADR-0083](docs/adr/0083-run-the-ci-gate-locally-as-make-ci.md)).
 - ADRs record the decision, not how it was reached. State context, decision,
   and consequences as facts. No narration of who asked, who was consulted, or
   the author's process; that belongs in the PR description
@@ -176,8 +181,14 @@ removed. -->
   ([ADR-0035](docs/adr/0035-author-organization-authority-as-strict-json.md)).
   `npm run check:fleet` then checks each `fleet_state: enabled` declaration's
   default branch over the network for `mise.toml`, `mise.lock`, and its
-  verify gate ([ADR-0043](docs/adr/0043-pin-repository-tools-in-mise-and-name-the-verify-gate.md)) —
-  presence only, run as CI's `fleet-conventions` job, not part of `check`/`verify`.
+  verify gate ([ADR-0043](docs/adr/0043-pin-repository-tools-in-mise-and-name-the-verify-gate.md)),
+  and for baseline rows B12 and B19: `ci.yml` runs `make ci`, `AGENTS.md`
+  names it, and no pull-request workflow lints or formats outside it
+  ([ADR-0083](docs/adr/0083-run-the-ci-gate-locally-as-make-ci.md)). It runs
+  as CI's required `fleet-conventions` job, not part of `check`/`verify`;
+  `node scripts/check-fleet-conventions.mjs OWNER/REPO...` checks other
+  repositories. Its readers live in `scripts/lib/ci-gate.mjs` and are
+  tested in `test/ci-gate.test.mjs`.
 - Declare every GitHub Actions secret's expiry in
   [.github/secrets-expiry.json](.github/secrets-expiry.json) — metadata only,
   closed schema, `warn_days_before` at least 30 and `never_relax` true

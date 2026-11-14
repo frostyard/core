@@ -80,6 +80,12 @@ names what the decision binds in core and where it lives here.
   — core's [.github/risk-paths.json](../.github/risk-paths.json) is schema
   version 2, with a level for each glob and the default L3; the `levels`
   step adds `level:L1` to `level:L4` and `risk:high` at L1 and L2.
+- [ADR-0083 — Run the CI gate locally as `make ci`](adr/0083-run-the-ci-gate-locally-as-make-ci.md)
+  — `make ci` runs the offline checks of [ci.yml](../.github/workflows/ci.yml);
+  its `fleet-conventions` and `scaffold-e2e` jobs need the network (a
+  GitHub API read, a pip install) and run on their own. Core's
+  [AGENTS.md](../AGENTS.md) names `make ci`, and
+  `test/repository-baseline.test.mjs` holds core to row B19.
 
 ## Rows that do not apply to core
 

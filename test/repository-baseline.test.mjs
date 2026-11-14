@@ -5,12 +5,20 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
+import { ciCoverageGaps, lintGaps, namesMakeCi, workflowCommands } from "../scripts/lib/ci-gate.mjs";
+
+// B12 (ADR-0073): the comparison of `make ci` with a CI workflow lives in
+// scripts/lib/ci-gate.mjs, which the organization gate shares (ADR-0083);
+// this file re-exports it.
+export { ciCoverageGaps, workflowCommands };
+
 // Repository baseline (ADR-0071, docs/specs/repository-baseline.md) applied to
 // core itself, 1 test per row. B2's record rules live in
 // scripts/check-corrections.mjs and its tests; the B2 test here holds core's
 // tree to the folder form. B6 lives in test/risk-paths.test.mjs and
 // scripts/check-risk-paths.mjs; B16 in
-// test/no-leftover-agent-trees.test.mjs; B17 in test/readme-check.test.mjs. B8, B9 and B11 do not apply to core
+// test/no-leftover-agent-trees.test.mjs; B17 in test/readme-check.test.mjs. B19 shares
+// scripts/lib/ci-gate.mjs with the organization gate. B8, B9 and B11 do not apply to core
 // (docs/org-adrs.md says why); B10 and B18 are checked by the sweep with gh api.
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -163,117 +171,6 @@ export function ungroupedEntries(dependabotText) {
   }
   if (parsed === 0 || parsed !== ecosystemLines) return [...unparsed, ...failing];
   return failing;
-}
-
-// B12 (ADR-0073): the parts of `make ci` that a CI workflow does not run. A
-// `make ci` step covers all of them. Otherwise each prerequisite of the `ci`
-// target needs a `make <target>` step (extra variables allowed), and each
-// command of the `ci` recipe needs a step that runs exactly that command.
-// Only the commands of `run:` steps count: comments, step names and other
-// keys do not.
-export function workflowCommands(workflowText) {
-  const indentOf = (line) => line.length - line.trimStart().length;
-  // Shell comments: from an unquoted # at the start or after a blank.
-  const stripShellComment = (line) => {
-    let quote = null;
-    for (let i = 0; i < line.length; i++) {
-      const c = line[i];
-      if (quote) {
-        if (c === quote) quote = null;
-      } else if (c === "'" || c === '"') {
-        quote = c;
-      } else if (c === "#" && (i === 0 || /\s/.test(line[i - 1]))) {
-        return line.slice(0, i).trim();
-      }
-    }
-    return line.trim();
-  };
-  const lines = workflowText.split("\n");
-  const commands = [];
-  let stepsIndent = -1; // indent of the current `steps:` key
-  let itemIndent = -1; // indent of the `-` of the steps' list items
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    if (line.trim() === "" || line.trim().startsWith("#")) continue;
-    const indent = indentOf(line);
-    // A step list can be indented under `steps:` or start at its indent.
-    const indentlessItem = indent === stepsIndent && /^\s*-\s/.test(line);
-    if (stepsIndent >= 0 && indent <= stepsIndent && !indentlessItem) stepsIndent = itemIndent = -1;
-    if (/^\s*steps:\s*(#.*)?$/.test(line)) {
-      stepsIndent = indent;
-      continue;
-    }
-    if (stepsIndent < 0) continue;
-    const item = /^(\s*)-\s+(.*)$/.exec(line);
-    if (item && (itemIndent < 0 || item[1].length === itemIndent)) itemIndent = item[1].length;
-    // A step's own `run` key: on the `-` line, or at the item's key indent.
-    let value = null;
-    let keyIndent = -1;
-    if (item && item[1].length === itemIndent && /^run:/.test(item[2])) {
-      value = item[2].slice(4);
-      keyIndent = itemIndent + 2;
-    } else if (itemIndent >= 0 && indent === itemIndent + 2 && /^\s*run:/.test(line)) {
-      value = line.trim().slice(4);
-      keyIndent = indent;
-    }
-    if (value === null) continue;
-    value = value.trim();
-    const quoted = /^'((?:[^']|'')*)'|^"((?:[^"\\]|\\.)*)"/.exec(value);
-    if (quoted) {
-      // A quoted YAML scalar: its text, decoded; a # inside the quotes is not a YAML comment.
-      value = quoted[1] !== undefined ? quoted[1].replace(/''/g, "'") : quoted[2].replace(/\\(.)/g, "$1");
-    } else {
-      value = value.replace(/(^|\s+)#.*$/, "").trim();
-    }
-    const block = quoted ? null : /^([|>])[-+]?$/.exec(value);
-    if (!block) {
-      const command = stripShellComment(value);
-      if (command) commands.push(command);
-      continue;
-    }
-    // A block scalar: the lines indented deeper than the key. A literal (|)
-    // block runs each line; a folded (>) block joins its lines into 1 command.
-    const body = [];
-    for (i += 1; i < lines.length; i++) {
-      if (lines[i].trim() === "") continue;
-      if (indentOf(lines[i]) <= keyIndent) {
-        i -= 1;
-        break;
-      }
-      body.push(lines[i].trim());
-    }
-    const blockCommands = block[1] === ">" ? [body.join(" ")] : body;
-    for (const command of blockCommands.map(stripShellComment)) if (command) commands.push(command);
-  }
-  return commands;
-}
-
-export function ciCoverageGaps(makefileText, workflowText) {
-  const lines = makefileText.split("\n");
-  const start = lines.findIndex((line) => /^ci\s*:(?!=)/.test(line));
-  if (start === -1) return ["a ci target in the Makefile"];
-  const commands = workflowCommands(workflowText);
-  const escape = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const runsMake = (target) => {
-    const pattern = new RegExp(`(^|[;&|]\\s*)make ${escape(target)}(\\s|$)`);
-    return commands.some((command) => pattern.test(command));
-  };
-  if (runsMake("ci")) return [];
-  const prerequisites = lines[start].replace(/^ci\s*:/, "").replace(/#.*$/, "").trim().split(/\s+/).filter(Boolean);
-  const recipe = [];
-  for (let i = start + 1; i < lines.length; i++) {
-    const line = lines[i];
-    if (line.trim() === "" || line.startsWith("#")) continue; // blank lines and comments do not end a recipe
-    if (!line.startsWith("\t")) break;
-    const command = line.trim().replace(/^[@-]+/, "").replace(/\$\(MAKE\)/g, "make");
-    if (command && !command.startsWith("#")) recipe.push(command);
-  }
-  const gaps = prerequisites.filter((target) => !runsMake(target)).map((target) => `make ${target}`);
-  for (const command of recipe) {
-    const target = /^make (\S+)$/.exec(command);
-    if (target ? !runsMake(target[1]) : !commands.includes(command)) gaps.push(command);
-  }
-  return gaps;
 }
 
 // B5: the checkout steps of a workflow, and the 1-based line of each one that
@@ -493,6 +390,16 @@ test("B12: ciCoverageGaps reads commented steps keys, indentless step lists and 
   assert.deepEqual(ciCoverageGaps(makefile, afterSteps), ["make verify"]);
 });
 
+test("B12: ciCoverageGaps counts each target of 1 make call (ADR-0083)", () => {
+  const makefile = "ci: verify ui-check desktop-build desktop-build-windows\n\tgo test -race ./...\n";
+  const workflow =
+    "on: [pull_request]\njobs:\n  a:\n    steps:\n      - run: make verify\n      - run: make ui-check IN_NSL='sh -c'\n      - run: make desktop-build desktop-build-windows\n      - run: go test -race ./...\n";
+  assert.deepEqual(ciCoverageGaps(makefile, workflow), []);
+  assert.deepEqual(ciCoverageGaps(makefile, workflow.replace(" desktop-build-windows\n", "\n")), ["make desktop-build-windows"]);
+  // An echo that names make is not a make call.
+  assert.deepEqual(ciCoverageGaps("ci: verify\n", "on: [pull_request]\njobs:\n  a:\n    steps:\n      - run: echo 'run make ci'\n"), ["make verify"]);
+});
+
 test("B12: core's ci.yml runs make ci on pull requests", () => {
   const ci = read(".github/workflows/ci.yml");
   assert.match(ci, /pull_request/);
@@ -604,4 +511,14 @@ test("B15: core tracks no CODEOWNERS file", () => {
   for (const file of ["CODEOWNERS", ".github/CODEOWNERS", "docs/CODEOWNERS"]) {
     assert.ok(!files.has(file), `${file} is tracked`);
   }
+});
+
+test("B19: core's AGENTS.md names make ci, and no pull-request workflow lints outside it (ADR-0083)", () => {
+  assert.ok(namesMakeCi(read("AGENTS.md")), "AGENTS.md does not name make ci");
+  const workflows = Object.fromEntries(
+    readdirSync(path.join(root, ".github/workflows"))
+      .filter((name) => /\.ya?ml$/.test(name))
+      .map((name) => [name, read(`.github/workflows/${name}`)]),
+  );
+  assert.deepEqual(lintGaps({ makefile: read("Makefile"), packageJson: read("package.json"), workflows }), []);
 });

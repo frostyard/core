@@ -187,3 +187,5 @@ against.
 - Amended in part by: [ADR-0080](0080-document-the-snosi-images-on-frostyard-org.md)
   (exemptions: snosi has no tool site, item 9)
 - Amended in part by: [ADR-0081](0081-store-each-correction-in-a-file-of-its-own.md)
+- Amended in part by: [ADR-0083](0083-run-the-ci-gate-locally-as-make-ci.md)
+  (the organization gate checks rows B12 and B19, not presence only)

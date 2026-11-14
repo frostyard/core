@@ -101,6 +101,7 @@ which baseline rows do not apply here.
 - [0080 — Document the snosi images on frostyard.org](adr/0080-document-the-snosi-images-on-frostyard-org.md)
 - [0081 — Store each correction in a file of its own](adr/0081-store-each-correction-in-a-file-of-its-own.md)
 - [0082 — Verify the build provenance of omarchy-apps](adr/0082-verify-the-build-provenance-of-omarchy-apps.md)
+- [0083 — Run the CI gate locally as `make ci`](adr/0083-run-the-ci-gate-locally-as-make-ci.md)
 
 ### Design
 
