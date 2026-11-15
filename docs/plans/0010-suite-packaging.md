@@ -26,9 +26,18 @@ waits for frostread now. The `frostyard` remote drops
 and lodge and Porter drop the app `read`
 ([lodge#80](https://github.com/frostyard/lodge/pull/80),
 [porter#51](https://github.com/frostyard/porter/pull/51)). The articles
-that frostread saved stay as notes in frostnotes. Snosi's `readd` sysext
-and its files under `https://repository.frostyard.org/ext/readd/` are
-removed in Snosi's own change and its publication step.
+that frostread saved stay as notes in frostnotes. Snosi no longer builds
+or publishes the `readd` sysext, and its base image no longer ships the
+`readd` transfer
+([snosi#1314](https://github.com/frostyard/snosi/pull/1314), 2026-11-15).
+The files already published under
+`https://repository.frostyard.org/ext/readd/` stay on R2. On 2026-11-15
+the directory listing there shows `SHA256SUMS`, `SHA256SUMS.gpg` and
+`readd.transfer`, and `SHA256SUMS` names the `readd` images `0.1.0` to
+`0.5.0`. A host with the feature enabled keeps its last image until an
+administrator removes it; Snosi's
+[sysext design](https://github.com/frostyard/snosi/blob/main/docs/design/sysexts.md#readd-retired)
+gives the steps.
 
 ## Inventory
 
