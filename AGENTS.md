@@ -77,8 +77,8 @@ Start from .agents/skills/TEMPLATE/SKILL.md. -->
   `docs/`, and a read-only checker for rules R1 to R12
   ([ADR-0072](docs/adr/0072-write-every-readme-to-one-standard.md),
   [README spec](docs/specs/readme.md)).
-- **Releasing a suite app (frostnotes, frostmail, frostread, lodge,
-  porter): Flatpak candidate, clean-desktop gate, promotion and listing;
+- **Releasing a suite app (frostnotes, frostmail, lodge, porter):
+  Flatpak candidate, clean-desktop gate, promotion and listing;
   the daemon's attested `.deb` and its snosi sysext** →
   [.agents/skills/frostyard-suite-app-release/SKILL.md](.agents/skills/frostyard-suite-app-release/SKILL.md)
   ([ADR-0058](docs/adr/0058-ship-suite-desktop-apps-as-flatpaks-and-services-as-sysexts.md),

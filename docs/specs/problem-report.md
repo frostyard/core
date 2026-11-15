@@ -110,7 +110,12 @@ repository already uses ([ADR-0016](../adr/0016-reverse-dns-org-frostyard-identi
 | `org.frostyard.pilothouse` | frostyard/pilothouse |
 | `org.frostyard.Frostmail` | frostyard/frostmail |
 | `org.frostyard.Frostnotes` | frostyard/frostnotes |
-| `org.frostyard.Frostread` | frostyard/frostread |
+| `org.frostyard.Frostread` | frostyard/frostread (retired 2026-11-14) |
+
+frostread is retired, and no new release of it comes. Its ID stays in
+`frostyard.problem/1`: rule 5 makes any change to the schema a new
+version, and an installed copy of its last release (its `readd` writes
+problem records) can still write records with it.
 
 **Allowed Go frame modules (S8 `frames`).** A frame is a Go function name as
 the runtime prints it, with no file path, line or argument. Its import path
