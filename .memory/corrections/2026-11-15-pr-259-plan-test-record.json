@@ -1,0 +1,7 @@
+{
+  "date": "2026-11-15",
+  "scope": "plan-records",
+  "correction": "A plan record of a test states what the transcript shows, not the expected cause (a Qt start that fails on a missing platform plugin is not proof of a missing display); a cited PR's date is its merge date, not its commit's author date; every count in the PR body is recounted from its source index",
+  "evidence": "Cross-review of frostyard/core#259 (openai/gpt-6.1-sol) at 8838751 found the moonlight-qt start recorded as a missing-display stop when the transcript showed the offscreen plugin missing, apt-publisher#32 dated by its author date (2026-11-05) instead of its merge (2026-11-06), and 7 single-version package names where the forky indexes hold 6; fixed in frostyard/core#259 with a rerun on the default platform selection; guarded by a new AGENTS.md rule on test records, and the AGENTS.md rules on counts and on the date of the change itself cover the last 2",
+  "promoted_to": "AGENTS.md"
+}

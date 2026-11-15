@@ -248,22 +248,67 @@ waiting in `backports-new`, leaving every 6.18+ backports kernel
 uninstallable. frostyard/snosi#1043 takes their kernel from `forky` (7.2.8)
 until that queue is processed.
 
-- [ ] Producers that register `forky` publish to it: unmarked static builds
-  directly, and distribution-linked packages as `~deb14` builds.
-  - Done for updex, intuneme and firn.
-  - chairlift: a smoke test of v0.17.1 on `debian:forky` passed
-    (frostyard/chairlift#306); its registration is in
-    frostyard/apt-publisher#50. first-setup has no producer row today.
-  - bootc-debian needs a `debian:forky` build with `~deb14` versions and
-    per-codename `Depends` (frostyard/bootc-debian#27). Its ostree must be
-    at least 2026.6, because `forky` ships libostree 2026.6-1 on 2026-11-13.
-  - incus needs a Debian 14 build carrying `~deb14`
-    (frostyard/incus#17).
-  - omarchy-apps (`voxtype`, `moonlight-qt`) is `trixie` only. Its unmarked
-    builds can go to `forky` after an install and start test on
-    `debian:forky` (frostyard/omarchy-apps#19).
-  - frostyard/apt-publisher#50 registers bootc-debian, incus, omarchy-apps
-    and chairlift for `forky`, and must merge before they request it.
+- [x] Producers that register `forky` publish to it: unmarked static builds
+  directly, and distribution-linked packages as `~deb14` builds. Done on
+  2026-11-13, when the last of the seven producers published its first
+  `forky` build.
+  - Source of the versions and counts below: the `forky` amd64 indexes
+    [main](https://repository.frostyard.org/debian/dists/forky/main/binary-amd64/Packages)
+    (38 entries) and
+    [image](https://repository.frostyard.org/debian/dists/forky/image/binary-amd64/Packages)
+    (12 entries), read on 2026-11-15 under the `forky` `InRelease` dated
+    2026-11-14 01:57:07 UTC. A count is the number of entries of that
+    package name.
+  - The registrations are rows of apt-publisher's `config/producers.tsv`.
+    A producer whose release step names no codename publishes to every
+    codename of its row.
+  - **updex:** registered `trixie,forky` in apt-publisher's first commit
+    (`38ee348`, 2026-10-02); its release step requests publication since
+    frostyard/updex#432 (2026-10-02). `frostyard-updex`: 13 versions,
+    2.0.2 to 2.3.1.
+  - **intuneme:** registered `trixie,forky` by frostyard/apt-publisher#9
+    (2026-10-03); release step frostyard/intuneme#204 (2026-10-03).
+    `frostyard-intuneme`: 7 versions, 0.20.3 to 0.23.0.
+  - **firn:** registered `trixie,forky` by frostyard/apt-publisher#9
+    (2026-10-03); release step frostyard/firn#104 (2026-10-03).
+    `frostyard-firn-gui` came with frostyard/firn#122 and its registration
+    with frostyard/apt-publisher#17 (both 2026-10-26). `frostyard-firn`:
+    10 versions, 0.6.1 to 0.12.0; `frostyard-firn-gui`: 4 versions, 0.10.0
+    to 0.12.0.
+  - **chairlift:** a smoke test of v0.17.1 on `debian:forky` passed
+    (frostyard/chairlift#306, 2026-11-13). frostyard/apt-publisher#50
+    (2026-11-13) registers it for `forky`, and
+    [publish run 43489626827](https://github.com/frostyard/apt-publisher/actions/runs/43489626827)
+    published v0.17.1 there the same day. `frostyard-chairlift` and
+    `frostyard-chairlift-system-integration`: 1 version each, 0.17.1.
+    first-setup has no producer row (retired by
+    frostyard/apt-publisher#32, 2026-11-06).
+  - **bootc-debian:** frostyard/bootc-debian#27 (2026-11-13) builds
+    Debian 13 and Debian 14 packages from 1 build stamp, and
+    frostyard/apt-publisher#50 registers it for `forky`.
+    [Publish run 43504005818](https://github.com/frostyard/apt-publisher/actions/runs/43504005818)
+    published `bootc-1.17.4-ostree-2026.6-202611132023` on 2026-11-13.
+    `bootc` 1.17.4-frostyard202611132023~deb14 and `libostree-1-1`
+    2026.6-frostyard202611132023~deb14: 1 version each. That
+    `libostree-1-1` sorts above Debian `forky`'s own 2026.6-1.
+  - **incus:** frostyard/incus#17 (2026-11-13, on its default branch
+    `stable`) adds the Debian 14 build carrying `~deb14`, and
+    frostyard/apt-publisher#50 registers it for `forky`. Publish runs
+    [43498417064](https://github.com/frostyard/apt-publisher/actions/runs/43498417064)
+    (2026-11-13) and
+    [43540214881](https://github.com/frostyard/apt-publisher/actions/runs/43540214881)
+    (2026-11-14) published `7.6-debian14-202611132003` and
+    `7.6-debian14-202611140118`. `incus`, `incus-base`, `incus-client`,
+    `incus-extra` and `incus-ui-canonical`: 2 versions each,
+    1:7.6-debian14-202611132003~deb14 and
+    1:7.6-debian14-202611140118~deb14.
+  - **omarchy-apps:** frostyard/omarchy-apps#19 (2026-11-13) installs and
+    runs each package in `debian:forky` before it releases, and
+    frostyard/apt-publisher#50 registers it for `forky`.
+    [Publish run 43491240131](https://github.com/frostyard/apt-publisher/actions/runs/43491240131)
+    published `main-20261113192000-4de76c0` to `trixie` and `forky` on
+    2026-11-13. `voxtype` 1.1.1-frostyard20261113191850 and `moonlight-qt`
+    6.2.0-frostyard20261113191853: 1 version each.
 - [ ] Build each sysext for each suite. updex picks a sysext by `%w`, the
   host's `VERSION_ID`, and Debian `forky`'s os-release has no `VERSION_ID`
   before Debian releases it (base-files 14.2), so a `forky` image must set
@@ -271,6 +316,41 @@ until that queue is processed.
   the other suite.
 - [ ] Prove clean install, update and rollback on `forky`, without changing
   `trixie` or `stable`.
+  - Package level, passed on 2026-11-15, amd64 only (the arm64 entries of
+    `main` were not tested): each of the 15 package names of the 50 entries
+    in the 2 `forky` amd64 indexes above installed from
+    `https://repository.frostyard.org/debian/` `forky` (components `main`
+    and `image`, `Signed-By` the `debian/frostyard.gpg` key
+    `432C452CD2B7F4FF1B5D23264DE6A2016E622F97`). The test used 1 fresh local
+    `debian:forky` container for each package family
+    (`debian@sha256:15f483ba923e…`), and wrote nothing to the repository.
+    - In each container: a clean install of the newest version, and
+      `dpkg-query` showed it installed at that version.
+    - Every package with 2 or more versions (`frostyard-updex`,
+      `frostyard-firn`, `frostyard-firn-gui`, `frostyard-intuneme`, and the
+      5 incus packages): after a purge, install N-1, upgrade to N with
+      `apt-get install --only-upgrade`, then roll back with
+      `apt-get install PKG=N-1 --allow-downgrades`. `dpkg-query` showed
+      N-1 after the rollback, and `dpkg --audit` found nothing. The pairs
+      were updex 2.3.0 and 2.3.1, firn and firn-gui 0.11.1 and 0.12.0,
+      intuneme 0.22.1 and 0.23.0, and incus 202611132003 and
+      202611140118.
+    - The single-version packages (`bootc`, `libostree-1-1`, both chairlift
+      packages, `voxtype`, `moonlight-qt`) were installed clean. Their
+      update and rollback stay unproven until a 2nd `forky` version exists.
+      `frostyard-chairlift` and `frostyard-chairlift-system-integration`
+      conflict with each other by design, so each was installed in its own
+      container.
+    - The binaries ran: `updex`, `firn`, `intuneme`, `voxtype`, `bootc`
+      and `incus` printed their versions. `chairlift` started and stopped
+      with "cannot open display". `moonlight-qt` started, found no Wayland
+      or X11 display, and stopped because Qt found no usable platform plugin
+      (the package ships only `xcb`). The container had no display, so this
+      test does not show that either GUI runs.
+    - The `InRelease` files of `trixie`, `forky` and legacy `stable` had the
+      same `Date` line and SHA-256 before and after the test.
+  - Not proven by it: image and sysext install, update and rollback on
+    `forky` (Snosi). This item stays open until they are.
 - [ ] Rebase or replace Snosi PR #924 once packages and products validate.
 - **Done when:** `forky` and `trixie` independently install and roll back.
 
