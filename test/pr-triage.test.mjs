@@ -2096,25 +2096,20 @@ test("the expression evaluator follows the GitHub Actions comparison and truthin
 
 test("the job if: skips a title or body edit and a label other than ready-for-human", async () => {
   const workflow = await readFile(workflowPath, "utf8");
-  const outside = outsideBlocks(workflow);
 
-  // Every line outside the heredocs that contains the word `if`, with the comment
-  // lines dropped. This is an exact match and not a YAML reader: a line in any
-  // other form (a quoted key, a flow mapping, a folded block, CRLF, a trailing
-  // comment) does not equal 1 of the 5 expected lines, so a new or a changed
-  // condition fails this test closed. Because it accepts only these exact lines,
-  // it needs no input-shape cases.
-  assert.deepEqual(
-    outside.filter((line) => !/^\s*#/.test(line) && /\bif\b/.test(line)),
-    [
-      `    if: ${JOB_IF}`,
-      `        if: ${LEVELS_IF}`,
-      `        if: ${READINESS_IF}`,
-      `        if: ${SHADOW_IF}`,
-      `        if: ${SHADOW_IF}`,
-    ],
-    "the workflow has exactly these 5 if: lines, in this order",
-  );
+  // The test evaluates the 4 expected conditions. Each must be in the workflow as
+  // 1 exact line (an exact-text match, not a YAML reader). The test does not
+  // claim that the workflow has no other condition: a step or a condition that a
+  // later change adds is outside this test. What the steps read is checked by
+  // the behavioral test "no step reads the PR title, ...".
+  for (const [indent, expression] of [
+    ["    ", JOB_IF],
+    ["        ", LEVELS_IF],
+    ["        ", READINESS_IF],
+    ["        ", SHADOW_IF],
+  ]) {
+    assert.ok(workflow.includes(`\n${indent}if: ${expression}\n`), `the workflow has the line if: ${expression}`);
+  }
 
   const contextOf = (event, author, shadow) => {
     const payload = { action: event.action, pull_request: { user: { login: author } } };

@@ -1,7 +1,7 @@
 {
   "date": "2026-11-15",
   "scope": "tests",
-  "correction": "A test that proves which event fields a workflow step does not read runs the step on an event wrapped in a Proxy that records each read, not a regex on the library source; a test that needs a workflow condition matches exact lines in a closed list, not lines found by indentation",
-  "evidence": "Cross-review of frostyard/core#264 (openai/gpt-6.1-sol) at a12c225 found that the source-regex guard missed pr[\"body\"], const { body } = pr and event[\"changes\"], and that the new if: extraction was a hand-written YAML reader with no input-shape tests; fixed in frostyard/core#264 with a Proxy recorder over the levels, readiness and shadow steps (with a self-test of computed, destructured, in and spread reads) and an exact closed list of the 5 if: lines",
+  "correction": "A test that proves which event fields a workflow step does not read runs the step on an event wrapped in a Proxy that records each read, not a regex on the library source; a test of workflow conditions matches each expected condition as 1 exact line and claims no completeness that a line scan of YAML cannot prove",
+  "evidence": "Cross-review of frostyard/core#264 (openai/gpt-6.1-sol) at a12c225 found that the source-regex guard missed pr[\"body\"], const { body } = pr and event[\"changes\"], and that the new if: extraction was a hand-written YAML reader with no input-shape tests; the re-review at dc6354c found that the closed list of if: lines that replaced it missed an escaped key such as \"\\u0069f\"; fixed in frostyard/core#264 with a Proxy recorder over the levels, readiness and shadow steps (with a self-test of computed, destructured, in and spread reads) and exact-line matches of the 4 conditions, with no claim that the workflow has no other condition",
   "promoted_to": "test/pr-triage.test.mjs"
 }
