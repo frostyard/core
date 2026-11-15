@@ -370,27 +370,28 @@ until that queue is processed.
     - The `InRelease` files of `trixie`, `forky` and legacy `stable` had the
       same `Date` line and SHA-256 before and after the test.
   - Signed images: `forky-publish.yml` (Snosi ADR-0038; every product
-    since frostyard/snosi#1309, ADR-0039) published 2 `forky` images of
+    since frostyard/snosi#1309 of 2026-11-14, ADR-0039) published 2 `forky` images of
     each product, N and N+1. Each run made 1 tag, `cosign verify` passed,
     and `latest` did not change. Runs: Floe 43550711663 and 43553230001,
     Snow 43611296094 and 43616447362, Snowfield 43621104199 and
     43624974195, Sundog 43630664360 and 43635094915.
   - Images in the lab: install, update and rollback on the dev lane, with
     Secure Boot and TPM2-LUKS. The update target is the immutable N+1
-    version tag, which frostyard/lab#243 allows as `target_ref`. Each
+    version tag, which frostyard/lab#243 (2026-11-14) allows as
+    `target_ref`. Each
     product passed `forky`→`forky` and `trixie`→`forky`, in that order in
     the lab runs `dev-snow-bootc-lifecycle-<id>` below:
     - Floe: `k7mtk` and `f8sv7`.
     - Snow: `bp2t9` and `kjsb2`.
     - Sundog: `dpgf5` and `ptsp2`.
     - Snowfield: `6tvjf`, and `j6kwb`, `65xfw` and `zdw24`. The
-      `trixie`→`forky` runs pass since frostyard/lab#244 lists its kernel
+      `trixie`→`forky` runs pass since frostyard/lab#244 (2026-11-15) lists its kernel
       `7.3.4-1-surface` as a known-defect kernel.
     - The fs-verity notes of these runs are the upstream btrfs defect of
       frostyard/snosi#1130. It is not specific to `forky`.
   - Sysexts in the lab: run `257hz` passed `verified_sysext_probe` on
     `forky` (install). Run `ps9wh` passed `verified_sysext_suite_switch`, a
-    mode that frostyard/lab#245 adds: it enabled incus, coder and nix on
+    mode that frostyard/lab#245 (2026-11-15) adds: it enabled incus, coder and nix on
     `trixie` Snow (`_13_` links) and updated to `forky` Snow, where
     `updex-suite-switch.service` ended `success` and every link named the
     `_14_` file. Then it rolled back to the `_13_` links. This suite switch
