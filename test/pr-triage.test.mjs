@@ -1717,10 +1717,20 @@ function outsideBlocks(text) {
   return out;
 }
 
-// The job `if:` of the reusable workflow, as 1 literal line without the indent.
+// The job `if:` and the step `if:`s of the reusable workflow, each as exact text
+// without its indent. The tests below compare these against the workflow by exact
+// line and evaluate them, and never read YAML by indentation.
 const JOB_IF =
   "${{ (github.event.action != 'edited' || github.event.changes.base != null) && " +
   "(github.event.action != 'labeled' || github.event.label.name == 'ready-for-human') }}";
+const LEVELS_IF = "${{ github.event.action != 'labeled' }}";
+const READINESS_IF =
+  "${{ !cancelled() && (github.event.action == 'synchronize' || " +
+  "(github.event.action == 'labeled' && github.event.label.name == 'ready-for-human')) }}";
+// The deps and shadow steps share 1 condition.
+const SHADOW_IF =
+  "${{ !cancelled() && inputs.dependabot-shadow && github.event.pull_request.user.login == 'dependabot[bot]' && " +
+  "contains(fromJSON('[\"opened\",\"synchronize\",\"reopened\"]'), github.event.action) }}";
 
 function escapeRegExp(text) {
   return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -2017,7 +2027,7 @@ test("the workflow writes the scripts, then runs the levels, readiness and shado
   assert.ok(
     text.includes(
       "        id: levels\n" +
-        "        if: ${{ github.event.action != 'labeled' }}\n" +
+        `        if: ${LEVELS_IF}\n` +
         "        env:\n" +
         "          GITHUB_TOKEN: ${{ github.token }}\n" +
         "          PR_TRIAGE_STEP: levels\n" +
@@ -2027,28 +2037,25 @@ test("the workflow writes the scripts, then runs the levels, readiness and shado
   assert.ok(
     text.includes(
       "        id: readiness\n" +
-        "        if: ${{ !cancelled() && (github.event.action == 'synchronize' || (github.event.action == 'labeled' && github.event.label.name == 'ready-for-human')) }}\n" +
+        `        if: ${READINESS_IF}\n` +
         "        env:\n" +
         "          GITHUB_TOKEN: ${{ github.token }}\n" +
         "          PR_TRIAGE_STEP: readiness\n" +
         '        run: node "$RUNNER_TEMP/pr-triage/pr-triage.mjs"\n',
     ),
   );
-  const shadowIf =
-    "${{ !cancelled() && inputs.dependabot-shadow && github.event.pull_request.user.login == 'dependabot[bot]' && " +
-    "contains(fromJSON('[\"opened\",\"synchronize\",\"reopened\"]'), github.event.action) }}";
   assert.ok(
     text.includes(
       "      - name: Fetch the Dependabot metadata\n" +
         "        id: deps\n" +
-        `        if: ${shadowIf}\n` +
+        `        if: ${SHADOW_IF}\n` +
         "        continue-on-error: true\n" +
         "        uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0\n" +
         "        with:\n" +
         "          github-token: ${{ github.token }}\n" +
         "      - name: Write the Dependabot shadow call\n" +
         "        id: shadow\n" +
-        `        if: ${shadowIf}\n` +
+        `        if: ${SHADOW_IF}\n` +
         "        env:\n" +
         "          GITHUB_TOKEN: ${{ github.token }}\n" +
         "          PR_TRIAGE_STEP: shadow\n" +
@@ -2091,27 +2098,23 @@ test("the job if: skips a title or body edit and a label other than ready-for-hu
   const workflow = await readFile(workflowPath, "utf8");
   const outside = outsideBlocks(workflow);
 
-  const jobIfs = outside.filter((line) => /^ {4}if: /.test(line));
-  assert.equal(jobIfs.length, 1, "1 line at 4 spaces is the job if:");
-  const jobIf = jobIfs[0].replace(/^ {4}if: /, "");
-  assert.equal(jobIf, JOB_IF, "the job if: is the expected expression");
-
-  const steps = [];
-  outside.forEach((line, index) => {
-    if (!/^ {8}if: /.test(line)) return;
-    const idLine = outside
-      .slice(0, index)
-      .reverse()
-      .find((above) => /^ {8}id: /.test(above));
-    assert.ok(idLine, `a step if: has an id: line above it: ${line}`);
-    steps.push({ id: idLine.replace(/^ {8}id: /, ""), expression: line.replace(/^ {8}if: /, "") });
-  });
+  // Every line outside the heredocs that contains the word `if`, with the comment
+  // lines dropped. This is an exact match and not a YAML reader: a line in any
+  // other form (a quoted key, a flow mapping, a folded block, CRLF, a trailing
+  // comment) does not equal 1 of the 5 expected lines, so a new or a changed
+  // condition fails this test closed. Because it accepts only these exact lines,
+  // it needs no input-shape cases.
   assert.deepEqual(
-    steps.map((step) => step.id),
-    ["levels", "readiness", "deps", "shadow"],
-    "4 step if: lines at 8 spaces, in order",
+    outside.filter((line) => !/^\s*#/.test(line) && /\bif\b/.test(line)),
+    [
+      `    if: ${JOB_IF}`,
+      `        if: ${LEVELS_IF}`,
+      `        if: ${READINESS_IF}`,
+      `        if: ${SHADOW_IF}`,
+      `        if: ${SHADOW_IF}`,
+    ],
+    "the workflow has exactly these 5 if: lines, in this order",
   );
-  assert.equal(outside.filter((line) => /^ {8}if: /.test(line)).length, 4);
 
   const contextOf = (event, author, shadow) => {
     const payload = { action: event.action, pull_request: { user: { login: author } } };
@@ -2119,12 +2122,9 @@ test("the job if: skips a title or body edit and a label other than ready-for-hu
     if (event.label !== undefined) payload.label = { name: event.label };
     return { github: { event_name: "pull_request_target", event: payload }, inputs: { "dependabot-shadow": shadow } };
   };
-  const jobRuns = (event, author, shadow) => evaluateExpression(jobIf, contextOf(event, author, shadow));
-  const stepRuns = (id, event, author, shadow) => {
-    const step = steps.find((entry) => entry.id === id);
-    assert.ok(step, `the workflow has a step ${id}`);
-    return evaluateExpression(step.expression, contextOf(event, author, shadow));
-  };
+  const jobRuns = (event, author, shadow) => evaluateExpression(JOB_IF, contextOf(event, author, shadow));
+  const stepRuns = (expression, event, author, shadow) =>
+    evaluateExpression(expression, contextOf(event, author, shadow));
 
   const BASE_CHANGE = { base: { ref: { from: "old" }, sha: { from: "0".repeat(40) } } };
   const events = [
@@ -2148,11 +2148,15 @@ test("the job if: skips a title or body edit and a label other than ready-for-hu
   assert.equal(jobRuns(event("edited, body only"), "octocat", false), false, "an edit of the body only skips the job");
   assert.equal(jobRuns(event("edited, title only"), "octocat", false), false, "an edit of the title only skips the job");
   assert.equal(jobRuns(event("edited, base"), "octocat", false), true, "an edit of the base branch runs the job");
-  assert.equal(stepRuns("levels", event("edited, base"), "octocat", false), true, "the levels step runs after a base change");
+  assert.equal(
+    stepRuns(LEVELS_IF, event("edited, base"), "octocat", false),
+    true,
+    "the levels step runs after a base change",
+  );
   assert.equal(jobRuns(event("labeled documentation"), "octocat", false), false, "another label skips the job");
   assert.equal(jobRuns(event("labeled ready-for-human"), "octocat", false), true, "ready-for-human runs the job");
   assert.equal(
-    stepRuns("readiness", event("labeled ready-for-human"), "octocat", false),
+    stepRuns(READINESS_IF, event("labeled ready-for-human"), "octocat", false),
     true,
     "the readiness step runs for ready-for-human",
   );
@@ -2167,7 +2171,9 @@ test("the job if: skips a title or body edit and a label other than ready-for-hu
         const skip =
           !baseChanged || (entry.action === "labeled" && entry.label !== "ready-for-human");
         const job = jobRuns(entry, author, shadow);
-        const anyStep = steps.some((step) => evaluateExpression(step.expression, contextOf(entry, author, shadow)));
+        const anyStep = [LEVELS_IF, READINESS_IF, SHADOW_IF].some((expression) =>
+          evaluateExpression(expression, contextOf(entry, author, shadow)),
+        );
         assert.equal(job, !skip, `${where}: the job runs when the event can change a result`);
         assert.equal(
           job,
@@ -2179,25 +2185,127 @@ test("the job if: skips a title or body edit and a label other than ready-for-hu
   }
 });
 
-test("the triage libraries read no PR title, PR body and no event changes, so the job can skip those events", async () => {
-  // The job `if:` of .github/workflows/pr-triage.yml skips an edit of the title or
-  // the body, and a label other than ready-for-human, because no step reads them.
-  // When a library starts to read 1 of them, this test fails and the job `if:`
-  // must change with it: otherwise the skipped event would change a result.
-  for (const file of [libraryPath, triageLibraryPath]) {
-    const source = (await readFile(file, "utf8"))
-      .split("\n")
-      .filter((line) => !/^\s*(\/\/|\*|\/\*)/.test(line))
-      .join("\n");
-    // The libraries name the pull request `pr` (`const pr = event?.pull_request`),
-    // so no code line may name `title` at all, read `.changes` or destructure
-    // `changes`, and no `.body` of `pr` or `pull_request` (a comment body or a
-    // request body is fine).
-    assert.ok(!/\btitle\b/.test(source), `${file} names a title`);
-    assert.ok(!/\.changes\b|\{[^}]*\bchanges\b[^}]*\}\s*=/.test(source), `${file} reads the event changes`);
-    assert.ok(!/\b(pr|pull_request)\??\.(body|title)\b/.test(source), `${file} reads a PR title or body`);
-    assert.ok(!/\b(pr|pull_request)\??\.\[/.test(source), `${file} reads a PR field by a computed name`);
+// ---- The event fields the job `if:` skips --------------------------------
+
+const FORBIDDEN_ON_PULL_REQUEST = ["title", "body"];
+const FORBIDDEN_ON_EVENT = ["changes"];
+
+// Wraps an event so that a read of a key the job `if:` skips is recorded: `get`,
+// `has` and `getOwnPropertyDescriptor`, and `ownKeys` for an enumeration (a spread,
+// `Object.keys`, `JSON.stringify` or `for...in`) which is recorded as "enumerated".
+// The values stay real, so a read that the library makes gets a value and the step
+// goes on: only the access itself is watched.
+function watchForbiddenEvent(originalEvent) {
+  const seen = [];
+  const watch = (target, forbidden) =>
+    new Proxy(target, {
+      get(object, key, receiver) {
+        if (forbidden.includes(key)) seen.push(String(key));
+        return Reflect.get(object, key, receiver);
+      },
+      has(object, key) {
+        if (forbidden.includes(key)) seen.push(String(key));
+        return Reflect.has(object, key);
+      },
+      getOwnPropertyDescriptor(object, key) {
+        if (forbidden.includes(key)) seen.push(String(key));
+        return Reflect.getOwnPropertyDescriptor(object, key);
+      },
+      ownKeys(object) {
+        for (const key of Reflect.ownKeys(object)) {
+          if (forbidden.includes(key)) seen.push(`${String(key)} (enumerated)`);
+        }
+        return Reflect.ownKeys(object);
+      },
+    });
+
+  const event = { ...originalEvent };
+  const pullRequest = originalEvent?.pull_request;
+  if (pullRequest !== null && typeof pullRequest === "object") {
+    event.pull_request = watch(pullRequest, FORBIDDEN_ON_PULL_REQUEST);
   }
+  return { event: watch(event, FORBIDDEN_ON_EVENT), seen };
+}
+
+test("the forbidden-access recorder records every kind of read", () => {
+  // Each case is 1 way a library could read a skipped key. This test proves that
+  // the guard below can fail: without it, a recorder that sees nothing would pass.
+  const pullRequest = () => ({ number: 7, title: "a title", body: "a body" });
+  const cases = [
+    ["a computed read", (pr) => pr["body"], false],
+    [
+      "a destructured read",
+      (pr) => {
+        const { title } = pr;
+        return title;
+      },
+      false,
+    ],
+    ["an in check", (pr) => "title" in pr, false],
+    ["an enumeration", (pr) => ({ ...pr }), true],
+  ];
+  for (const [what, read, enumerated] of cases) {
+    const { event, seen } = watchForbiddenEvent({ pull_request: pullRequest() });
+    read(event.pull_request);
+    assert.ok(seen.length >= 1, `${what} is recorded`);
+    if (enumerated) {
+      assert.ok(seen.some((entry) => entry.endsWith("(enumerated)")), `${what} is recorded as enumerated`);
+    }
+  }
+
+  const changes = watchForbiddenEvent({ pull_request: { number: 7 }, changes: { title: { from: "x" } } });
+  void changes.event["changes"];
+  assert.deepEqual(changes.seen, ["changes"]);
+});
+
+test("no step reads the PR title, the PR body or the event changes, so the job can skip those events", async () => {
+  // The job `if:` of .github/workflows/pr-triage.yml skips an `edited` event that
+  // changed only the title or the body, and a `labeled` event whose label is not
+  // ready-for-human, because no step reads those fields. When a step starts to
+  // read 1 of them, this test fails and the job `if:` must change with it:
+  // otherwise the skipped event would change a result.
+  const assertNoRead = (what, seen) => assert.deepEqual(seen, [], `${what} reads no skipped field`);
+  // A real value in each skipped field, so a read gets a value and the step goes on.
+  const withSkippedFields = (event) => ({
+    ...event,
+    pull_request: { ...event.pull_request, title: "a title", body: "a body" },
+  });
+
+  // The levels step, on each action the job lets through.
+  for (const action of ["opened", "synchronize", "edited"]) {
+    const base = { ref: { from: "main" }, sha: { from: "e".repeat(40) } };
+    const { event, seen } = watchForbiddenEvent(
+      levelsEvent({
+        action,
+        ...(action === "edited" ? { changes: { base } } : {}),
+        pull_request: { number: 7, base: { sha: BASE_SHA }, head: { sha: HEAD }, title: "a title", body: "a body" },
+      }),
+    );
+    const { api, calls } = levelsApi({ files: [file("src/a.go")] });
+    const { result } = await levels(api, { ev: event });
+    assert.equal(result.outcome, "labeled", `levels ${action} reached the label logic`);
+    assert.equal(result.level, "L3");
+    assert.deepEqual(addedLabels(calls), [LEVEL_LABELS.L3], `levels ${action} added the level label`);
+    assertNoRead(`the levels step on ${action}`, seen);
+  }
+
+  // The readiness step: a synchronize with the label and a moved head, and the label being added.
+  const moved = watchForbiddenEvent(withSkippedFields(syncEvent()));
+  const movedRun = await step(fakeApi({ comments: [] }).api, { ev: moved.event });
+  assert.equal(movedRun.result.outcome, "revoked", "readiness synchronize reached the revoke");
+  assertNoRead("the readiness step on synchronize", moved.seen);
+
+  const added = watchForbiddenEvent(withSkippedFields(labeledEvent()));
+  const addedRun = await step(fakeApi({ checkRuns: [run("ci", "failure")] }).api, { ev: added.event });
+  assert.equal(addedRun.result.outcome, "revoked", "readiness labeled reached the revoke");
+  assert.equal(addedRun.result.reason, "checks-not-green");
+  assertNoRead("the readiness step on labeled", added.seen);
+
+  // The shadow step, on a Dependabot pull request that passes S1 to S4.
+  const called = watchForbiddenEvent(withSkippedFields(shadowEvent()));
+  const calledRun = await shadow(shadowApi().api, { ev: called.event });
+  assert.deepEqual(calledRun.result, { outcome: "called", level: "L3", checks: CI_CHECKS });
+  assertNoRead("the shadow step", called.seen);
 });
 
 test("the workflow lines outside the heredocs never name a head or merge ref", async () => {
