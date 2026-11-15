@@ -282,7 +282,7 @@ until that queue is processed.
     published v0.17.1 there the same day. `frostyard-chairlift` and
     `frostyard-chairlift-system-integration`: 1 version each, 0.17.1.
     first-setup has no producer row (retired by
-    frostyard/apt-publisher#32, 2026-11-05).
+    frostyard/apt-publisher#32, 2026-11-06).
   - **bootc-debian:** frostyard/bootc-debian#27 (2026-11-13) builds
     Debian 13 and Debian 14 packages from 1 build stamp, and
     frostyard/apt-publisher#50 registers it for `forky`.
@@ -342,9 +342,11 @@ until that queue is processed.
       conflict with each other by design, so each was installed in its own
       container.
     - The binaries ran: `updex`, `firn`, `intuneme`, `voxtype`, `bootc`
-      and `incus` printed their versions. `chairlift` and `moonlight-qt`
-      started and stopped at the missing display, as expected in a
-      container.
+      and `incus` printed their versions. `chairlift` started and stopped
+      with "cannot open display". `moonlight-qt` started, found no Wayland
+      or X11 display, and stopped because Qt found no usable platform plugin
+      (the package ships only `xcb`). The container had no display, so this
+      test does not show that either GUI runs.
     - The `InRelease` files of `trixie`, `forky` and legacy `stable` had the
       same `Date` line and SHA-256 before and after the test.
   - Not proven by it: image and sysext install, update and rollback on
