@@ -1717,6 +1717,223 @@ function outsideBlocks(text) {
   return out;
 }
 
+// The job `if:` and the step `if:`s of the reusable workflow, each as exact text
+// without its indent. The tests below compare these against the workflow by exact
+// line and evaluate them, and never read YAML by indentation.
+const JOB_IF =
+  "${{ (github.event.action != 'edited' || github.event.changes.base != null) && " +
+  "(github.event.action != 'labeled' || github.event.label.name == 'ready-for-human') }}";
+const LEVELS_IF = "${{ github.event.action != 'labeled' }}";
+const READINESS_IF =
+  "${{ !cancelled() && (github.event.action == 'synchronize' || " +
+  "(github.event.action == 'labeled' && github.event.label.name == 'ready-for-human')) }}";
+// The deps and shadow steps share 1 condition.
+const SHADOW_IF =
+  "${{ !cancelled() && inputs.dependabot-shadow && github.event.pull_request.user.login == 'dependabot[bot]' && " +
+  "contains(fromJSON('[\"opened\",\"synchronize\",\"reopened\"]'), github.event.action) }}";
+
+function escapeRegExp(text) {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+// A minimal evaluator for the subset of the GitHub Actions expression syntax
+// that pr-triage.yml uses: `${{ }}`, `(`, `)`, `&&`, `||` (which return an
+// operand, as in JS), `!`, `==`, `!=`, single-quoted strings (`''` is an
+// escaped quote), `null`, `true`, `false`, numbers, property paths, and the
+// functions `cancelled()`, `contains()` and `fromJSON()`. It throws on any
+// other token, so a construct that these tests do not model fails a test
+// instead of passing silently.
+function tokenizeExpression(source) {
+  const tokens = [];
+  let index = 0;
+  while (index < source.length) {
+    const rest = source.slice(index);
+    const space = /^\s+/.exec(rest);
+    if (space) {
+      index += space[0].length;
+      continue;
+    }
+    const operator = /^(&&|\|\||!=|==|!|\(|\)|,)/.exec(rest);
+    if (operator) {
+      tokens.push({ kind: "operator", value: operator[0] });
+      index += operator[0].length;
+      continue;
+    }
+    const string = /^'((?:[^']|'')*)'/.exec(rest);
+    if (string) {
+      tokens.push({ kind: "value", value: string[1].replace(/''/g, "'") });
+      index += string[0].length;
+      continue;
+    }
+    const number = /^-?(?:\d+(?:\.\d+)?|\.\d+)/.exec(rest);
+    if (number) {
+      tokens.push({ kind: "value", value: Number(number[0]) });
+      index += number[0].length;
+      continue;
+    }
+    const name = /^[A-Za-z_][A-Za-z0-9_-]*(?:\.[A-Za-z_][A-Za-z0-9_-]*)*/.exec(rest);
+    if (name) {
+      tokens.push({ kind: "name", value: name[0] });
+      index += name[0].length;
+      continue;
+    }
+    throw new Error(`unsupported token at ${JSON.stringify(rest.slice(0, 10))} in ${JSON.stringify(source)}`);
+  }
+  return tokens;
+}
+
+// GitHub's falsy values are false, 0, -0, "" and null. An object or an array is truthy.
+function truthyInGitHub(value) {
+  if (Array.isArray(value)) return true;
+  if (value === null || value === undefined) return false;
+  if (typeof value === "object") return true;
+  if (typeof value === "number") return value !== 0 && !Number.isNaN(value);
+  if (typeof value === "string") return value !== "";
+  return value === true;
+}
+
+// A value that `==` compares as a number: null is 0, true 1, false 0, a string by
+// Number(), and an object or an array is NaN.
+function numberInGitHub(value) {
+  if (value === null || value === undefined) return 0;
+  if (typeof value === "boolean") return value ? 1 : 0;
+  if (typeof value === "number") return value;
+  if (typeof value === "string") return Number(value);
+  return Number.NaN;
+}
+
+// `==` and `!=`: 2 strings compare without case, values of different types compare
+// as numbers, and NaN equals nothing.
+function equalsInGitHub(left, right) {
+  if (typeof left === "string" && typeof right === "string") return left.toLowerCase() === right.toLowerCase();
+  if (left === null || left === undefined) {
+    if (right === null || right === undefined) return true;
+  } else if (typeof left === "boolean" && typeof right === "boolean") {
+    return left === right;
+  } else if (typeof left === "number" && typeof right === "number") {
+    return left === right;
+  }
+  const first = numberInGitHub(left);
+  const second = numberInGitHub(right);
+  if (Number.isNaN(first) || Number.isNaN(second)) return false;
+  return first === second;
+}
+
+function callExpressionFunction(name, args) {
+  if (name === "cancelled") {
+    if (args.length !== 0) throw new Error("cancelled() takes no argument");
+    return false;
+  }
+  if (name === "contains") {
+    const [search, item] = args;
+    if (Array.isArray(search)) {
+      return search.some((entry) =>
+        entry !== null && typeof entry === "object" ? entry === item : equalsInGitHub(entry, item),
+      );
+    }
+    if (typeof search === "string") return search.toLowerCase().includes(String(item).toLowerCase());
+    return false;
+  }
+  if (name === "fromJSON") return JSON.parse(String(args[0]));
+  throw new Error(`unsupported function: ${name}`);
+}
+
+function evaluateExpression(text, context) {
+  const trimmed = text.trim();
+  if (!trimmed.startsWith("${{") || !trimmed.endsWith("}}")) {
+    throw new Error(`not a \${{ }} expression: ${trimmed}`);
+  }
+  const tokens = tokenizeExpression(trimmed.slice(3, -2));
+  let position = 0;
+  const peek = () => tokens[position];
+  const take = () => tokens[position++];
+  const isOperator = (value) => peek()?.kind === "operator" && peek().value === value;
+  const expect = (value) => {
+    const token = take();
+    if (!(token?.kind === "operator" && token.value === value)) throw new Error(`expected ${value}, got ${JSON.stringify(token)}`);
+  };
+
+  function parsePrimary() {
+    const token = take();
+    if (token === undefined) throw new Error("unexpected end of expression");
+    if (token.kind === "operator" && token.value === "(") {
+      const value = parseLogicalOr();
+      expect(")");
+      return value;
+    }
+    if (token.kind === "value") return token.value;
+    if (token.kind === "name") return resolveName(token.value);
+    throw new Error(`unsupported token: ${JSON.stringify(token)}`);
+  }
+
+  function parseUnary() {
+    if (isOperator("!")) {
+      take();
+      return !truthyInGitHub(parseUnary());
+    }
+    return parsePrimary();
+  }
+
+  function parseComparison() {
+    let left = parseUnary();
+    while (isOperator("==") || isOperator("!=")) {
+      const operator = take().value;
+      const right = parseUnary();
+      left = operator === "==" ? equalsInGitHub(left, right) : !equalsInGitHub(left, right);
+    }
+    return left;
+  }
+
+  function parseLogicalAnd() {
+    let left = parseComparison();
+    while (isOperator("&&")) {
+      take();
+      const right = parseComparison();
+      left = truthyInGitHub(left) ? right : left;
+    }
+    return left;
+  }
+
+  function parseLogicalOr() {
+    let left = parseLogicalAnd();
+    while (isOperator("||")) {
+      take();
+      const right = parseLogicalAnd();
+      left = truthyInGitHub(left) ? left : right;
+    }
+    return left;
+  }
+
+  function resolveName(name) {
+    if (isOperator("(")) {
+      take();
+      const args = [];
+      if (!isOperator(")")) {
+        args.push(parseLogicalOr());
+        while (isOperator(",")) {
+          take();
+          args.push(parseLogicalOr());
+        }
+      }
+      expect(")");
+      return callExpressionFunction(name, args);
+    }
+    if (name === "null") return null;
+    if (name === "true") return true;
+    if (name === "false") return false;
+    let value = context;
+    for (const part of name.split(".")) {
+      if (value === null || value === undefined || typeof value !== "object") return null;
+      value = Object.prototype.hasOwnProperty.call(value, part) ? value[part] : null;
+    }
+    return value === undefined ? null : value;
+  }
+
+  const result = parseLogicalOr();
+  if (position !== tokens.length) throw new Error(`trailing tokens in ${JSON.stringify(trimmed)}`);
+  return result;
+}
+
 function jobPermissions(lines) {
   const start = lines.findIndex((line) => /^ {4}permissions:\s*$/.test(line));
   assert.notEqual(start, -1, "the job has a permissions block");
@@ -1781,7 +1998,14 @@ test("the workflow has the input, the job, the permissions and no checkout", asy
     code,
     /^on:\n {2}workflow_call:\n {4}inputs:\n {6}dependabot-shadow:\n {8}description: [^\n]+\n {8}type: boolean\n {8}default: true\n\npermissions: \{\}$/m,
   );
-  assert.match(code, /^jobs:\n {2}pr-triage:\n {4}runs-on: ubuntu-latest\n {4}timeout-minutes: 5\n {4}permissions:/m);
+  assert.match(
+    code,
+    new RegExp(
+      `^jobs:\\n {2}pr-triage:\\n {4}if: ${escapeRegExp(JOB_IF)}\\n {4}runs-on: ubuntu-latest\\n {4}timeout-minutes: 5\\n {4}permissions:`,
+      "m",
+    ),
+  );
+  assert.ok(lines.includes(`    if: ${JOB_IF}`), "the job if: is exactly the expected line");
   assert.deepEqual(jobPermissions(codeLines(lines.join("\n"))), ["contents: read", "pull-requests: write"]);
   assert.ok(!workflow.includes("actions/checkout"));
   assert.match(code, /node-version: "22"/);
@@ -1803,7 +2027,7 @@ test("the workflow writes the scripts, then runs the levels, readiness and shado
   assert.ok(
     text.includes(
       "        id: levels\n" +
-        "        if: ${{ github.event.action != 'labeled' }}\n" +
+        `        if: ${LEVELS_IF}\n` +
         "        env:\n" +
         "          GITHUB_TOKEN: ${{ github.token }}\n" +
         "          PR_TRIAGE_STEP: levels\n" +
@@ -1813,28 +2037,25 @@ test("the workflow writes the scripts, then runs the levels, readiness and shado
   assert.ok(
     text.includes(
       "        id: readiness\n" +
-        "        if: ${{ !cancelled() && (github.event.action == 'synchronize' || (github.event.action == 'labeled' && github.event.label.name == 'ready-for-human')) }}\n" +
+        `        if: ${READINESS_IF}\n` +
         "        env:\n" +
         "          GITHUB_TOKEN: ${{ github.token }}\n" +
         "          PR_TRIAGE_STEP: readiness\n" +
         '        run: node "$RUNNER_TEMP/pr-triage/pr-triage.mjs"\n',
     ),
   );
-  const shadowIf =
-    "${{ !cancelled() && inputs.dependabot-shadow && github.event.pull_request.user.login == 'dependabot[bot]' && " +
-    "contains(fromJSON('[\"opened\",\"synchronize\",\"reopened\"]'), github.event.action) }}";
   assert.ok(
     text.includes(
       "      - name: Fetch the Dependabot metadata\n" +
         "        id: deps\n" +
-        `        if: ${shadowIf}\n` +
+        `        if: ${SHADOW_IF}\n` +
         "        continue-on-error: true\n" +
         "        uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0\n" +
         "        with:\n" +
         "          github-token: ${{ github.token }}\n" +
         "      - name: Write the Dependabot shadow call\n" +
         "        id: shadow\n" +
-        `        if: ${shadowIf}\n` +
+        `        if: ${SHADOW_IF}\n` +
         "        env:\n" +
         "          GITHUB_TOKEN: ${{ github.token }}\n" +
         "          PR_TRIAGE_STEP: shadow\n" +
@@ -1849,6 +2070,237 @@ test("the workflow writes the scripts, then runs the levels, readiness and shado
     text.includes("        description: Run the Dependabot shadow step (docs/design/dependabot-shadow.md). " +
       "It only writes a comment; it never enables auto-merge.\n"),
   );
+});
+
+test("the expression evaluator follows the GitHub Actions comparison and truthiness rules", () => {
+  const empty = { github: { event: { action: "opened" } }, inputs: {} };
+  const edited = { github: { event: { action: "edited", changes: { body: { from: "x" } } } }, inputs: {} };
+  assert.equal(evaluateExpression("${{ null != null }}", empty), false);
+  assert.equal(evaluateExpression("${{ null == null }}", empty), true);
+  assert.equal(evaluateExpression("${{ github.event.changes != null }}", empty), false, "a missing property is null");
+  assert.equal(evaluateExpression("${{ github.event.changes != null }}", edited), true, "an object is not null");
+  assert.equal(evaluateExpression("${{ github.event.missing.deeper == null }}", empty), true, "a property of null is null");
+  assert.equal(evaluateExpression("${{ 'A' == 'a' }}", empty), true, "2 strings compare without case");
+  assert.equal(evaluateExpression("${{ 'it''s' != 'IT''S' }}", empty), false, "'' is an escaped quote");
+  assert.equal(evaluateExpression("${{ 1 == '1' }}", empty), true, "different types compare as numbers");
+  assert.equal(evaluateExpression("${{ false == 0 }}", empty), true);
+  assert.equal(evaluateExpression("${{ '' == 0 }}", empty), true);
+  assert.equal(evaluateExpression("${{ github.event == 0 }}", edited), false, "an object is NaN, and NaN equals nothing");
+  assert.equal(evaluateExpression("${{ cancelled() }}", empty), false);
+  assert.equal(evaluateExpression("${{ 'b' && '' || 'c' }}", empty), "c", "&& and || return an operand");
+  assert.equal(evaluateExpression("${{ !github.event.missing }}", empty), true);
+  assert.throws(() => evaluateExpression("${{ 1 > 0 }}", empty), /unsupported token/);
+  assert.throws(() => evaluateExpression("${{ startsWith('a', 'a') }}", empty), /unsupported function: startsWith/);
+  assert.throws(() => evaluateExpression("${{ github.event.action }} extra", empty), /not a \$\{\{ \}\} expression/);
+});
+
+test("the job if: skips a title or body edit and a label other than ready-for-human", async () => {
+  const workflow = await readFile(workflowPath, "utf8");
+
+  // The test evaluates the 4 expected conditions. Each must be in the workflow as
+  // 1 exact line (an exact-text match, not a YAML reader). The test does not
+  // claim that the workflow has no other condition: a step or a condition that a
+  // later change adds is outside this test. What the steps read is checked by
+  // the behavioral test "no step reads the PR title, ...".
+  for (const [indent, expression] of [
+    ["    ", JOB_IF],
+    ["        ", LEVELS_IF],
+    ["        ", READINESS_IF],
+    ["        ", SHADOW_IF],
+  ]) {
+    assert.ok(workflow.includes(`\n${indent}if: ${expression}\n`), `the workflow has the line if: ${expression}`);
+  }
+
+  const contextOf = (event, author, shadow) => {
+    const payload = { action: event.action, pull_request: { user: { login: author } } };
+    if (event.changes !== undefined) payload.changes = event.changes;
+    if (event.label !== undefined) payload.label = { name: event.label };
+    return { github: { event_name: "pull_request_target", event: payload }, inputs: { "dependabot-shadow": shadow } };
+  };
+  const jobRuns = (event, author, shadow) => evaluateExpression(JOB_IF, contextOf(event, author, shadow));
+  const stepRuns = (expression, event, author, shadow) =>
+    evaluateExpression(expression, contextOf(event, author, shadow));
+
+  const BASE_CHANGE = { base: { ref: { from: "old" }, sha: { from: "0".repeat(40) } } };
+  const events = [
+    { name: "opened", action: "opened" },
+    { name: "reopened", action: "reopened" },
+    { name: "synchronize", action: "synchronize" },
+    { name: "edited, body only", action: "edited", changes: { body: { from: "x" } } },
+    { name: "edited, title only", action: "edited", changes: { title: { from: "x" } } },
+    { name: "edited, base", action: "edited", changes: BASE_CHANGE },
+    { name: "edited, title and base", action: "edited", changes: { title: { from: "x" }, ...BASE_CHANGE } },
+    { name: "labeled ready-for-human", action: "labeled", label: "ready-for-human" },
+    { name: "labeled documentation", action: "labeled", label: "documentation" },
+  ];
+  const event = (name) => {
+    const found = events.find((entry) => entry.name === name);
+    assert.ok(found, `the matrix has ${name}`);
+    return found;
+  };
+
+  // The named cases, each on 1 author and 1 input value.
+  assert.equal(jobRuns(event("edited, body only"), "octocat", false), false, "an edit of the body only skips the job");
+  assert.equal(jobRuns(event("edited, title only"), "octocat", false), false, "an edit of the title only skips the job");
+  assert.equal(jobRuns(event("edited, base"), "octocat", false), true, "an edit of the base branch runs the job");
+  assert.equal(
+    stepRuns(LEVELS_IF, event("edited, base"), "octocat", false),
+    true,
+    "the levels step runs after a base change",
+  );
+  assert.equal(jobRuns(event("labeled documentation"), "octocat", false), false, "another label skips the job");
+  assert.equal(jobRuns(event("labeled ready-for-human"), "octocat", false), true, "ready-for-human runs the job");
+  assert.equal(
+    stepRuns(READINESS_IF, event("labeled ready-for-human"), "octocat", false),
+    true,
+    "the readiness step runs for ready-for-human",
+  );
+  assert.equal(jobRuns(event("synchronize"), "octocat", false), true, "synchronize runs the job");
+
+  // Every event, for each author and each input value.
+  for (const entry of events) {
+    for (const author of ["dependabot[bot]", "octocat"]) {
+      for (const shadow of [true, false]) {
+        const where = `${entry.name}, ${author}, dependabot-shadow ${shadow}`;
+        const baseChanged = entry.action !== "edited" || entry.changes?.base !== undefined;
+        const skip =
+          !baseChanged || (entry.action === "labeled" && entry.label !== "ready-for-human");
+        const job = jobRuns(entry, author, shadow);
+        const anyStep = [LEVELS_IF, READINESS_IF, SHADOW_IF].some((expression) =>
+          evaluateExpression(expression, contextOf(entry, author, shadow)),
+        );
+        assert.equal(job, !skip, `${where}: the job runs when the event can change a result`);
+        assert.equal(
+          job,
+          anyStep && baseChanged,
+          `${where}: the job runs exactly when a step would run and the event is not a title or body edit`,
+        );
+      }
+    }
+  }
+});
+
+// ---- The event fields the job `if:` skips --------------------------------
+
+const FORBIDDEN_ON_PULL_REQUEST = ["title", "body"];
+const FORBIDDEN_ON_EVENT = ["changes"];
+
+// Wraps an event so that a read of a key the job `if:` skips is recorded: `get`,
+// `has` and `getOwnPropertyDescriptor`, and `ownKeys` for an enumeration (a spread,
+// `Object.keys`, `JSON.stringify` or `for...in`) which is recorded as "enumerated".
+// The values stay real, so a read that the library makes gets a value and the step
+// goes on: only the access itself is watched.
+function watchForbiddenEvent(originalEvent) {
+  const seen = [];
+  const watch = (target, forbidden) =>
+    new Proxy(target, {
+      get(object, key, receiver) {
+        if (forbidden.includes(key)) seen.push(String(key));
+        return Reflect.get(object, key, receiver);
+      },
+      has(object, key) {
+        if (forbidden.includes(key)) seen.push(String(key));
+        return Reflect.has(object, key);
+      },
+      getOwnPropertyDescriptor(object, key) {
+        if (forbidden.includes(key)) seen.push(String(key));
+        return Reflect.getOwnPropertyDescriptor(object, key);
+      },
+      ownKeys(object) {
+        for (const key of Reflect.ownKeys(object)) {
+          if (forbidden.includes(key)) seen.push(`${String(key)} (enumerated)`);
+        }
+        return Reflect.ownKeys(object);
+      },
+    });
+
+  const event = { ...originalEvent };
+  const pullRequest = originalEvent?.pull_request;
+  if (pullRequest !== null && typeof pullRequest === "object") {
+    event.pull_request = watch(pullRequest, FORBIDDEN_ON_PULL_REQUEST);
+  }
+  return { event: watch(event, FORBIDDEN_ON_EVENT), seen };
+}
+
+test("the forbidden-access recorder records every kind of read", () => {
+  // Each case is 1 way a library could read a skipped key. This test proves that
+  // the guard below can fail: without it, a recorder that sees nothing would pass.
+  const pullRequest = () => ({ number: 7, title: "a title", body: "a body" });
+  const cases = [
+    ["a computed read", (pr) => pr["body"], false],
+    [
+      "a destructured read",
+      (pr) => {
+        const { title } = pr;
+        return title;
+      },
+      false,
+    ],
+    ["an in check", (pr) => "title" in pr, false],
+    ["an enumeration", (pr) => ({ ...pr }), true],
+  ];
+  for (const [what, read, enumerated] of cases) {
+    const { event, seen } = watchForbiddenEvent({ pull_request: pullRequest() });
+    read(event.pull_request);
+    assert.ok(seen.length >= 1, `${what} is recorded`);
+    if (enumerated) {
+      assert.ok(seen.some((entry) => entry.endsWith("(enumerated)")), `${what} is recorded as enumerated`);
+    }
+  }
+
+  const changes = watchForbiddenEvent({ pull_request: { number: 7 }, changes: { title: { from: "x" } } });
+  void changes.event["changes"];
+  assert.deepEqual(changes.seen, ["changes"]);
+});
+
+test("no step reads the PR title, the PR body or the event changes, so the job can skip those events", async () => {
+  // The job `if:` of .github/workflows/pr-triage.yml skips an `edited` event that
+  // changed only the title or the body, and a `labeled` event whose label is not
+  // ready-for-human, because no step reads those fields. When a step starts to
+  // read 1 of them, this test fails and the job `if:` must change with it:
+  // otherwise the skipped event would change a result.
+  const assertNoRead = (what, seen) => assert.deepEqual(seen, [], `${what} reads no skipped field`);
+  // A real value in each skipped field, so a read gets a value and the step goes on.
+  const withSkippedFields = (event) => ({
+    ...event,
+    pull_request: { ...event.pull_request, title: "a title", body: "a body" },
+  });
+
+  // The levels step, on each action the job lets through.
+  for (const action of ["opened", "synchronize", "edited"]) {
+    const base = { ref: { from: "main" }, sha: { from: "e".repeat(40) } };
+    const { event, seen } = watchForbiddenEvent(
+      levelsEvent({
+        action,
+        ...(action === "edited" ? { changes: { base } } : {}),
+        pull_request: { number: 7, base: { sha: BASE_SHA }, head: { sha: HEAD }, title: "a title", body: "a body" },
+      }),
+    );
+    const { api, calls } = levelsApi({ files: [file("src/a.go")] });
+    const { result } = await levels(api, { ev: event });
+    assert.equal(result.outcome, "labeled", `levels ${action} reached the label logic`);
+    assert.equal(result.level, "L3");
+    assert.deepEqual(addedLabels(calls), [LEVEL_LABELS.L3], `levels ${action} added the level label`);
+    assertNoRead(`the levels step on ${action}`, seen);
+  }
+
+  // The readiness step: a synchronize with the label and a moved head, and the label being added.
+  const moved = watchForbiddenEvent(withSkippedFields(syncEvent()));
+  const movedRun = await step(fakeApi({ comments: [] }).api, { ev: moved.event });
+  assert.equal(movedRun.result.outcome, "revoked", "readiness synchronize reached the revoke");
+  assertNoRead("the readiness step on synchronize", moved.seen);
+
+  const added = watchForbiddenEvent(withSkippedFields(labeledEvent()));
+  const addedRun = await step(fakeApi({ checkRuns: [run("ci", "failure")] }).api, { ev: added.event });
+  assert.equal(addedRun.result.outcome, "revoked", "readiness labeled reached the revoke");
+  assert.equal(addedRun.result.reason, "checks-not-green");
+  assertNoRead("the readiness step on labeled", added.seen);
+
+  // The shadow step, on a Dependabot pull request that passes S1 to S4.
+  const called = watchForbiddenEvent(withSkippedFields(shadowEvent()));
+  const calledRun = await shadow(shadowApi().api, { ev: called.event });
+  assert.deepEqual(calledRun.result, { outcome: "called", level: "L3", checks: CI_CHECKS });
+  assertNoRead("the shadow step", called.seen);
 });
 
 test("the workflow lines outside the heredocs never name a head or merge ref", async () => {

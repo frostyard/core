@@ -15,6 +15,7 @@ The reusable workflow is `frostyard/core/.github/workflows/pr-triage.yml`, with 
 | Workflow name | `PR triage` |
 | Top-level permissions | `{}` |
 | Job | `pr-triage`: `runs-on: ubuntu-latest`, `timeout-minutes: 5` |
+| Job `if:` | `${{ (github.event.action != 'edited' \|\| github.event.changes.base != null) && (github.event.action != 'labeled' \|\| github.event.label.name == 'ready-for-human') }}` |
 | Job permissions | `contents: read` and `pull-requests: write`, no other |
 | Secrets | None. The steps use `github.token` only. |
 | Checkout | None |
@@ -31,11 +32,21 @@ The job runs these steps in order:
 
 A step after `levels` uses `!cancelled()` in its `if:`, so that it runs after an earlier step failed. A new step goes in this job in the same way.
 
+A skipped job starts no runner and runs no step. The job `if:` skips 2 events that change no result ([core#237](https://github.com/frostyard/core/issues/237)):
+
+| Event | The job skips it when |
+| --- | --- |
+| `edited` | `github.event.changes.base` is missing, so the edit changed only the title or the body. |
+| `labeled` | `github.event.label.name` is not `ready-for-human`. |
+
+The job runs on `opened`, `synchronize` and `reopened`, and on `labeled` with `ready-for-human`, as before.
+
 ## Rules
 
 ### A. Workflow and caller
 
 - The caller runs on `pull_request_target` with types `opened`, `synchronize`, `reopened`, `edited` and `labeled`.
+- In a reusable workflow, `github.event` is the caller's event, so the job `if:` reads the caller's event and no caller changes. An `edited` event runs the job only when the base branch changed, and the job then reads the list at the new base SHA. The job skips an edit of the title or the body, and skips `labeled` with a label other than `ready-for-human` ([core#237](https://github.com/frostyard/core/issues/237)).
 - The caller pins the reusable workflow to a full 40-character core commit SHA (ADR-0021): `frostyard/core/.github/workflows/pr-triage.yml@<SHA>`.
 - Core's own caller, `.github/workflows/risk-paths-caller.yml`, uses the local path `./.github/workflows/pr-triage.yml`. Under `pull_request_target`, the local path resolves to the base branch commit, not to the PR head.
 - The caller's job id is `pr-triage`. The check is named `pr-triage / pr-triage`. The `readiness` step leaves out check runs whose name starts with `pr-triage`.
@@ -58,7 +69,8 @@ The step computes the level of the PR and sets the level label by the ratchet, w
 - Trigger 1, the head moved after the label. The action is `synchronize` and `pull_request.labels` has `ready-for-human`. The reason is `head-moved`. The step uses `before` and `after` of the event. Both must be 40 lowercase hex characters.
 - Trigger 2, the label came while CI is not green. The action is `labeled` and `label.name` is `ready-for-human`. The reason is `checks-not-green`. The step reads the checks of `pull_request.head.sha`, which must be 40 lowercase hex characters.
 - A `synchronize` event on a PR without the label: no API call, no change.
-- Any other action, or `labeled` with another label: no change.
+- Any other action: no change.
+- A `labeled` event with another label: no change. The job `if:` skips the job, so the step does not run.
 - The event name must be `pull_request_target`. Another event name fails the step.
 - No sender is exempt. This includes GitHub's "Update branch" button and a bot.
 
