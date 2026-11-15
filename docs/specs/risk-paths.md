@@ -149,7 +149,7 @@ With a version 1 list, every PR that matches a glob is at L1 and gets `risk:high
 
 The reusable workflow is `frostyard/core/.github/workflows/pr-triage.yml`, with `on: workflow_call`. Its contract is the [PR triage spec](pr-triage.md). The `levels` step of that workflow does the work that this section describes.
 
-- The caller runs on `pull_request_target` with types `opened`, `synchronize`, `reopened`, `edited` and `labeled`. An `edited` event includes a change of the base branch: the job then reads the list at the new base SHA and matches the current file list. The `levels` step runs on every listed type except `labeled`: a label change moves no file.
+- The caller runs on `pull_request_target` with types `opened`, `synchronize`, `reopened`, `edited` and `labeled`. The job runs on `edited` only when the base branch changed (`github.event.changes.base`): it then reads the list at the new base SHA and matches the current file list. An edit of the title or the body skips the job, and so does `labeled` with a label other than `ready-for-human`. The `levels` step runs on every listed type except `labeled`: a label change moves no file.
 - The caller pins the reusable workflow to a full 40-character core commit SHA (ADR-0021): `frostyard/core/.github/workflows/pr-triage.yml@<SHA>`. During the move to `pr-triage.yml`, a caller of the older `frostyard/core/.github/workflows/risk-paths.yml@<SHA>` stays valid at its pinned SHA.
 - Core's own caller, `.github/workflows/risk-paths-caller.yml`, is the 1 exception to the SHA pin. It uses the local path `./.github/workflows/pr-triage.yml`. Under `pull_request_target`, the local path resolves to the base branch commit, not to the PR head.
 - The caller has no `merge_group` trigger.

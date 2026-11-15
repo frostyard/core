@@ -1717,6 +1717,213 @@ function outsideBlocks(text) {
   return out;
 }
 
+// The job `if:` of the reusable workflow, as 1 literal line without the indent.
+const JOB_IF =
+  "${{ (github.event.action != 'edited' || github.event.changes.base != null) && " +
+  "(github.event.action != 'labeled' || github.event.label.name == 'ready-for-human') }}";
+
+function escapeRegExp(text) {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+// A minimal evaluator for the subset of the GitHub Actions expression syntax
+// that pr-triage.yml uses: `${{ }}`, `(`, `)`, `&&`, `||` (which return an
+// operand, as in JS), `!`, `==`, `!=`, single-quoted strings (`''` is an
+// escaped quote), `null`, `true`, `false`, numbers, property paths, and the
+// functions `cancelled()`, `contains()` and `fromJSON()`. It throws on any
+// other token, so a construct that these tests do not model fails a test
+// instead of passing silently.
+function tokenizeExpression(source) {
+  const tokens = [];
+  let index = 0;
+  while (index < source.length) {
+    const rest = source.slice(index);
+    const space = /^\s+/.exec(rest);
+    if (space) {
+      index += space[0].length;
+      continue;
+    }
+    const operator = /^(&&|\|\||!=|==|!|\(|\)|,)/.exec(rest);
+    if (operator) {
+      tokens.push({ kind: "operator", value: operator[0] });
+      index += operator[0].length;
+      continue;
+    }
+    const string = /^'((?:[^']|'')*)'/.exec(rest);
+    if (string) {
+      tokens.push({ kind: "value", value: string[1].replace(/''/g, "'") });
+      index += string[0].length;
+      continue;
+    }
+    const number = /^-?(?:\d+(?:\.\d+)?|\.\d+)/.exec(rest);
+    if (number) {
+      tokens.push({ kind: "value", value: Number(number[0]) });
+      index += number[0].length;
+      continue;
+    }
+    const name = /^[A-Za-z_][A-Za-z0-9_-]*(?:\.[A-Za-z_][A-Za-z0-9_-]*)*/.exec(rest);
+    if (name) {
+      tokens.push({ kind: "name", value: name[0] });
+      index += name[0].length;
+      continue;
+    }
+    throw new Error(`unsupported token at ${JSON.stringify(rest.slice(0, 10))} in ${JSON.stringify(source)}`);
+  }
+  return tokens;
+}
+
+// GitHub's falsy values are false, 0, -0, "" and null. An object or an array is truthy.
+function truthyInGitHub(value) {
+  if (Array.isArray(value)) return true;
+  if (value === null || value === undefined) return false;
+  if (typeof value === "object") return true;
+  if (typeof value === "number") return value !== 0 && !Number.isNaN(value);
+  if (typeof value === "string") return value !== "";
+  return value === true;
+}
+
+// A value that `==` compares as a number: null is 0, true 1, false 0, a string by
+// Number(), and an object or an array is NaN.
+function numberInGitHub(value) {
+  if (value === null || value === undefined) return 0;
+  if (typeof value === "boolean") return value ? 1 : 0;
+  if (typeof value === "number") return value;
+  if (typeof value === "string") return Number(value);
+  return Number.NaN;
+}
+
+// `==` and `!=`: 2 strings compare without case, values of different types compare
+// as numbers, and NaN equals nothing.
+function equalsInGitHub(left, right) {
+  if (typeof left === "string" && typeof right === "string") return left.toLowerCase() === right.toLowerCase();
+  if (left === null || left === undefined) {
+    if (right === null || right === undefined) return true;
+  } else if (typeof left === "boolean" && typeof right === "boolean") {
+    return left === right;
+  } else if (typeof left === "number" && typeof right === "number") {
+    return left === right;
+  }
+  const first = numberInGitHub(left);
+  const second = numberInGitHub(right);
+  if (Number.isNaN(first) || Number.isNaN(second)) return false;
+  return first === second;
+}
+
+function callExpressionFunction(name, args) {
+  if (name === "cancelled") {
+    if (args.length !== 0) throw new Error("cancelled() takes no argument");
+    return false;
+  }
+  if (name === "contains") {
+    const [search, item] = args;
+    if (Array.isArray(search)) {
+      return search.some((entry) =>
+        entry !== null && typeof entry === "object" ? entry === item : equalsInGitHub(entry, item),
+      );
+    }
+    if (typeof search === "string") return search.toLowerCase().includes(String(item).toLowerCase());
+    return false;
+  }
+  if (name === "fromJSON") return JSON.parse(String(args[0]));
+  throw new Error(`unsupported function: ${name}`);
+}
+
+function evaluateExpression(text, context) {
+  const trimmed = text.trim();
+  if (!trimmed.startsWith("${{") || !trimmed.endsWith("}}")) {
+    throw new Error(`not a \${{ }} expression: ${trimmed}`);
+  }
+  const tokens = tokenizeExpression(trimmed.slice(3, -2));
+  let position = 0;
+  const peek = () => tokens[position];
+  const take = () => tokens[position++];
+  const isOperator = (value) => peek()?.kind === "operator" && peek().value === value;
+  const expect = (value) => {
+    const token = take();
+    if (!(token?.kind === "operator" && token.value === value)) throw new Error(`expected ${value}, got ${JSON.stringify(token)}`);
+  };
+
+  function parsePrimary() {
+    const token = take();
+    if (token === undefined) throw new Error("unexpected end of expression");
+    if (token.kind === "operator" && token.value === "(") {
+      const value = parseLogicalOr();
+      expect(")");
+      return value;
+    }
+    if (token.kind === "value") return token.value;
+    if (token.kind === "name") return resolveName(token.value);
+    throw new Error(`unsupported token: ${JSON.stringify(token)}`);
+  }
+
+  function parseUnary() {
+    if (isOperator("!")) {
+      take();
+      return !truthyInGitHub(parseUnary());
+    }
+    return parsePrimary();
+  }
+
+  function parseComparison() {
+    let left = parseUnary();
+    while (isOperator("==") || isOperator("!=")) {
+      const operator = take().value;
+      const right = parseUnary();
+      left = operator === "==" ? equalsInGitHub(left, right) : !equalsInGitHub(left, right);
+    }
+    return left;
+  }
+
+  function parseLogicalAnd() {
+    let left = parseComparison();
+    while (isOperator("&&")) {
+      take();
+      const right = parseComparison();
+      left = truthyInGitHub(left) ? right : left;
+    }
+    return left;
+  }
+
+  function parseLogicalOr() {
+    let left = parseLogicalAnd();
+    while (isOperator("||")) {
+      take();
+      const right = parseLogicalAnd();
+      left = truthyInGitHub(left) ? left : right;
+    }
+    return left;
+  }
+
+  function resolveName(name) {
+    if (isOperator("(")) {
+      take();
+      const args = [];
+      if (!isOperator(")")) {
+        args.push(parseLogicalOr());
+        while (isOperator(",")) {
+          take();
+          args.push(parseLogicalOr());
+        }
+      }
+      expect(")");
+      return callExpressionFunction(name, args);
+    }
+    if (name === "null") return null;
+    if (name === "true") return true;
+    if (name === "false") return false;
+    let value = context;
+    for (const part of name.split(".")) {
+      if (value === null || value === undefined || typeof value !== "object") return null;
+      value = Object.prototype.hasOwnProperty.call(value, part) ? value[part] : null;
+    }
+    return value === undefined ? null : value;
+  }
+
+  const result = parseLogicalOr();
+  if (position !== tokens.length) throw new Error(`trailing tokens in ${JSON.stringify(trimmed)}`);
+  return result;
+}
+
 function jobPermissions(lines) {
   const start = lines.findIndex((line) => /^ {4}permissions:\s*$/.test(line));
   assert.notEqual(start, -1, "the job has a permissions block");
@@ -1781,7 +1988,14 @@ test("the workflow has the input, the job, the permissions and no checkout", asy
     code,
     /^on:\n {2}workflow_call:\n {4}inputs:\n {6}dependabot-shadow:\n {8}description: [^\n]+\n {8}type: boolean\n {8}default: true\n\npermissions: \{\}$/m,
   );
-  assert.match(code, /^jobs:\n {2}pr-triage:\n {4}runs-on: ubuntu-latest\n {4}timeout-minutes: 5\n {4}permissions:/m);
+  assert.match(
+    code,
+    new RegExp(
+      `^jobs:\\n {2}pr-triage:\\n {4}if: ${escapeRegExp(JOB_IF)}\\n {4}runs-on: ubuntu-latest\\n {4}timeout-minutes: 5\\n {4}permissions:`,
+      "m",
+    ),
+  );
+  assert.ok(lines.includes(`    if: ${JOB_IF}`), "the job if: is exactly the expected line");
   assert.deepEqual(jobPermissions(codeLines(lines.join("\n"))), ["contents: read", "pull-requests: write"]);
   assert.ok(!workflow.includes("actions/checkout"));
   assert.match(code, /node-version: "22"/);
@@ -1849,6 +2063,141 @@ test("the workflow writes the scripts, then runs the levels, readiness and shado
     text.includes("        description: Run the Dependabot shadow step (docs/design/dependabot-shadow.md). " +
       "It only writes a comment; it never enables auto-merge.\n"),
   );
+});
+
+test("the expression evaluator follows the GitHub Actions comparison and truthiness rules", () => {
+  const empty = { github: { event: { action: "opened" } }, inputs: {} };
+  const edited = { github: { event: { action: "edited", changes: { body: { from: "x" } } } }, inputs: {} };
+  assert.equal(evaluateExpression("${{ null != null }}", empty), false);
+  assert.equal(evaluateExpression("${{ null == null }}", empty), true);
+  assert.equal(evaluateExpression("${{ github.event.changes != null }}", empty), false, "a missing property is null");
+  assert.equal(evaluateExpression("${{ github.event.changes != null }}", edited), true, "an object is not null");
+  assert.equal(evaluateExpression("${{ github.event.missing.deeper == null }}", empty), true, "a property of null is null");
+  assert.equal(evaluateExpression("${{ 'A' == 'a' }}", empty), true, "2 strings compare without case");
+  assert.equal(evaluateExpression("${{ 'it''s' != 'IT''S' }}", empty), false, "'' is an escaped quote");
+  assert.equal(evaluateExpression("${{ 1 == '1' }}", empty), true, "different types compare as numbers");
+  assert.equal(evaluateExpression("${{ false == 0 }}", empty), true);
+  assert.equal(evaluateExpression("${{ '' == 0 }}", empty), true);
+  assert.equal(evaluateExpression("${{ github.event == 0 }}", edited), false, "an object is NaN, and NaN equals nothing");
+  assert.equal(evaluateExpression("${{ cancelled() }}", empty), false);
+  assert.equal(evaluateExpression("${{ 'b' && '' || 'c' }}", empty), "c", "&& and || return an operand");
+  assert.equal(evaluateExpression("${{ !github.event.missing }}", empty), true);
+  assert.throws(() => evaluateExpression("${{ 1 > 0 }}", empty), /unsupported token/);
+  assert.throws(() => evaluateExpression("${{ startsWith('a', 'a') }}", empty), /unsupported function: startsWith/);
+  assert.throws(() => evaluateExpression("${{ github.event.action }} extra", empty), /not a \$\{\{ \}\} expression/);
+});
+
+test("the job if: skips a title or body edit and a label other than ready-for-human", async () => {
+  const workflow = await readFile(workflowPath, "utf8");
+  const outside = outsideBlocks(workflow);
+
+  const jobIfs = outside.filter((line) => /^ {4}if: /.test(line));
+  assert.equal(jobIfs.length, 1, "1 line at 4 spaces is the job if:");
+  const jobIf = jobIfs[0].replace(/^ {4}if: /, "");
+  assert.equal(jobIf, JOB_IF, "the job if: is the expected expression");
+
+  const steps = [];
+  outside.forEach((line, index) => {
+    if (!/^ {8}if: /.test(line)) return;
+    const idLine = outside
+      .slice(0, index)
+      .reverse()
+      .find((above) => /^ {8}id: /.test(above));
+    assert.ok(idLine, `a step if: has an id: line above it: ${line}`);
+    steps.push({ id: idLine.replace(/^ {8}id: /, ""), expression: line.replace(/^ {8}if: /, "") });
+  });
+  assert.deepEqual(
+    steps.map((step) => step.id),
+    ["levels", "readiness", "deps", "shadow"],
+    "4 step if: lines at 8 spaces, in order",
+  );
+  assert.equal(outside.filter((line) => /^ {8}if: /.test(line)).length, 4);
+
+  const contextOf = (event, author, shadow) => {
+    const payload = { action: event.action, pull_request: { user: { login: author } } };
+    if (event.changes !== undefined) payload.changes = event.changes;
+    if (event.label !== undefined) payload.label = { name: event.label };
+    return { github: { event_name: "pull_request_target", event: payload }, inputs: { "dependabot-shadow": shadow } };
+  };
+  const jobRuns = (event, author, shadow) => evaluateExpression(jobIf, contextOf(event, author, shadow));
+  const stepRuns = (id, event, author, shadow) => {
+    const step = steps.find((entry) => entry.id === id);
+    assert.ok(step, `the workflow has a step ${id}`);
+    return evaluateExpression(step.expression, contextOf(event, author, shadow));
+  };
+
+  const BASE_CHANGE = { base: { ref: { from: "old" }, sha: { from: "0".repeat(40) } } };
+  const events = [
+    { name: "opened", action: "opened" },
+    { name: "reopened", action: "reopened" },
+    { name: "synchronize", action: "synchronize" },
+    { name: "edited, body only", action: "edited", changes: { body: { from: "x" } } },
+    { name: "edited, title only", action: "edited", changes: { title: { from: "x" } } },
+    { name: "edited, base", action: "edited", changes: BASE_CHANGE },
+    { name: "edited, title and base", action: "edited", changes: { title: { from: "x" }, ...BASE_CHANGE } },
+    { name: "labeled ready-for-human", action: "labeled", label: "ready-for-human" },
+    { name: "labeled documentation", action: "labeled", label: "documentation" },
+  ];
+  const event = (name) => {
+    const found = events.find((entry) => entry.name === name);
+    assert.ok(found, `the matrix has ${name}`);
+    return found;
+  };
+
+  // The named cases, each on 1 author and 1 input value.
+  assert.equal(jobRuns(event("edited, body only"), "octocat", false), false, "an edit of the body only skips the job");
+  assert.equal(jobRuns(event("edited, title only"), "octocat", false), false, "an edit of the title only skips the job");
+  assert.equal(jobRuns(event("edited, base"), "octocat", false), true, "an edit of the base branch runs the job");
+  assert.equal(stepRuns("levels", event("edited, base"), "octocat", false), true, "the levels step runs after a base change");
+  assert.equal(jobRuns(event("labeled documentation"), "octocat", false), false, "another label skips the job");
+  assert.equal(jobRuns(event("labeled ready-for-human"), "octocat", false), true, "ready-for-human runs the job");
+  assert.equal(
+    stepRuns("readiness", event("labeled ready-for-human"), "octocat", false),
+    true,
+    "the readiness step runs for ready-for-human",
+  );
+  assert.equal(jobRuns(event("synchronize"), "octocat", false), true, "synchronize runs the job");
+
+  // Every event, for each author and each input value.
+  for (const entry of events) {
+    for (const author of ["dependabot[bot]", "octocat"]) {
+      for (const shadow of [true, false]) {
+        const where = `${entry.name}, ${author}, dependabot-shadow ${shadow}`;
+        const baseChanged = entry.action !== "edited" || entry.changes?.base !== undefined;
+        const skip =
+          !baseChanged || (entry.action === "labeled" && entry.label !== "ready-for-human");
+        const job = jobRuns(entry, author, shadow);
+        const anyStep = steps.some((step) => evaluateExpression(step.expression, contextOf(entry, author, shadow)));
+        assert.equal(job, !skip, `${where}: the job runs when the event can change a result`);
+        assert.equal(
+          job,
+          anyStep && baseChanged,
+          `${where}: the job runs exactly when a step would run and the event is not a title or body edit`,
+        );
+      }
+    }
+  }
+});
+
+test("the triage libraries read no PR title, PR body and no event changes, so the job can skip those events", async () => {
+  // The job `if:` of .github/workflows/pr-triage.yml skips an edit of the title or
+  // the body, and a label other than ready-for-human, because no step reads them.
+  // When a library starts to read 1 of them, this test fails and the job `if:`
+  // must change with it: otherwise the skipped event would change a result.
+  for (const file of [libraryPath, triageLibraryPath]) {
+    const source = (await readFile(file, "utf8"))
+      .split("\n")
+      .filter((line) => !/^\s*(\/\/|\*|\/\*)/.test(line))
+      .join("\n");
+    // The libraries name the pull request `pr` (`const pr = event?.pull_request`),
+    // so no code line may name `title` at all, read `.changes` or destructure
+    // `changes`, and no `.body` of `pr` or `pull_request` (a comment body or a
+    // request body is fine).
+    assert.ok(!/\btitle\b/.test(source), `${file} names a title`);
+    assert.ok(!/\.changes\b|\{[^}]*\bchanges\b[^}]*\}\s*=/.test(source), `${file} reads the event changes`);
+    assert.ok(!/\b(pr|pull_request)\??\.(body|title)\b/.test(source), `${file} reads a PR title or body`);
+    assert.ok(!/\b(pr|pull_request)\??\.\[/.test(source), `${file} reads a PR field by a computed name`);
+  }
 });
 
 test("the workflow lines outside the heredocs never name a head or merge ref", async () => {

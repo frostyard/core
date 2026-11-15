@@ -1208,8 +1208,8 @@ WOULD  POST repos/bketelsen/truenas-mcp/labels (create label level:L4)
   queue runs `make ci` on the tip of `main` with the pull request, then
   merges it.
 - The `levels` step labels a pull request on its next event (opened,
-  synchronize, reopened, edited). Pull requests that were open before the
-  labels existed get their level label from
+  synchronize, reopened, edited with a base change). Pull requests that were
+  open before the labels existed get their level label from
   `node scripts/pr-triage-backfill.mjs OWNER/REPO... [--apply]`: it runs the
   same `levels` step on each open pull request. Without `--apply` it is a dry
   run that writes nothing; a second run after `--apply` prints no change.

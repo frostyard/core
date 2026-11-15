@@ -24,6 +24,10 @@
 #
 # Later steps use !cancelled() in their `if:`, so they run after an earlier
 # step failed.
+#
+# The job skips an `edited` event that changed only the title or the body, and a
+# `labeled` event whose label is not `ready-for-human` (core#237). Neither
+# changes a result, and a skipped job starts no runner.
 name: PR triage
 
 on:
@@ -38,6 +42,7 @@ permissions: {}
 
 jobs:
   pr-triage:
+    if: ${{ (github.event.action != 'edited' || github.event.changes.base != null) && (github.event.action != 'labeled' || github.event.label.name == 'ready-for-human') }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
