@@ -11,9 +11,9 @@ legacy `stable` suite to explicit codenames at
 [`frostyard/apt-publisher`](https://github.com/frostyard/apt-publisher).
 
 - **Done:** the writer, the seeded `trixie` suite, CDN caching, every
-  producer whose packages Snosi installs, and Snosi itself (Phases 1–5).
-- **What remains:** validating `forky` (Phase 6) and steady state
-  (Phase 7).
+  producer whose packages Snosi installs, Snosi itself (Phases 1–5), and
+  the validation of `forky` (Phase 6).
+- **What remains:** steady state (Phase 7).
 - **Suites:** `forky` is a 2nd suite beside `trixie`, not its successor.
   `trixie` stays, and it stays the default; nothing is promoted or moved.
   The aim is a pipeline that works for `forky` the day Debian releases it,
@@ -240,7 +240,7 @@ ever need APT publication.
   - the alarm passed on its re-baselined record (frostyard/core#153,
     [run 37151554483](https://github.com/frostyard/core/actions/runs/37151554483)).
 
-## Phase 6 — Build and validate `forky`
+## Phase 6 — Build and validate `forky` (done 2026-11-15)
 
 On 2026-10-04 Snosi's secure image builds were failing on Debian's
 half-published trixie-backports kernel. `linux-signed-amd64` 7.2.6 was
@@ -309,13 +309,33 @@ until that queue is processed.
     published `main-20261113192000-4de76c0` to `trixie` and `forky` on
     2026-11-13. `voxtype` 1.1.1-frostyard20261113191850 and `moonlight-qt`
     6.2.0-frostyard20261113191853: 1 version each.
-- [ ] Build each sysext for each suite. updex picks a sysext by `%w`, the
+- [x] Build each sysext for each suite. updex picks a sysext by `%w`, the
   host's `VERSION_ID`, and Debian `forky`'s os-release has no `VERSION_ID`
   before Debian releases it (base-files 14.2), so a `forky` image must set
   `VERSION_ID=14`. A host that switches suite must never merge a sysext of
-  the other suite.
-- [ ] Prove clean install, update and rollback on `forky`, without changing
-  `trixie` or `stable`.
+  the other suite. Done on 2026-11-14, except for 2 sysexts that are
+  `trixie` only (below).
+  - frostyard/snosi#1292 (2026-11-13) makes the Debian release a build
+    input, sets `VERSION_ID="14"` on `forky`, and builds Floe on `forky`
+    beside `trixie` (Snosi ADR-0037).
+  - frostyard/snosi#1306 (2026-11-14) builds Snow, Snowfield, Sundog and
+    the sysexts on `forky`. frostyard/snosi#1308 (2026-11-14) publishes the
+    `forky` sysexts after the `trixie` publish.
+  - frostyard/snosi#1307 (2026-11-14) enables `updex-suite-switch.service`,
+    which frostyard-updex 2.3.1 ships (frostyard/updex#516). At boot after
+    a suite switch, it links the sysext images of the running suite.
+  - [`build.yml` run 43611342770](https://github.com/frostyard/snosi/actions/runs/43611342770)
+    (job `build-forky`, at `812e98eb`) published 31 sysext files, all
+    `_14_`, and 31 manifests under `manifests/forky/`. `trixie` stayed
+    intact: its `_13_` lines in `SHA256SUMS` stayed, and the HTML index
+    and the 33 `trixie` manifests were byte-identical. The publication of
+    the next main run,
+    [43611567059](https://github.com/frostyard/snosi/actions/runs/43611567059),
+    was idempotent.
+  - `trixie` only: `sunshine` (no upstream `forky` package) and the
+    himmelblau sysext.
+- [x] Prove clean install, update and rollback on `forky`, without changing
+  `trixie` or `stable`. Done on 2026-11-15.
   - Package level, passed on 2026-11-15, amd64 only (the arm64 entries of
     `main` were not tested): each of the 15 package names of the 50 entries
     in the 2 `forky` amd64 indexes above installed from
@@ -349,10 +369,62 @@ until that queue is processed.
       test does not show that either GUI runs.
     - The `InRelease` files of `trixie`, `forky` and legacy `stable` had the
       same `Date` line and SHA-256 before and after the test.
-  - Not proven by it: image and sysext install, update and rollback on
-    `forky` (Snosi). This item stays open until they are.
-- [ ] Rebase or replace Snosi PR #924 once packages and products validate.
+  - Signed images: `forky-publish.yml` (Snosi ADR-0038; every product
+    since frostyard/snosi#1309, ADR-0039) published 2 `forky` images of
+    each product, N and N+1. Each run made 1 tag, `cosign verify` passed,
+    and `latest` did not change. Runs: Floe 43550711663 and 43553230001,
+    Snow 43611296094 and 43616447362, Snowfield 43621104199 and
+    43624974195, Sundog 43630664360 and 43635094915.
+  - Images in the lab: install, update and rollback on the dev lane, with
+    Secure Boot and TPM2-LUKS. The update target is the immutable N+1
+    version tag, which frostyard/lab#243 allows as `target_ref`. Each
+    product passed `forky`→`forky` and `trixie`→`forky`, in that order in
+    the lab runs `dev-snow-bootc-lifecycle-<id>` below:
+    - Floe: `k7mtk` and `f8sv7`.
+    - Snow: `bp2t9` and `kjsb2`.
+    - Sundog: `dpgf5` and `ptsp2`.
+    - Snowfield: `6tvjf`, and `j6kwb`, `65xfw` and `zdw24`. The
+      `trixie`→`forky` runs pass since frostyard/lab#244 lists its kernel
+      `7.3.4-1-surface` as a known-defect kernel.
+    - The fs-verity notes of these runs are the upstream btrfs defect of
+      frostyard/snosi#1130. It is not specific to `forky`.
+  - Sysexts in the lab: run `257hz` passed `verified_sysext_probe` on
+    `forky` (install). Run `ps9wh` passed `verified_sysext_suite_switch`, a
+    mode that frostyard/lab#245 adds: it enabled incus, coder and nix on
+    `trixie` Snow (`_13_` links) and updated to `forky` Snow, where
+    `updex-suite-switch.service` ended `success` and every link named the
+    `_14_` file. Then it rolled back to the `_13_` links. This suite switch
+    is the sysext update proof of this phase.
+  - The `:forky` tag: frostyard/snosi#1313 (2026-11-15, Snosi ADR-0040)
+    moves it to a verified `forky` image by dispatch. The first promotions
+    moved it to the N+1 digest that the lab proved, and verified each
+    digest with `cosign`; `latest` did not change. Floe `3520a458`
+    ([run 43669601867](https://github.com/frostyard/snosi/actions/runs/43669601867)),
+    Snow `8c99b9d6`
+    ([43669674713](https://github.com/frostyard/snosi/actions/runs/43669674713)),
+    Sundog `81fd2d5e`
+    ([43669719699](https://github.com/frostyard/snosi/actions/runs/43669719699))
+    and Snowfield `e5c8b694`
+    ([43708659346](https://github.com/frostyard/snosi/actions/runs/43708659346)).
+  - frostyard/snosi#1312 (2026-11-15) documents the `forky` opt-in
+    stream: the switch, the rollback, and the way back to `trixie`.
+- [x] Rebase or replace Snosi PR #924 once packages and products validate.
+  Replaced by frostyard/snosi#1292, which takes the `forky` package
+  renames and the `VERSION_ID="14"` handling of #924 and builds `forky` as
+  a 2nd suite instead of moving the repository to it. #924 was closed
+  unmerged on 2026-11-13.
 - **Done when:** `forky` and `trixie` independently install and roll back.
+  Both held on 2026-11-15: the package, image and sysext records above.
+- Open after this phase:
+  - Sysext revision update on `forky` (r to r+1 within `_14_`). It needs
+    a 2nd `_14_` revision of a sysext and an updex option that enables a
+    pinned older version.
+  - Update and rollback of the single-version packages above, when a 2nd
+    `forky` version exists.
+  - Snowfield on representative Surface hardware: not tested.
+  - frostyard/snosi#1130 is open upstream.
+  - frostyard/snosi#1315 (open) documents that a newer waiting dispatch of
+    `forky-publish.yml` cancels an older one.
 
 ## Phase 7 — Steady state
 
