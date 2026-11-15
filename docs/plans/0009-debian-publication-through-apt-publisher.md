@@ -407,6 +407,8 @@ until that queue is processed.
     ([43669719699](https://github.com/frostyard/snosi/actions/runs/43669719699))
     and Snowfield `e5c8b694`
     ([43708659346](https://github.com/frostyard/snosi/actions/runs/43708659346)).
+    frostyard/snosi#1315 (2026-11-15) documents that a newer waiting
+    dispatch of `forky-publish.yml` cancels an older one.
   - frostyard/snosi#1312 (2026-11-15) documents the `forky` opt-in
     stream: the switch, the rollback, and the way back to `trixie`.
 - [x] Rebase or replace Snosi PR #924 once packages and products validate.
@@ -423,9 +425,7 @@ until that queue is processed.
   - Update and rollback of the single-version packages above, when a 2nd
     `forky` version exists.
   - Snowfield on representative Surface hardware: not tested.
-  - frostyard/snosi#1130 is open upstream.
-  - frostyard/snosi#1315 (open) documents that a newer waiting dispatch of
-    `forky-publish.yml` cancels an older one.
+  - frostyard/snosi#1130 (an upstream btrfs defect) is open.
 
 ## Phase 7 — Steady state
 
