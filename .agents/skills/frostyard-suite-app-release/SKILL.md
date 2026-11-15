@@ -1,6 +1,6 @@
 ---
 name: frostyard-suite-app-release
-description: Release a Frostyard suite app (frostnotes, frostmail, frostread, lodge, porter) on its two delivery tracks — the desktop Flatpak through an attested release candidate, a clean-desktop gate, promotion and the flatpak-index listing, and the service daemon's attested frostyard-<name> .deb that snosi pins and ships as a sysext. Use whenever preparing, gating, promoting, or debugging a suite app release, adding a suite app to the Flatpak remote, or adding a suite daemon as a sysext.
+description: Release a Frostyard suite app (frostnotes, frostmail, lodge, porter) on its two delivery tracks — the desktop Flatpak through an attested release candidate, a clean-desktop gate, promotion and the flatpak-index listing, and the service daemon's attested frostyard-<name> .deb that snosi pins and ships as a sysext. Use whenever preparing, gating, promoting, or debugging a suite app release, adding a suite app to the Flatpak remote, or adding a suite daemon as a sysext.
 ---
 
 # Release a suite app: Flatpak candidate, gate, promotion, and sysext
@@ -13,10 +13,10 @@ A suite app ships on up to two tracks
   sandbox), an OCI image on `ghcr.io/frostyard/<repo>`, listed by
   [frostyard/flatpak-index](https://github.com/frostyard/flatpak-index) only
   when its digest carries a build-provenance attestation from the app's
-  release workflow on a `v*` tag. Desktop apps: frostnotes, frostmail,
-  frostread. frostread has no `flatpak.yml` yet (its plan 0002 adds it and
-  uses the candidate flow below). lodge and porter have no Flatpak.
-- **Server:** one sysext per daemon (`lodge`, `notesd`, `maild`, `readd`,
+  release workflow on a `v*` tag. Desktop apps: frostnotes and frostmail.
+  lodge and porter have no Flatpak. frostread is retired (2026-11-14): it
+  has no Flatpak listing and no sysext to release.
+- **Server:** one sysext per daemon (`lodge`, `notesd`, `maild`,
   `porterd`), built by snosi from the app's attested
   `frostyard-<name>_X.Y.Z_amd64.deb`. That `.deb` is a build input: it is
   **not** registered with apt-publisher and not published to

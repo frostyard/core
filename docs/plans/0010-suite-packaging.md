@@ -17,6 +17,19 @@ frostmail's M6 packaging lines. The Flatpak track (Phases 5a to 5c and 6)
 does not depend on the sysext track (Phases 1 to 4); they can run side by
 side.
 
+**frostread is retired (2026-11-14).** It gives nothing that another feed
+reader does not, so its repository is archived after the removals below.
+Its rows and Phase 5c stay here as the record of their time; no phase
+waits for frostread now. The `frostyard` remote drops
+`org.frostyard.Frostread`
+([flatpak-index#20](https://github.com/frostyard/flatpak-index/pull/20)),
+and lodge and Porter drop the app `read`
+([lodge#80](https://github.com/frostyard/lodge/pull/80),
+[porter#51](https://github.com/frostyard/porter/pull/51)). The articles
+that frostread saved stay as notes in frostnotes. Snosi's `readd` sysext
+and its files under `https://repository.frostyard.org/ext/readd/` are
+removed in Snosi's own change and its publication step.
+
 ## Inventory
 
 Every artifact of the five suite repositories, and its side.
@@ -35,9 +48,9 @@ Every artifact of the five suite repositories, and its side.
 | frostmail | maild and `mailctl` on a desktop | inside the Flatpak | ADR-0062 and frostmail [ADR-0046](https://github.com/frostyard/frostmail/blob/main/docs/adr/0046-the-desktop-flatpak-carries-its-own-maild.md): maild runs in its own sandbox of the app, and no user unit ships |
 | frostmail | the Windows install | not in this plan | frostmail M7 |
 | frostmail | `tools/lodgeprobe` | not shipped | development only |
-| frostread | `readd`, `readctl`, the `read` web build, `frostread.service`, `frostread.socket`, `sysusers.d` | sysext `readd` | the repository is public since 2026-10-23 (Phase 0 recorded it on 2026-10-27), so Snosi's `verified_download` needs no credentials; the `readd` sysext is in Snosi's `main` ([snosi#1173](https://github.com/frostyard/snosi/pull/1173), 2026-10-28). On 2026-11-13 Snosi pins frostread `v0.5.0`'s attested `.deb`, and `https://repository.frostyard.org/ext/readd/` lists `readd` `0.1.0` to `0.5.0` |
-| frostread | `readdev` | not shipped | development only |
-| frostread | the desktop UI, readd, `readctl` | Flatpak `org.frostyard.Frostread` | carries the UI, readd and `readctl`; readd runs in its own sandbox of the app ([frostread ADR-0008](https://github.com/frostyard/frostread/blob/main/docs/adr/0008-the-desktop-flatpak-carries-its-own-readd-and-lodge-is-a-connection.md), which sets the ID per [ADR-0016](../adr/0016-reverse-dns-org-frostyard-identifiers.md); amended in part by frostread [ADR-0009](https://github.com/frostyard/frostread/blob/main/docs/adr/0009-readd-stops-when-the-gnome-session-ends.md)); lodge connection mode; [ADR-0062](../adr/0062-make-desktop-suite-apps-standalone-flatpaks-with-opt-in-lodge.md). Released as `v0.6.0` on 2026-11-13: `ghcr.io/frostyard/frostread@sha256:20c4f3e7595e107663ecf821e8b61c9df891ef8a9fa06335756b894d96dbb886`, the attested candidate `v0.6.0-rc.6` (commit `fb0ba06`) that passed the standalone check; listed in the `frostyard` remote ([flatpak-index#16](https://github.com/frostyard/flatpak-index/pull/16)) and installed from it on a clean Snow VM ([frostread#86](https://github.com/frostyard/frostread/pull/86)); see [Phase 5c](#phase-5c--read-as-a-standalone-flatpak-large) |
+| frostread | `readd`, `readctl`, the `read` web build, `frostread.service`, `frostread.socket`, `sysusers.d` | sysext `readd` | retired 2026-11-14 (see above). The repository is public since 2026-10-23 (Phase 0 recorded it on 2026-10-27), so Snosi's `verified_download` needs no credentials; the `readd` sysext is in Snosi's `main` ([snosi#1173](https://github.com/frostyard/snosi/pull/1173), 2026-10-28). On 2026-11-13 Snosi pins frostread `v0.5.0`'s attested `.deb`, and `https://repository.frostyard.org/ext/readd/` lists `readd` `0.1.0` to `0.5.0` |
+| frostread | `readdev` | not shipped | development only; retired 2026-11-14 |
+| frostread | the desktop UI, readd, `readctl` | Flatpak `org.frostyard.Frostread` | retired 2026-11-14 (see above). Carries the UI, readd and `readctl`; readd runs in its own sandbox of the app ([frostread ADR-0008](https://github.com/frostyard/frostread/blob/main/docs/adr/0008-the-desktop-flatpak-carries-its-own-readd-and-lodge-is-a-connection.md), which sets the ID per [ADR-0016](../adr/0016-reverse-dns-org-frostyard-identifiers.md); amended in part by frostread [ADR-0009](https://github.com/frostyard/frostread/blob/main/docs/adr/0009-readd-stops-when-the-gnome-session-ends.md)); lodge connection mode; [ADR-0062](../adr/0062-make-desktop-suite-apps-standalone-flatpaks-with-opt-in-lodge.md). Released as `v0.6.0` on 2026-11-13: `ghcr.io/frostyard/frostread@sha256:20c4f3e7595e107663ecf821e8b61c9df891ef8a9fa06335756b894d96dbb886`, the attested candidate `v0.6.0-rc.6` (commit `fb0ba06`) that passed the standalone check; listed in the `frostyard` remote ([flatpak-index#16](https://github.com/frostyard/flatpak-index/pull/16)) and installed from it on a clean Snow VM ([frostread#86](https://github.com/frostyard/frostread/pull/86)); see [Phase 5c](#phase-5c--read-as-a-standalone-flatpak-large) |
 | porter | `porterd`, the `porter` web build, `frostporter.service`, `frostporter.socket`, `sysusers.d` | sysext `porterd` | stages `/usr/local/bin` today; the host runs `/opt/lodge/bin/porterd`; no Flatpak (ADR-0062) |
 
 Two more facts do not fit cleanly:
@@ -466,6 +479,10 @@ released and listed. The sources are frostmail plan 0013's Phase 8, 9 and
 
 ## Phase 5c — Read as a standalone Flatpak (large)
 
+frostread is retired (2026-11-14): this phase is the record of its
+release, and its listing is removed
+([flatpak-index#20](https://github.com/frostyard/flatpak-index/pull/20)).
+
 This phase depends on frostread's ADR for the desktop design and its app
 ID. Nothing else waits for it.
 
@@ -571,6 +588,10 @@ porter ADR-0003).
 - **Done when:** `flatpak remote-ls frostyard` lists the 3 apps, each one
   after its check, with their names and icons from AppStream, and a test
   image without an attestation still stops the catalogue's deployment.
+- On 2026-11-14 frostread, which is retired, leaves `apps.json` and the
+  README ([flatpak-index#20](https://github.com/frostyard/flatpak-index/pull/20)):
+  the remote lists frostnotes and frostmail (and Igloo, which is not a
+  suite app).
 
 ## Phase 7 — The records follow (small)
 
