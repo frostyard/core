@@ -32,7 +32,7 @@ block and `## Develop`.
 | `extension` | an extension to another program (a GNOME Shell extension, a Pi Pocket extension) | bketelsen/pi-pocket-team, bketelsen/pi-pocket-dune |
 | `tool` | a command that people install and run (CLI, TUI, installer, MCP server) | nsl, updex, repogen, firn, intuneme, bketelsen/truenas-mcp |
 | `website` | a website that people read | frostyard-org |
-| `service` | a daemon, worker or web application that runs on a host and serves people over a network | lodge, porter, frostread, pilothouse, problem-intake, bketelsen/trimlights |
+| `service` | a daemon, worker or web application that runs on a host and serves people over a network | lodge, porter, pilothouse, problem-intake, bketelsen/trimlights |
 | `library` | a module that other code imports, with no command | clix, std, snowkit |
 | `infrastructure` | configuration, pipelines, test suites or records for the team's own machines | lab, testsuite, bketelsen/fleet, bketelsen/pi-pocket-config |
 
