@@ -77,6 +77,15 @@ Start from .agents/skills/TEMPLATE/SKILL.md. -->
   `docs/`, and a read-only checker for rules R1 to R12
   ([ADR-0072](docs/adr/0072-write-every-readme-to-one-standard.md),
   [README spec](docs/specs/readme.md)).
+- **Writing or extending a repository's `.github/risk-paths.json` (a first
+  list for baseline row B6, a PR that adds a privileged code path, a
+  review that finds a file missing from the list)** →
+  [.agents/skills/frostyard-risk-paths/SKILL.md](.agents/skills/frostyard-risk-paths/SKILL.md)
+  — marker scan, callers and gates, L1 or L2 globs with a rule B `why`,
+  and a coverage test with a negative control
+  ([ADR-0068](docs/adr/0068-label-pull-requests-that-touch-high-risk-paths.md),
+  [ADR-0078](docs/adr/0078-sort-pull-requests-by-levels-l1-to-l4.md),
+  [risk-paths spec](docs/specs/risk-paths.md)).
 - **Releasing a suite app (frostnotes, frostmail, lodge, porter):
   Flatpak candidate, clean-desktop gate, promotion and listing;
   the daemon's attested `.deb` and its snosi sysext** →
@@ -223,6 +232,11 @@ removed. -->
   those libraries, then run `npm run sync:risk-paths-workflow`; never edit an
   embedded copy by hand. `npm run check:risk-paths` (in `verify`) fails when a
   copy drifts.
+- A skill, doc or code sample that reads a risk-path list's levels holds
+  for both schema versions: a version 1 entry has no `level` and counts as
+  L1. A text that says a PR "gets `risk:high`" also covers the PR that
+  adds the first list: with no list at the base SHA the workflow adds no
+  label (risk-paths spec rule E), so the author adds it by hand.
 - Conformance alias symlinks are listed in
   [ADR-0029](docs/adr/0029-acmm-conformance-via-canonical-aliases.md) —
   edit their canonical targets, never the aliases.
