@@ -24,7 +24,8 @@ each add a record add 2 different files, so they do not conflict.
     old file (below).
 - **Content:** 1 JSON object with exactly 5 string fields, in this order:
   `date` (a real `YYYY-MM-DD` date), `scope`, `correction`, `evidence` (not
-  empty), and `promoted_to` (`""`, or the path the record was promoted to).
+  empty), and `promoted_to` (`""`, or the path of the rule, document,
+  test or skill that the record was promoted to).
 - **Canonical form:** the file text is exactly
   `JSON.stringify(record, null, 2) + "\n"`, with the keys in the order
   above. Formatters do not rewrite these files.
@@ -43,10 +44,20 @@ each add a record add 2 different files, so they do not conflict.
   changes, except that an empty `promoted_to` is filled once.
 - The folder holds only record files, and an optional empty `.gitkeep` for a
   repository with no records. No subfolder, no symbolic link.
-- `promoted_to` starts empty; when a correction graduates into
-  [AGENTS.md](../AGENTS.md), a doc under [docs/](../docs/README.md), or a
-  skill, set it to that path. Promotion is the only sanctioned duplication —
-  the `frostyard-repo-docs` maintenance pass drains this inbox.
+- `promoted_to` names the path where the correction became a check or a
+  rule.
+  - When the pull request that adds the record also adds its guard (a
+    targeted test that fails without the fix, or an
+    [AGENTS.md](../AGENTS.md) rule when no test can catch it; the
+    [quality loop](../docs/design/quality-loop.md) blocker-to-guard rule),
+    set `promoted_to` to that path when you make the record
+    (`scripts/new-correction.mjs --promoted-to PATH`). The example above
+    does this.
+  - Otherwise it starts `""`. When the correction graduates into
+    [AGENTS.md](../AGENTS.md), a doc under [docs/](../docs/README.md), or a
+    skill, set it once to that path. Promotion is the only sanctioned
+    duplication — the `frostyard-repo-docs` maintenance pass drains this
+    inbox.
 - Never record credentials or non-public vulnerability details.
 - A blocking review point adds a record in the PR that fixes it
   ([quality loop](../docs/design/quality-loop.md), Learn station).
