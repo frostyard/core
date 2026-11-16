@@ -146,6 +146,9 @@ Start from .agents/skills/TEMPLATE/SKILL.md. -->
   a command or a query) and what it selects. Each label covers every item
   counted under it, and items whose status the source does not state are
   counted apart, not in the total they are unsure for.
+- A rule in a doc that matches paths or names by prefix states its root
+  and boundary cases, and holds for each: the root itself, a child of the
+  root, and a sibling with a longer name (`/Chan` against `/Chani`).
 - A test record in a PR body, a plan or a doc states what the output
   shows and what the test did not cover. It never gives an expected cause
   of a failure as proven: quote or paraphrase the error the output shows

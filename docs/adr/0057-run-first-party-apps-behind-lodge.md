@@ -128,3 +128,6 @@ The contract between lodge and its apps is lodge's
   (how the suite ships).
 - Amended in part by: [ADR-0062](0062-make-desktop-suite-apps-standalone-flatpaks-with-opt-in-lodge.md)
   (local is the default mode of every desktop app; lodge is opt-in).
+- Amended in part by: [ADR-0085](0085-build-new-first-party-apps-on-hearth-with-lodge-as-their-hub.md)
+  (for apps on hearth: lodge's 1 MCP gateway replaces the per-app MCP
+  endpoint, and hearth replaces `lodge/kit` as the app library).
