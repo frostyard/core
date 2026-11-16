@@ -143,6 +143,12 @@ Start from .agents/skills/TEMPLATE/SKILL.md. -->
   before it pushes there: `make ci` is each repository's local CI gate,
   lint and format included, and a pass in 1 repository proves nothing for
   another ([ADR-0083](docs/adr/0083-run-the-ci-gate-locally-as-make-ci.md)).
+- A skill step that stands in for a command (hand tag steps for
+  `make bump`) keeps every guard of that command, in the same order. A
+  skill's check after a release binds to that release: an attestation
+  names the release commit (`--source-digest`), and a delivery that goes
+  through a pull request (a Homebrew tap) passes only when it is on the
+  default branch.
 - ADRs record the decision, not how it was reached. State context, decision,
   and consequences as facts. No narration of who asked, who was consulted, or
   the author's process; that belongs in the PR description
@@ -155,6 +161,12 @@ Start from .agents/skills/TEMPLATE/SKILL.md. -->
   a command or a query) and what it selects. Each label covers every item
   counted under it, and items whose status the source does not state are
   counted apart, not in the total they are unsure for.
+- A skill or doc that restates a rule of this file keeps every case of
+  it: each subject, each trigger and each time it applies (a PR called
+  open or waiting, checked before each push and before `ready-for-human`).
+  An evidence rule says which details each kind of source needs (a run,
+  a read, a person's report), and lets a record say that a value does not
+  apply or is not known.
 - A rule in a doc that matches paths or names by prefix states its root
   and boundary cases, and holds for each: the root itself, a child of the
   root, and a sibling with a longer name (`/Chan` against `/Chani`).
