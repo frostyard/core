@@ -77,6 +77,15 @@ Start from .agents/skills/TEMPLATE/SKILL.md. -->
   `docs/`, and a read-only checker for rules R1 to R12
   ([ADR-0072](docs/adr/0072-write-every-readme-to-one-standard.md),
   [README spec](docs/specs/readme.md)).
+- **Writing or extending a repository's `.github/risk-paths.json` (a first
+  list for baseline row B6, a PR that adds a privileged code path, a
+  review that finds a file missing from the list)** →
+  [.agents/skills/frostyard-risk-paths/SKILL.md](.agents/skills/frostyard-risk-paths/SKILL.md)
+  — marker scan, callers and gates, L1 or L2 globs with a rule B `why`,
+  and a coverage test with a negative control
+  ([ADR-0068](docs/adr/0068-label-pull-requests-that-touch-high-risk-paths.md),
+  [ADR-0078](docs/adr/0078-sort-pull-requests-by-levels-l1-to-l4.md),
+  [risk-paths spec](docs/specs/risk-paths.md)).
 - **Releasing a suite app (frostnotes, frostmail, lodge, porter):
   Flatpak candidate, clean-desktop gate, promotion and listing;
   the daemon's attested `.deb` and its snosi sysext** →

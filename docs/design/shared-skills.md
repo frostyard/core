@@ -32,6 +32,7 @@ linked canonical skill rather than a copied version:
 | [frostyard-onboard-repo](../../.agents/skills/frostyard-onboard-repo/SKILL.md) | Onboarding an existing repository into the fleet and the skills sync |
 | [frostyard-plan-project](../../.agents/skills/frostyard-plan-project/SKILL.md) | Planning a multi-step project into an approved task graph |
 | [frostyard-readme](../../.agents/skills/frostyard-readme/SKILL.md) | Writing or fixing a root `README.md` to the README spec, with its checker |
+| [frostyard-risk-paths](../../.agents/skills/frostyard-risk-paths/SKILL.md) | Writing or extending `.github/risk-paths.json` so that every privileged file is at L1 or L2, with a coverage test |
 | [frostyard-suite-app-release](../../.agents/skills/frostyard-suite-app-release/SKILL.md) | Releasing a suite app's Flatpak and its daemon's sysext |
 | [frostyard-write-adr](../../.agents/skills/frostyard-write-adr/SKILL.md) | Writing, accepting, amending or superseding an ADR |
 | `golang-*` (20 skills, [list](#vendored-go-skills)) | General Go practice in Go repositories, vendored from samber/cc-skills-golang |
