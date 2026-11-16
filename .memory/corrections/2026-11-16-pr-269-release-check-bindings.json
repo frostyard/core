@@ -1,0 +1,7 @@
+{
+  "date": "2026-11-16",
+  "scope": "skills",
+  "correction": "A release step in a skill keeps every guard of the command it replaces (svu-version-check, bump-main-check before the gate and before the tag), and a check after a release binds to the release itself: the attestation names the release commit (--source-digest), and a delivery that goes through a pull request (a Homebrew tap) passes only when it reached the default branch",
+  "evidence": "frostyard/core#269, cross-review (openai/gpt-6.1-sol) of head c31dedb: 3 blocking points in frostyard-go-repo (the hand tag steps for another version left out svu-version-check and bump-main-check; the Homebrew check passed on a bump branch whose pull request into the tap's main was still open, as nsl's .goreleaser.yaml opens one; the GHCR attestation check named only the repository, not the release commit); fixed in the next commit of the PR; no test can check the wording of a skill step, so a new AGENTS.md rule (Working conventions) guards it",
+  "promoted_to": "AGENTS.md"
+}

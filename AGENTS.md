@@ -143,6 +143,12 @@ Start from .agents/skills/TEMPLATE/SKILL.md. -->
   before it pushes there: `make ci` is each repository's local CI gate,
   lint and format included, and a pass in 1 repository proves nothing for
   another ([ADR-0083](docs/adr/0083-run-the-ci-gate-locally-as-make-ci.md)).
+- A skill step that stands in for a command (hand tag steps for
+  `make bump`) keeps every guard of that command, in the same order. A
+  skill's check after a release binds to that release: an attestation
+  names the release commit (`--source-digest`), and a delivery that goes
+  through a pull request (a Homebrew tap) passes only when it is on the
+  default branch.
 - ADRs record the decision, not how it was reached. State context, decision,
   and consequences as facts. No narration of who asked, who was consulted, or
   the author's process; that belongs in the PR description
