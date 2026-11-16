@@ -64,8 +64,8 @@ optional member:
   script does not accept another owner or an arbitrary clone URL.
 
 Only keys present in `repos` are consumers. The live file is authoritative;
-it includes `chairlift`, `clix`, `firn`, `hearth`, `intuneme`, `lab`,
-`pilothouse`, `repogen`, `snosi`, `std`, and `updex`. Every one except
+it includes `chairlift`, `clix`, `firn`, `frostmarks`, `hearth`,
+`intuneme`, `lab`, `pilothouse`, `repogen`, `snosi`, `std`, and `updex`. Every one except
 `lab` and `snosi` receives the `@go` group in addition to the default
 skills: that group is
 `frostyard-go-repo` plus the vendored Go skills
