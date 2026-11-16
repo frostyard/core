@@ -103,6 +103,7 @@ which baseline rows do not apply here.
 - [0082 — Verify the build provenance of omarchy-apps](adr/0082-verify-the-build-provenance-of-omarchy-apps.md)
 - [0083 — Run the CI gate locally as `make ci`](adr/0083-run-the-ci-gate-locally-as-make-ci.md)
 - [0084 — Accept a tool's own site or a frostyard.org guide as its docs home](adr/0084-accept-a-tools-own-site-or-a-frostyard-org-guide-as-its-docs-home.md)
+- [0085 — Build new first-party apps on hearth, with lodge as their hub](adr/0085-build-new-first-party-apps-on-hearth-with-lodge-as-their-hub.md)
 
 ### Design
 

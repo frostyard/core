@@ -11,6 +11,9 @@ and its weekly conformance sweep replace Phase 2's adoption measure; no
 portfolio map or quarterly review replaces Phases 1 and 4. The Dev release
 concurrency item is done: chairlift#208 and pilothouse#197 merged on
 2026-08-13 ([Plan 0004](0004-dev-release-concurrency-rollout.md)).
+The lifecycle states below stay in use:
+[Incubating repositories](#incubating-repositories) lists the repositories
+in that state.
 
 This plan turns core from a shared-material repository into the visible
 planning surface for Frostyard's repository portfolio. It establishes a
@@ -114,6 +117,37 @@ must distinguish inactivity from an intentional maintenance posture.
   `goreleaser-nightly` group with `cancel-in-progress: true` in CI and their
   pull requests are merged.
 
+## Incubating repositories
+
+Each repository below is Incubating. On its decision date it is promoted
+to another lifecycle state or retired, by its exit criteria.
+
+| Repository | Capability | Decision date |
+| --- | --- | --- |
+| [frostyard/hearth](https://github.com/frostyard/hearth) | Toolkit for apps with an API, MCP tools, permissions and events from 1 Protobuf definition ([ADR-0085](../adr/0085-build-new-first-party-apps-on-hearth-with-lodge-as-their-hub.md)) | 2027-03-31 |
+| [frostyard/frostmarks](https://github.com/frostyard/frostmarks) | Bookmark manager, the first app on hearth ([ADR-0085](../adr/0085-build-new-first-party-apps-on-hearth-with-lodge-as-their-hub.md)) | 2027-03-31 |
+
+Exit criteria, shared by both repositories (the pilot of ADR-0085):
+
+- The owner tells their personal agent to get bookmark access; lodge's
+  consent page shows the requested scopes; the owner narrows and approves;
+  the agent's bookmark tools appear in its 1 gateway entry with no
+  configuration change.
+- A bookmark saved from the bookmarklet reaches the agent as an event;
+  with a "now" subscription it wakes the agent, and the agent tags the
+  bookmark.
+- A grant that reads 1 folder receives only that folder's events (an
+  automated test).
+- Revoking the grant removes the tools and ends the event subscription
+  together.
+- A second, standard MCP client (not pi-pocket) connects through the same
+  OAuth flow.
+- frostmarks works with no lodge: its daemon, its CLI and its stdio MCP
+  server.
+- A developer outside frostyard can build a small example app on hearth
+  from its README alone (hearth's example app is built only from the
+  README's steps).
+
 ## Later / ideas
 
 - Publish a generated organization dashboard after the lifecycle map and
@@ -138,6 +172,7 @@ must distinguish inactivity from an intentional maintenance posture.
 - Tracks: [core#56](https://github.com/frostyard/core/issues/56)
 - Builds on:
   [ADR-0025](../adr/0025-consolidate-repository-docs-into-docs.md),
+  [ADR-0085](../adr/0085-build-new-first-party-apps-on-hearth-with-lodge-as-their-hub.md),
   [ADR-0026](../adr/0026-distribute-core-skills-via-sync-prs.md),
   [ADR-0034](../adr/0034-cancel-stale-rolling-dev-releases.md)
 - Coordinates with:
