@@ -35,6 +35,7 @@
     "clix": ["@go"],
     "std": ["@go"],
     "intuneme": ["@go"],
-    "firn": ["@go"]
+    "firn": ["@go"],
+    "hearth": ["@go"]
   }
 }
