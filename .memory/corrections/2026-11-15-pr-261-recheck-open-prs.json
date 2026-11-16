@@ -1,0 +1,7 @@
+{
+  "date": "2026-11-15",
+  "scope": "plan-records",
+  "correction": "A plan record or PR body that calls another PR open or waiting checks that PR's state again with gh before each push and before ready-for-human; a PR that merged in the meantime is recorded as merged with its merge date",
+  "evidence": "Snosi owner review of frostyard/core#261 at 3808aed found frostyard/snosi#1315 listed as open under Plan 0009 Phase 6 'Open after this phase' and in the PR body, although it merged on 2026-11-15 at 12:08Z (0be393a6) after the author last read its state; fixed in frostyard/core#261 by recording it as merged in the :forky bullet; no test can catch a PR state that changes on GitHub, so a new AGENTS.md rule guards it",
+  "promoted_to": "AGENTS.md"
+}

@@ -313,3 +313,8 @@ anchors valid) and add the back-links on the targets. Use relative paths.
   date of the change itself, not the date a record noted it. Check each
   against that repository's `main` before the PR
   ([core#245](https://github.com/frostyard/core/pull/245)).
+- A doc or PR body that calls another PR open or waiting checks its state
+  again (`gh pr view N -R OWNER/REPO --json state,mergedAt`) before each
+  push and before `ready-for-human`. A PR that merged since then is
+  recorded as merged, with its merge date
+  ([core#261](https://github.com/frostyard/core/pull/261)).
