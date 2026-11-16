@@ -232,6 +232,11 @@ removed. -->
   those libraries, then run `npm run sync:risk-paths-workflow`; never edit an
   embedded copy by hand. `npm run check:risk-paths` (in `verify`) fails when a
   copy drifts.
+- A skill, doc or code sample that reads a risk-path list's levels holds
+  for both schema versions: a version 1 entry has no `level` and counts as
+  L1. A text that says a PR "gets `risk:high`" also covers the PR that
+  adds the first list: with no list at the base SHA the workflow adds no
+  label (risk-paths spec rule E), so the author adds it by hand.
 - Conformance alias symlinks are listed in
   [ADR-0029](docs/adr/0029-acmm-conformance-via-canonical-aliases.md) —
   edit their canonical targets, never the aliases.

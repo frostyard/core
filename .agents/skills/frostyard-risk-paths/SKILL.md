@@ -98,17 +98,24 @@ in the repository's own gate fails when 1 of those files is left out; and
    - An L4 glob never covers `docs/adr/**`, `docs/specs/**`, `AGENTS.md`,
      `policies/**` or the whole `docs/**` (rule H).
    - Follow the glob syntax of rule A: a glob with no `/` matches only at
-     the root; use `**/name` for a name anywhere. No `[...]`, `!` or `a**`.
+     the root, except `**` alone, which matches every path; use `**/name`
+     for a name anywhere. No `[...]`, `!` or `a**`.
 5. **Add or extend the coverage test.** Put it in the repository's own
    gate (`make ci`), in its usual test language. It reads the list with the
    vendored library and holds 3 checks, each with a count in its output:
    - **Required files.** An explicit list of the privileged files from
      steps 2 and 3. Each must exist in the tree and match a glob of the
-     list whose `level` is `L1` or `L2` (in a version 1 list, every glob
-     is L1): `list.paths.some((e) => (e.level === "L1" || e.level ===
-     "L2") && matchGlob(e.glob, path))`. A glob that matches at L3 or L4
-     does not count: it gets no `risk:high`. A floor does not count
-     either (see Pitfalls).
+     list at L1 or L2. A version 1 list has no `level` field, and every
+     glob in it is L1, so the check reads both versions:
+
+     ```js
+     const strict = (e) =>
+       list.schema_version === 1 || e.level === "L1" || e.level === "L2";
+     const covered = list.paths.some((e) => strict(e) && matchGlob(e.glob, path));
+     ```
+
+     A version 2 glob that matches at L3 or L4 does not count: it gets no
+     `risk:high`. A floor does not count either (see Pitfalls).
    - **Marker scan.** The marker patterns of step 2 run over the tracked
      files (`git ls-files`), and each hit must match an L1 or L2 glob, or
      be named in a short exemption list in the test with a reason for each
@@ -124,8 +131,15 @@ in the repository's own gate fails when 1 of those files is left out; and
    fail. A check that passes on an empty file list proves nothing: assert
    that the count of checked files is above 0.
 6. **Verify and write the pull request.**
-   - Run `make ci` and keep the output. The pull request changes the list,
-     so it is at least L2 (rule G) and gets `risk:high`.
+   - Run `make ci` and keep the output.
+   - A pull request that changes an existing list is at least L2 (rule G),
+     and the workflow adds `risk:high`.
+   - A pull request that adds the first list gets no label from the
+     workflow: with no list at the base SHA, the job writes "no list on
+     base", adds no label and passes (spec rule E). Treat it as L2 or
+     stricter anyway: add `risk:high` and `level:L2` by hand (`level:L1`
+     when the PR also changes a file that the new list puts at L1), and
+     follow rule F as for any `risk:high` PR.
    - In the PR body, name each matched path and why the change is safe, as
      `risk:high` needs for an owner author (spec rule F). List the marker
      commands of step 2 and the count of files that each check covers.

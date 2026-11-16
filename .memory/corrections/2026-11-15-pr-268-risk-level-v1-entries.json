@@ -1,0 +1,7 @@
+{
+  "date": "2026-11-15",
+  "scope": "risk-paths skill",
+  "correction": "A coverage check that reads e.level rejects every version 1 risk-path entry, which has no level and counts as L1; a sample check accepts list.schema_version === 1 or a level of L1 or L2.",
+  "evidence": "frostyard/core#268, cross-review (openai/gpt-6.1-sol) of head 05cff413fb1c6112d0ee46f1812673b384a34c86, finding 1",
+  "promoted_to": "AGENTS.md"
+}

@@ -1,0 +1,7 @@
+{
+  "date": "2026-11-15",
+  "scope": "risk-paths skill",
+  "correction": "A PR that adds the first risk-path list gets no label from the workflow (no list on base, spec rule E); a text must not say it gets risk:high, and the author adds risk:high and the level label by hand.",
+  "evidence": "frostyard/core#268, cross-review (openai/gpt-6.1-sol) of head 05cff413fb1c6112d0ee46f1812673b384a34c86, finding 2",
+  "promoted_to": "AGENTS.md"
+}
