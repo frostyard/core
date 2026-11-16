@@ -265,7 +265,9 @@ run creates another one.
   [ADR-0071](../adr/0071-hold-every-code-repository-to-one-baseline.md)
   (the Fleet toolchain table in `frostyard-go-repo`, carried by `@go`);
   [ADR-0072](../adr/0072-write-every-readme-to-one-standard.md)
-  (the `frostyard-readme` skill, a default skill)
+  (the `frostyard-readme` skill, a default skill);
+  [ADR-0068](../adr/0068-label-pull-requests-that-touch-high-risk-paths.md)
+  (the `frostyard-risk-paths` skill, a default skill)
 - Contracts: [README spec](../specs/readme.md) (the
   `frostyard-readme` checker and templates)
 - Operations: [Skills sync operations](skills-sync-operations.md)
