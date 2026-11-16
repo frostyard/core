@@ -1,6 +1,6 @@
 ---
 name: frostyard-go-repo
-description: Structure, build, test, and release a frostyard Go repository the way updex does — SDK-first layout, clix CLI entry, Makefile check gate, golangci-lint v2, GoReleaser Pro with svu-tagged releases and a nightly dev snapshot. Use whenever creating a new frostyard Go repo, adding CLI/release tooling to one, or making an existing one match org conventions.
+description: Structure, build, test, and release a frostyard Go repository the way updex does — SDK-first layout, clix CLI entry, Makefile check gate, golangci-lint v2, GoReleaser Pro with svu-tagged releases and a nightly dev snapshot. Use whenever creating a new frostyard Go repo, adding CLI/release tooling to one, making an existing one match org conventions, or preparing, verifying or patching a release.
 ---
 
 # Build a frostyard Go repository
@@ -137,9 +137,110 @@ Rules:
   groups by them and svu derives the next version from them.
 - `make bump` is the release command; never hand-craft versions. A
   maintainer runs it: agents never tag, push a tag, or publish a release.
-  An agent that finds a release due proposes the version (`svu next` is
-  read-only) and asks the maintainer to tag.
+  An agent that finds a release due prepares it (below), proposes the
+  version (`svu next` is read-only) and asks the maintainer to tag.
 - The `dev` pre-release is the rolling snapshot; real releases are svu tags.
+
+### Before the tag
+
+1. **Check the guards.** `mise.toml` pins `svu` (updex and std pin
+   `svu = "3.4.1"`): an svu older than v3 does not read the `.svu.yml`
+   format and gives no error. `make bump` runs `svu-version-check` first,
+   which refuses any svu other than the pin
+   ([std#90](https://github.com/frostyard/std/pull/90),
+   [updex#449](https://github.com/frostyard/updex/pull/449)), and
+   `bump-main-check`, which refuses a `HEAD` that is not `main` or not
+   equal to `origin/main`
+   ([updex#510](https://github.com/frostyard/updex/pull/510)). A repository
+   without these targets gets them from updex's `Makefile` in a pull request
+   before the release.
+2. **Name the release commit.** It is the `origin/main` SHA on the day of
+   the tag. Check that the CI workflow is green at that SHA
+   (`gh run list -R OWNER/REPO --commit SHA`) and run `make ci` there. When
+   `main` moves after a draft, name the new SHA and do steps 2 to 4 again: a
+   merge after the draft changes the release commit.
+3. **Compare the versions.** Run `svu next`, and `svu patch` or
+   `svu minor` for the alternatives. When `svu next` is not the version the
+   maintainer approved, say why. Two causes seen in the fleet:
+   - Dependabot commits with a `feat(deps)` prefix make `svu next` a minor
+     bump for dependency updates only.
+   - A behaviour change merged as `fix:` stays a patch for svu, but before
+     1.0 it needs a minor bump.
+
+   `make bump` can tag only `svu next`. For another version, give the
+   maintainer the steps that `make bump` does, with the version and SHA
+   written out: the gate that the repository's `bump` target runs (updex:
+   `make build test fmt lint`; std: `make check`), a clean tree, then
+   `git tag -a vX.Y.Z -m "Version vX.Y.Z" SHA` and
+   `git push origin vX.Y.Z`. Begin the steps with
+   `git switch main && git pull --ff-only` and a check that
+   `git rev-parse HEAD` prints the release commit.
+4. **Release notes.** GoReleaser writes the release body from the commits
+   and the `changelog` groups of `.goreleaser.yaml`. With
+   `release.mode: replace`, it replaces any body that exists when the
+   release run publishes, and a re-run replaces it again. So put
+   hand-written notes (behaviour changes first) in the release ask, and
+   apply them only after the release run ends:
+   `gh release edit vX.Y.Z -R OWNER/REPO --notes-file NOTES.md`.
+
+### After the tag
+
+Record each check with its command and its result. A check that you did
+not run is "not checked", not a pass.
+
+1. **Release run.** `gh run list -R OWNER/REPO -w release.yml -L 3`: the
+   run for the tag has conclusion `success`, and its commit is the release
+   commit.
+2. **Assets.**
+   `gh release view vX.Y.Z -R OWNER/REPO --json assets,isDraft,isPrerelease`:
+   every archive and package the `.goreleaser.yaml` builds, and
+   `checksums.txt`; not a draft, not a pre-release.
+3. **Checksums.** `gh release download vX.Y.Z -R OWNER/REPO -D DIR`, then
+   `sha256sum -c checksums.txt` in `DIR`.
+4. **Provenance.** For each asset and `checksums.txt`:
+   `gh attestation verify FILE --repo OWNER/REPO --source-ref refs/tags/vX.Y.Z`.
+   Record the signer workflow (`release.yml@refs/tags/vX.Y.Z`) and the
+   commit.
+5. **Delivery paths.** Check each path the repository has, and record a
+   path it does not have as "not a path", with the reason (for example, no
+   `homebrew_casks` section in `.goreleaser.yaml`):
+   - APT: the apt-publisher `publish` run for the tag and the canary, as in
+     step 5 of
+     [frostyard-apt-producer](https://github.com/frostyard/core/blob/main/.agents/skills/frostyard-apt-producer/SKILL.md).
+   - Homebrew: GoReleaser's cask commit in `frostyard/homebrew-tap` names
+     the version, and the tap CI run on that commit is green.
+   - GHCR: the image for the tag exists, and
+     `gh attestation verify oci://ghcr.io/frostyard/NAME:TAG --repo OWNER/REPO`
+     passes when the repository attests its images.
+   - A downstream build (for example a snosi image build after an APT
+     publication) belongs to its owner: record its run, not its result.
+
+### Go security patch
+
+When `govulncheck` (CI or a nightly run) reports a standard-library
+vulnerability that a Go patch release fixes:
+
+1. **Reachability.** Run `govulncheck ./...` with the release the
+   repository's CI installs (no `@latest`). Record the vulnerability ID,
+   the exit code, and whether the output shows call traces to the
+   vulnerable symbol or lists it only as not called.
+2. **Move the pin.** Change the `go 1.27.<patch>` line in `go.mod`, the
+   only Go pin of the Fleet toolchain table. Add no `toolchain` line, and
+   keep the Go minor.
+3. **`mise.lock`.** When it holds a `[[tools.go]]` entry, run `mise lock go`
+   after the `go.mod` change. Check that `mise.toml` did not change, and
+   that each URL and checksum matches
+   `https://go.dev/dl/?mode=json&include=all`. Where `mise.lock` is a risk
+   path, the pull request body names it and why the change is safe.
+4. **Prove it.** Run `govulncheck ./...` again on the branch (the ID is
+   gone) and `make ci`. Move the docs that name the Go version
+   (`AGENTS.md`, `README.md`) in the same pull request.
+5. **Release.** Open the pull request
+   (`build(go): move Go to 1.27.<patch> for GO-YYYY-NNNN`). After it merges
+   and CI on `main` is green, propose the patch release by "Before the
+   tag". A fleet-wide patch is 1 pull request in each repository, with the
+   same title and the same checks, and 1 release ask that lists every
+   repository with its fix pull request.
 
 ## Pitfalls
 
@@ -150,3 +251,7 @@ Rules:
 - `make lint` silently skips if golangci-lint isn't installed — CI is the
   backstop, so don't treat a quiet local `make check` as proof lint ran.
 - Don't disable the snapshot workflow's `cancel-in-progress` — see step 3.
+- Don't trust `svu next` without a look at the commits: a `feat(deps)`
+  Dependabot prefix makes it a minor bump — see "Before the tag".
+- Don't edit a release body before the release run ends:
+  `release.mode: replace` overwrites it.
