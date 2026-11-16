@@ -100,10 +100,15 @@ A plan record, a validation record, a phase close or a finding claims only
 what its evidence shows. Cross-review blocks each over-claim, so check
 each claim against these rules before the first review:
 
-1. **Name the source of each claim.** Give the command or the source
-   behind it (a file, a run URL, a query), the head SHA or tag it ran on,
-   and the date of the run, not the date of the record. A time read on 1
-   host is not the time of a read on another host: name the clock.
+1. **Name the source of each claim.** A claim from a run (a command, a
+   test, a workflow) gives the command or the run URL, the head SHA or tag
+   it ran on, and the date of the run, not the date of the record. A claim
+   read in a document or the code gives the file or URL, the SHA or tag it
+   was read at, and the date of the read. A claim that a person reported
+   gives who reported it and the date of the report. When a revision or a
+   date does not apply or is not known, say so; never invent one. A time
+   read on 1 host is not the time of a read on another host: name the
+   clock.
 2. **Mark each fact by how it is known.** Observed: a command or a test
    that you ran shows it. Reported: a person said it. Read: a document, a
    script or the code says it. Never record a reported or a read fact as
@@ -121,9 +126,11 @@ each claim against these rules before the first review:
 5. **Cite each part of another repository's work** to the PR or the commit
    that made that part, with the date of that change, and check each
    against that repository's default branch
-   ([core#245](https://github.com/frostyard/core/pull/245)). Check the
-   state of a PR that the record calls open again before each push, and
-   record a PR that merged since then as merged, with its merge date
+   ([core#245](https://github.com/frostyard/core/pull/245)). A record or
+   a PR body that calls another PR open or waiting checks its state again
+   (`gh pr view N -R OWNER/REPO --json state,mergedAt`) before each push
+   and before `ready-for-human`, and records a PR that merged since then
+   as merged, with its merge date
    ([core#261](https://github.com/frostyard/core/pull/261)).
 6. **Update the plan's status line and the index in the same PR.** A plan
    that is done, closed or superseded gets a `**Status:**` line under its
