@@ -12,10 +12,9 @@ MCP endpoint on lodge
 and daemons share code through lodge's Go module `lodge/kit`. On
 2026-11-15:
 
-- frostnotes serves 8 MCP tools over 69 RPC methods, and frostmail 20
-  tools over 133 methods, through lodge's `/mcp/notes` and `/mcp/mail`.
-  Each app has its own scope grammar and about 1,000 hand-written lines of
-  MCP code.
+- frostnotes and frostmail serve MCP through lodge's `/mcp/notes` and
+  `/mcp/mail`. Each app has its own scope grammar and its own hand-written
+  MCP code, apart from its RPC schema.
 - Each app keeps its own copy of `tools/rpcgen`, which generates its
   JSON-RPC code from a YAML schema. The copies drifted, and do not converge
   without a change of what each schema means
@@ -128,9 +127,11 @@ Generation fails on an RPC with no permission, no effect or an empty
 ### Permissions and trust
 
 - **A grant** is a list of items, each a capability on a selector path.
-  An item on path G covers path P when P is G or starts with G + `/`;
-  items union. Paths are `/`-separated Unicode NFC with no empty, `.` or
-  `..` segment. Standalone, the local user holds every capability on `/`.
+  A path is `/` (the root) or `/` followed by `/`-separated segments, in
+  Unicode NFC, with no empty, `.` or `..` segment and no trailing `/`. An
+  item on `/` covers every path. An item on another path G covers path P
+  when P is G or starts with G + `/`, so `/Chan` does not cover `/Chani`.
+  Items union. Standalone, the local user holds every capability on `/`.
 - **The app enforces; lodge issues.** The generated check refuses a call
   whose permission the grant lacks for the request's selector value. For
   an RPC on a stored object, the app resolves the object's stored selector

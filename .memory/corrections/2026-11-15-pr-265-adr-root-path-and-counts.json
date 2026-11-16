@@ -1,0 +1,7 @@
+{
+  "date": "2026-11-15",
+  "scope": "docs",
+  "correction": "A prefix rule over paths in a doc states the root case on its own (an item on / covers every path) and is checked at the root, a child of the root and a longer sibling name; a count in a doc names its source and selection, or the doc drops the number",
+  "evidence": "Cross-review of frostyard/core#265 (openai/gpt-6.1-sol) at 1607f5f found that ADR-0085's rule 'G covers P when P is G or starts with G + /' gave the root / no children, and that its tool, method and line counts named no source; fixed in frostyard/core#265 with a separate root clause and a /Chan against /Chani example, and the counts removed; the root and boundary rule is now in AGENTS.md beside the count rule",
+  "promoted_to": "AGENTS.md"
+}
