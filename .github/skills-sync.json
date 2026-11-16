@@ -36,6 +36,7 @@
     "std": ["@go"],
     "intuneme": ["@go"],
     "firn": ["@go"],
-    "hearth": ["@go"]
+    "hearth": ["@go"],
+    "frostmarks": ["@go"]
   }
 }

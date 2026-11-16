@@ -127,7 +127,10 @@ to another lifecycle state or retired, by its exit criteria.
 | [frostyard/hearth](https://github.com/frostyard/hearth) | Toolkit for apps with an API, MCP tools, permissions and events from 1 Protobuf definition ([ADR-0085](../adr/0085-build-new-first-party-apps-on-hearth-with-lodge-as-their-hub.md)) | 2027-03-31 |
 | [frostyard/frostmarks](https://github.com/frostyard/frostmarks) | Bookmark manager, the first app on hearth ([ADR-0085](../adr/0085-build-new-first-party-apps-on-hearth-with-lodge-as-their-hub.md)) | 2027-03-31 |
 
-Exit criteria, shared by both repositories (the pilot of ADR-0085):
+Exit criteria, shared by both repositories (the pilot of ADR-0085).
+frostmarks' own roadmap repeats them as the "Done when" lines of its
+phase 2 (`docs/plans/0001-roadmap.md`, added by
+[frostmarks#3](https://github.com/frostyard/frostmarks/pull/3)):
 
 - The owner tells their personal agent to get bookmark access; lodge's
   consent page shows the requested scopes; the owner narrows and approves;
