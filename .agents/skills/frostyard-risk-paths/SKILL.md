@@ -139,7 +139,11 @@ in the repository's own gate fails when 1 of those files is left out; and
      base", adds no label and passes (spec rule E). Treat it as L2 or
      stricter anyway: add `risk:high` and `level:L2` by hand (`level:L1`
      when the PR also changes a file that the new list puts at L1), and
-     follow rule F as for any `risk:high` PR.
+     follow rule F as for any `risk:high` PR. Add only labels that exist
+     in the repository (`gh label list`): adding a missing label creates
+     it, and only the accountable owner creates labels (the 4 level
+     labels with core's `scripts/apply-triage-settings.sh`). Never remove a stricter level
+     label that the PR already has.
    - In the PR body, name each matched path and why the change is safe, as
      `risk:high` needs for an owner author (spec rule F). List the marker
      commands of step 2 and the count of files that each check covers.
