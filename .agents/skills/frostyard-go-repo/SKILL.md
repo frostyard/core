@@ -168,13 +168,22 @@ Rules:
      1.0 it needs a minor bump.
 
    `make bump` can tag only `svu next`. For another version, give the
-   maintainer the steps that `make bump` does, with the version and SHA
-   written out: the gate that the repository's `bump` target runs (updex:
-   `make build test fmt lint`; std: `make check`), a clean tree, then
-   `git tag -a vX.Y.Z -m "Version vX.Y.Z" SHA` and
-   `git push origin vX.Y.Z`. Begin the steps with
-   `git switch main && git pull --ff-only` and a check that
-   `git rev-parse HEAD` prints the release commit.
+   maintainer the steps that `make bump` does, with its guards, and the
+   version and SHA written out, in this order:
+   1. `git switch main && git pull --ff-only`, then `make svu-version-check`.
+   2. `make bump-main-check`, and a check that `git rev-parse HEAD` prints
+      the release commit. Stop when it does not.
+   3. The gate that the repository's `bump` target runs (updex:
+      `make build test fmt lint`; std: `make check`), then a clean tree
+      (`test -z "$(git status --porcelain)"`).
+   4. `make bump-main-check` again, just before the tag.
+   5. `git tag -a vX.Y.Z -m "Version vX.Y.Z" SHA` and
+      `git push origin vX.Y.Z`.
+
+   In a repository without `bump-main-check`, use
+   `git fetch origin main` and a check that `git rev-parse HEAD` equals
+   `git rev-parse origin/main` in its place; propose the target in a pull
+   request ("Check the guards" above).
 4. **Release notes.** GoReleaser writes the release body from the commits
    and the `changelog` groups of `.goreleaser.yaml`. With
    `release.mode: replace`, it replaces any body that exists when the
@@ -198,20 +207,28 @@ not run is "not checked", not a pass.
 3. **Checksums.** `gh release download vX.Y.Z -R OWNER/REPO -D DIR`, then
    `sha256sum -c checksums.txt` in `DIR`.
 4. **Provenance.** For each asset and `checksums.txt`:
-   `gh attestation verify FILE --repo OWNER/REPO --source-ref refs/tags/vX.Y.Z`.
-   Record the signer workflow (`release.yml@refs/tags/vX.Y.Z`) and the
-   commit.
+   `gh attestation verify FILE --repo OWNER/REPO --source-ref refs/tags/vX.Y.Z --source-digest SHA`,
+   where `SHA` is the release commit. Record the signer workflow
+   (`release.yml@refs/tags/vX.Y.Z`) and the commit.
 5. **Delivery paths.** Check each path the repository has, and record a
    path it does not have as "not a path", with the reason (for example, no
    `homebrew_casks` section in `.goreleaser.yaml`):
    - APT: the apt-publisher `publish` run for the tag and the canary, as in
      step 5 of
      [frostyard-apt-producer](https://github.com/frostyard/core/blob/main/.agents/skills/frostyard-apt-producer/SKILL.md).
-   - Homebrew: GoReleaser's cask commit in `frostyard/homebrew-tap` names
-     the version, and the tap CI run on that commit is green.
-   - GHCR: the image for the tag exists, and
-     `gh attestation verify oci://ghcr.io/frostyard/NAME:TAG --repo OWNER/REPO`
-     passes when the repository attests its images.
+   - Homebrew: the cask change reaches the tap's default branch. When the
+     `homebrew_casks` entry opens a pull request
+     (`repository.pull_request.enabled: true`, as in nsl), that pull
+     request merged; an open one is "pending", not a pass. Then
+     `Casks/NAME.rb` on the tap's `main` names the version and the sha256
+     values that `checksums.txt` gives for the archives, and the tap CI run
+     on that commit is green.
+   - GHCR: the image for the tag exists. When the repository attests its
+     images,
+     `gh attestation verify oci://ghcr.io/frostyard/NAME:TAG --repo OWNER/REPO --source-digest SHA`
+     passes (add `--source-ref refs/tags/vX.Y.Z` when the image workflow
+     runs on the tag). Record the image digest, the signer workflow and the
+     source commit.
    - A downstream build (for example a snosi image build after an APT
      publication) belongs to its owner: record its run, not its result.
 
