@@ -2,6 +2,6 @@
   "date": "2026-11-16",
   "scope": "skills",
   "correction": "A shared skill rule that restates a core AGENTS.md rule keeps every case of that rule (open or waiting PRs, before each push and before ready-for-human), and an evidence rule says which metadata applies to each kind of source (a run, a read, a report), so that no agent must invent a revision or a run date",
-  "evidence": "frostyard/core#270, cross-review (openai/gpt-6.1-sol) of head 9c0e154: 2 blocking points in the new Record evidence section of frostyard-repo-docs (rule 5 checked an open PR only before each push; rule 1 asked a run SHA and run date of every claim, also a reported or read fact); fixed in the next commit of the PR; no test can check the wording of a skill rule, so the skill rule itself is the guard",
-  "promoted_to": ".agents/skills/frostyard-repo-docs/SKILL.md"
+  "evidence": "frostyard/core#270, cross-review (openai/gpt-6.1-sol) of head 9c0e154: 2 blocking points in the new Record evidence section of frostyard-repo-docs (rule 5 checked an open PR only before each push; rule 1 asked a run SHA and run date of every claim, also a reported or read fact); fixed in the next commit of the PR; no test can check the wording of a skill rule, so a new AGENTS.md rule (Working conventions) guards it",
+  "promoted_to": "AGENTS.md"
 }
