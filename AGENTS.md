@@ -37,6 +37,12 @@ Start from .agents/skills/TEMPLATE/SKILL.md. -->
   — apt-publisher is the single writer
   ([ADR-0055](docs/adr/0055-publish-debian-packages-through-the-apt-publisher.md),
   [ADR-0059](docs/adr/0059-publish-image-only-packages-in-a-separate-apt-component.md)).
+- **Reviewing, answering or closing a pull request from a person outside
+  the team (not the bot account, a maintainer or a dependency bot)** →
+  [.agents/skills/frostyard-contributor-review/SKILL.md](.agents/skills/frostyard-contributor-review/SKILL.md)
+  — checks as strict as any review, a warm and plain voice, labelled
+  points with a fix for each blocker, an honest bot note, kind declines
+  ([ADR-0020](docs/adr/0020-ai-automation-trust-boundaries.md)).
 - **Designing any Frostyard-branded interface, page, mock, or asset** →
   [.agents/skills/frostyard-design/SKILL.md](.agents/skills/frostyard-design/SKILL.md)
   — brand law, tokens, guidelines, components, UI kits, hero art.
