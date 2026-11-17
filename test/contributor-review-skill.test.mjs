@@ -22,6 +22,7 @@ test("the risk-path guidance keeps every case of the risk:high rule", async () =
     "an organization floor puts it there",
     "A version 1 list has no levels, and each of its matches counts as L1",
     "With no list at the base, as in the pull request that adds the first list, the workflow adds no label",
+    "the author adds `risk:high` by hand; an outside author who cannot add labels asks a maintainer to add it",
   ]) {
     assert.ok(text.includes(phrase), `${SKILL} must say: ${phrase}`);
   }

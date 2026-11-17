@@ -69,10 +69,11 @@ gh api repos/OWNER/REPO/pulls/N \
      floor puts it there. A version 1 list has no levels, and each of its
      matches counts as L1. With no list at the base, as in the pull
      request that adds the first list, the workflow adds no label: match
-     the files by hand, and a maintainer adds `risk:high` when the new
-     list puts a changed file at L1 or L2. Check each L1 or L2 file line
-     by line. A change that the description does not explain is a
-     question, every time.
+     the files by hand. When the new list puts a changed file at L1 or
+     L2, the author adds `risk:high` by hand; an outside author who
+     cannot add labels asks a maintainer to add it. Check each L1 or L2
+     file line by line. A change that the description does not explain
+     is a question, every time.
    - **Tests:** a bug fix has a test that fails without it; new behavior
      has a test of each case it adds.
    - **Scope:** the change does 1 thing, fits the repository's purpose
