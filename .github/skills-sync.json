@@ -1,5 +1,5 @@
 {
-  "defaults": ["frostyard-repo-docs", "frostyard-acmm-conformance", "frostyard-readme", "frostyard-risk-paths"],
+  "defaults": ["frostyard-repo-docs", "frostyard-acmm-conformance", "frostyard-readme", "frostyard-risk-paths", "frostyard-contributor-review"],
   "groups": {
     "go": [
       "frostyard-go-repo",

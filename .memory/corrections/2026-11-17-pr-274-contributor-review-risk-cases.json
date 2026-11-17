@@ -1,0 +1,7 @@
+{
+  "date": "2026-11-17",
+  "scope": "contributor-review skill",
+  "correction": "A skill step that says a pull request touching a risk-path glob gets risk:high drops cases: only L1 or L2 gets it, an organization floor can put a PR there with no glob match, a version 1 entry counts as L1, and with no list at the base (the PR that adds the first list) the workflow adds no label, so the author adds it by hand (an outside author asks a maintainer).",
+  "evidence": "frostyard/core#274, cross-review (openai/gpt-6.1-sol) of head 3bd672294b6f82fa085dc93cd9ce98f434da5419, finding 1, and re-review 1 of head 21ade5451997f55e14a5985e907316951cd7fa31",
+  "promoted_to": "test/contributor-review-skill.test.mjs"
+}

@@ -26,6 +26,7 @@ linked canonical skill rather than a copied version:
 | --- | --- |
 | [frostyard-acmm-conformance](../../.agents/skills/frostyard-acmm-conformance/SKILL.md) | Bringing a repository to Hive ACMM conformance |
 | [frostyard-apt-producer](../../.agents/skills/frostyard-apt-producer/SKILL.md) | Publishing a repository's `.deb` packages through apt-publisher |
+| [frostyard-contributor-review](../../.agents/skills/frostyard-contributor-review/SKILL.md) | Reviewing an outside contributor's pull request: strict checks, a warm voice, labelled points, an honest bot note |
 | [frostyard-design](../../.agents/skills/frostyard-design/SKILL.md) | Frostyard-branded interfaces and assets |
 | [frostyard-docs-site](../../.agents/skills/frostyard-docs-site/SKILL.md) | Adding a ProperDocs + MaterialX documentation site (GitHub Pages) |
 | [frostyard-go-repo](../../.agents/skills/frostyard-go-repo/SKILL.md) | Creating or conforming a Frostyard Go repository |
