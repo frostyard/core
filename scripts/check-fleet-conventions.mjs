@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 // Organization gate (ADR-0043, ADR-0044, ADR-0083): reads each enabled
 // declaration's default branch over the GitHub API, or each OWNER/REPO given
-// as an argument, and prints 1 line per repository. Exit 1 when a repository
-// fails, 2 on a usage error. Read only.
+// as an argument, and prints 1 line per repository. The gate also checks that
+// only the PR triage caller runs on pull_request_target. Exit 1 when a
+// repository fails, 2 on a usage error. Read only.
 
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -39,7 +40,8 @@ for (const { label, failures } of results) {
 }
 
 // A gate that read no repository proves nothing.
-console.log(`${results.length} repositories checked`);
+const total = results.reduce((sum, { workflows }) => sum + workflows, 0);
+console.log(`${results.length} repositories checked, ${total} workflow files read`);
 if (results.length === 0) {
   console.log("FAIL no repository to check");
   failed = true;

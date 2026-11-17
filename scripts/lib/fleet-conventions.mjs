@@ -2,6 +2,20 @@ import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 
 import { ciCoverageGaps, lintGaps, lintScriptPaths, namesMakeCi, runsOnPullRequest } from "./ci-gate.mjs";
+import { triggerEvents } from "./workflow-triggers.mjs";
+
+export const PULL_REQUEST_TARGET_CALLERS = ["risk-paths.yml", "risk-paths-caller.yml"];
+
+// The org Actions policy allows pull_request_target only for these 2 caller paths
+// (docs/design/pull-request-target-policy.md). GitHub does not block another
+// workflow in a repository that has the caller (core#273).
+export function pullRequestTargetGaps(workflows) {
+  return Object.entries(workflows)
+    .filter(([name, text]) => triggerEvents(text).includes("pull_request_target")
+      && !PULL_REQUEST_TARGET_CALLERS.includes(name))
+    .map(([name]) => name)
+    .sort();
+}
 
 const CONTENTS_API = "https://api.github.com/repos";
 
@@ -88,9 +102,13 @@ export async function checkRepository(fetchImpl, owner, name) {
     }
   }
 
-  failures.push(...(await checkCiGate(fetchImpl, owner, name, makefile)));
+  const workflows = await fetchWorkflows(fetchImpl, owner, name);
+  failures.push(...(await checkCiGate(fetchImpl, owner, name, makefile, workflows)));
+  for (const file of pullRequestTargetGaps(workflows)) {
+    failures.push(`pull_request_target: ${file} runs on pull_request_target; only the PR triage caller (risk-paths.yml, risk-paths-caller.yml) may`);
+  }
 
-  return { label, failures };
+  return { label, failures, workflows: Object.keys(workflows).length };
 }
 
 // The workflow files of the repository's default branch: name -> text. A
@@ -118,13 +136,12 @@ async function fetchWorkflows(fetchImpl, owner, name) {
 // ci.yml runs every part of `make ci`. Row B19: AGENTS.md names `make ci`,
 // and no pull-request workflow runs a lint or format check that `make ci`
 // does not run.
-async function checkCiGate(fetchImpl, owner, name, makefile) {
+async function checkCiGate(fetchImpl, owner, name, makefile, workflows) {
   const failures = [];
   const agents = await fetchFile(fetchImpl, owner, name, "AGENTS.md");
   if (agents === null) failures.push("B19: AGENTS.md missing");
   else if (!namesMakeCi(agents)) failures.push("B19: AGENTS.md does not name make ci");
 
-  const workflows = await fetchWorkflows(fetchImpl, owner, name);
   if (workflows["ci.yml"] === undefined) {
     failures.push("B12: .github/workflows/ci.yml missing");
   } else if (!runsOnPullRequest(workflows["ci.yml"])) {
@@ -159,7 +176,7 @@ export async function checkFleetConventions(fetchImpl, repositoriesRoot, only = 
     try {
       results.push(await checkRepository(fetchImpl, owner, name));
     } catch (error) {
-      results.push({ label: `${owner}/${name}`, failures: [error.message] });
+      results.push({ label: `${owner}/${name}`, failures: [error.message], workflows: 0 });
     }
   }
   return results;
