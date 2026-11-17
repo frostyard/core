@@ -222,8 +222,11 @@ removed. -->
   verify gate ([ADR-0043](docs/adr/0043-pin-repository-tools-in-mise-and-name-the-verify-gate.md)),
   and for baseline rows B12 and B19: `ci.yml` runs `make ci`, `AGENTS.md`
   names it, and no pull-request workflow lints or formats outside it
-  ([ADR-0083](docs/adr/0083-run-the-ci-gate-locally-as-make-ci.md)). It runs
-  as CI's required `fleet-conventions` job, not part of `check`/`verify`;
+  ([ADR-0083](docs/adr/0083-run-the-ci-gate-locally-as-make-ci.md)). It also
+  fails when a workflow other than the PR triage caller (`risk-paths.yml`,
+  `risk-paths-caller.yml`) runs on `pull_request_target`
+  ([pull_request_target policy](docs/design/pull-request-target-policy.md#code-guard)).
+  It runs as CI's required `fleet-conventions` job, not part of `check`/`verify`;
   `node scripts/check-fleet-conventions.mjs OWNER/REPO...` checks other
   repositories. Its readers live in `scripts/lib/ci-gate.mjs` and are
   tested in `test/ci-gate.test.mjs`.

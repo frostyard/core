@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { checkFleetConventions } from "../scripts/lib/fleet-conventions.mjs";
+import { checkFleetConventions, pullRequestTargetGaps, summaryLine } from "../scripts/lib/fleet-conventions.mjs";
 
 async function makeRepositoriesRoot(declarations) {
   const root = await mkdtemp(path.join(os.tmpdir(), "core-fleet-"));
@@ -98,8 +98,8 @@ test("a conformant Go repository and a conformant Node repository pass", async (
   const results = await checkFleetConventions(fetchImpl, root);
 
   assert.deepEqual(results, [
-    { label: "frostyard/gorepo", failures: [] },
-    { label: "frostyard/noderepo", failures: [] },
+    { label: "frostyard/gorepo", failures: [], workflows: 1 },
+    { label: "frostyard/noderepo", failures: [], workflows: 1 },
   ]);
 });
 
@@ -196,7 +196,7 @@ test("given repositories replace the enabled declarations", async () => {
 
   const results = await checkFleetConventions(fetchImpl, root, [{ owner: "bketelsen", name: "fleet" }]);
 
-  assert.deepEqual(results, [{ label: "bketelsen/fleet", failures: [] }]);
+  assert.deepEqual(results, [{ label: "bketelsen/fleet", failures: [], workflows: 1 }]);
   assert.ok(fetchImpl.calls.every((url) => url.includes("/repos/bketelsen/fleet/")));
 });
 
@@ -251,4 +251,131 @@ test("B19: a lint job outside make ci fails; the same tool inside make ci passes
 test("B19: a lint check in a workflow that does not run on pull requests is not read", async () => {
   const release = "on:\n  push:\n    tags: ['v*']\njobs:\n  lint:\n    if: github.event_name != 'pull_request'\n    steps:\n      - run: golangci-lint run\n";
   assert.deepEqual(await checkOne({ ".github/workflows/release.yml": release }), []);
+});
+
+test("pullRequestTargetGaps allows exactly the 2 PR triage caller names", () => {
+  assert.deepEqual(pullRequestTargetGaps({
+    "risk-paths.yml": "on: pull_request_target\n",
+    "risk-paths-caller.yml": "on: pull_request_target\n",
+  }), []);
+  assert.deepEqual(pullRequestTargetGaps({
+    "risk-paths.yaml": "on: pull_request_target\n",
+    "x-risk-paths.yml": "on: pull_request_target\n",
+  }), ["risk-paths.yaml", "x-risk-paths.yml"]);
+});
+
+test("pullRequestTargetGaps detects block and flow triggers", () => {
+  assert.deepEqual(pullRequestTargetGaps({
+    "deploy.yml": "on:\n  pull_request_target:\n    types: [labeled]\n",
+  }), ["deploy.yml"]);
+  assert.deepEqual(pullRequestTargetGaps({
+    "deploy.yml": "on: [push, pull_request_target]\n",
+  }), ["deploy.yml"]);
+});
+
+test("pullRequestTargetGaps ignores comments, jobs and other events", () => {
+  assert.deepEqual(pullRequestTargetGaps({
+    "comment.yml": "# on: pull_request_target\non: push # pull_request_target\n",
+    "jobs.yml": "on: push\njobs:\n  pull_request_target:\n    runs-on: ubuntu-latest\n",
+    "pr.yml": "on: pull_request\n",
+  }), []);
+});
+
+test("pullRequestTargetGaps handles no workflows and sorts gaps", () => {
+  assert.deepEqual(pullRequestTargetGaps({}), []);
+  assert.deepEqual(pullRequestTargetGaps({
+    "z.yml": "on: pull_request_target\n",
+    "a.yml": "on: pull_request_target\n",
+  }), ["a.yml", "z.yml"]);
+});
+
+test("a non-caller pull_request_target workflow fails with its file name", async () => {
+  const root = await makeRepositoriesRoot([
+    { repository: { owner: "frostyard", name: "repo" }, fleet_state: "enabled" },
+  ]);
+  const fetchImpl = fakeFetch(conformant("frostyard", "repo", {
+    ".github/workflows/publish.yml": "on: pull_request_target\n",
+  }));
+
+  const results = await checkFleetConventions(fetchImpl, root);
+
+  assert.deepEqual(results, [{
+    label: "frostyard/repo",
+    failures: ["pull_request_target: publish.yml runs on pull_request_target; only the PR triage caller (risk-paths.yml, risk-paths-caller.yml) may"],
+    workflows: 2,
+  }]);
+});
+
+test("a .yaml pull_request_target workflow fails with its file name and counts workflows", async () => {
+  const root = await makeRepositoriesRoot([
+    { repository: { owner: "frostyard", name: "repo" }, fleet_state: "enabled" },
+  ]);
+  const fetchImpl = fakeFetch(conformant("frostyard", "repo", {
+    ".github/workflows/x.yaml": "on: pull_request_target\n",
+  }));
+
+  const results = await checkFleetConventions(fetchImpl, root);
+
+  assert.deepEqual(results, [{
+    label: "frostyard/repo",
+    failures: ["pull_request_target: x.yaml runs on pull_request_target; only the PR triage caller (risk-paths.yml, risk-paths-caller.yml) may"],
+    workflows: 2,
+  }]);
+});
+
+test("summaryLine counts repositories and workflow files, including zero and missing counts", () => {
+  assert.equal(summaryLine([]), "0 repositories checked, 0 workflow files read");
+  assert.equal(summaryLine([{ workflows: 2 }]), "1 repositories checked, 2 workflow files read");
+  assert.equal(summaryLine([{ workflows: 3 }, { workflows: 0 }]), "2 repositories checked, 3 workflow files read");
+  assert.equal(summaryLine([{}]), "1 repositories checked, 0 workflow files read");
+});
+
+test("a PR triage caller on pull_request_target passes and counts workflows", async () => {
+  const root = await makeRepositoriesRoot([
+    { repository: { owner: "frostyard", name: "repo" }, fleet_state: "enabled" },
+  ]);
+  const fetchImpl = fakeFetch(conformant("frostyard", "repo", {
+    ".github/workflows/risk-paths.yml": "on: pull_request_target\n",
+  }));
+
+  const results = await checkFleetConventions(fetchImpl, root);
+
+  assert.deepEqual(results, [{ label: "frostyard/repo", failures: [], workflows: 2 }]);
+});
+
+test("the workflows directory listing is fetched once per repository", async () => {
+  const root = await makeRepositoriesRoot([
+    { repository: { owner: "frostyard", name: "one" }, fleet_state: "enabled" },
+    { repository: { owner: "frostyard", name: "two" }, fleet_state: "enabled" },
+  ]);
+  const fetchImpl = fakeFetch({
+    ...conformant("frostyard", "one"),
+    ...conformant("frostyard", "two", {
+      ".github/workflows/risk-paths.yml": "on: pull_request_target\n",
+    }),
+  });
+
+  const results = await checkFleetConventions(fetchImpl, root);
+
+  assert.deepEqual(results.map(({ workflows }) => workflows), [1, 2]);
+  const listingCalls = fetchImpl.calls.filter((url) => url.endsWith("/contents/.github/workflows"));
+  assert.deepEqual(listingCalls, [
+    "https://api.github.com/repos/frostyard/one/contents/.github/workflows",
+    "https://api.github.com/repos/frostyard/two/contents/.github/workflows",
+  ]);
+});
+
+test("a repository request error reports zero workflow files read", async () => {
+  const root = await makeRepositoriesRoot([
+    { repository: { owner: "frostyard", name: "repo" }, fleet_state: "enabled" },
+  ]);
+  const fetchImpl = async () => ({ status: 503, ok: false });
+
+  const results = await checkFleetConventions(fetchImpl, root);
+
+  assert.deepEqual(results, [{
+    label: "frostyard/repo",
+    failures: ["frostyard/repo: mise.toml request failed with status 503"],
+    workflows: 0,
+  }]);
 });

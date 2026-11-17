@@ -29,9 +29,11 @@ has no job: no level label, no `risk:high`, and no removal of
 `ready-for-human` after a push. Merges are not blocked, because the caller is
 not a required check. The guard of ADR-0077 then stops without a signal.
 
-This runbook keeps the caller running and keeps the default block for every
-other workflow. The bot account cannot change Actions policies, so an owner
-does each step:
+This runbook keeps the caller running. It was meant to keep the default
+block for every other workflow, but the test of 2026-11-16 points to a
+policy that lifts the block for the whole repository (see
+[Code guard](#code-guard)). The bot account cannot change Actions policies,
+so an owner does each step:
 
 1. The organization frostyard: 1 organization policy that allows
    `pull_request_target` only for the 2 caller paths.
@@ -46,7 +48,9 @@ pull_request_target event
   ├── workflow .github/workflows/risk-paths.yml or risk-paths-caller.yml
   │     └── the policy of this runbook allows the event ──► PR triage runs
   └── any other workflow
-        └── no policy allows the event ──► the default policy blocks the run
+        └── intended: the default policy blocks the run
+            (core#273: some runs were not blocked in a repository whose
+             caller is allowed, cause not proven; check:fleet fails it)
 ```
 
 ## Design
@@ -142,7 +146,12 @@ needs this step when it is created.
 frostyard/homebrew-tap is public and has 2 `pull_request_target` workflows:
 the caller (`risk-paths.yml`, workflow `PR triage`) and `publish.yml`
 (workflow `brew pr-pull`, type `labeled`). 1 label event starts both, so 1
-action shows the allow and the block.
+action shows the allow and the block. The test ran in the brownout of
+2026-11-16; its result is in [Hardening](#hardening-of-the-caller-and-pr-triage)
+and [core#273](https://github.com/frostyard/core/issues/273). `publish.yml`
+is gone since
+[homebrew-tap#49](https://github.com/frostyard/homebrew-tap/pull/49), so a
+repeat of this test needs another unrelated `pull_request_target` workflow.
 
 When: the default policy is enforced only in the brownout of 2026-11-16,
 16:00 to 18:00 UTC, and from 2026-12-02. At other times it evaluates only,
@@ -196,8 +205,8 @@ of frostyard and bketelsen (331 repositories).
 | frostyard/frostyard-org | `risk-paths.yml` | Tamalane | keep: step 1 | PR triage caller |
 | bketelsen: agentic-template (Lucilla), pi-pocket-dune, pi-pocket-team (Sheeana), trimlights (Irulan), truenas-mcp (Moneo) | `risk-paths.yml` | as named | keep: step 2 | PR triage caller |
 | frostyard/apt-publisher, bketelsen/fleet | `risk-paths.yml` | Lucilla, Teg | keep: no step | private: the default policy does not apply |
-| frostyard/updex | `claude-code-review.yml` | Lucilla | move to `pull_request`, after the test | it only requests a Copilot review with `pull-requests: write`; frostyard/lab and frostyard/pilothouse run their review workflow on `pull_request` and skip fork pull requests; until it moves, each pull request event makes 1 blocked run with no check run |
-| frostyard/homebrew-tap | `publish.yml` | Lucilla | move to `pull_request`, after the test | every pull request head is a branch of the tap, and the job has never run (51 runs, all skipped); a fork pull request then gets a read-only token and cannot push |
+| frostyard/updex | `claude-code-review.yml` | Lucilla | done: moved to `pull_request` in [updex#530](https://github.com/frostyard/updex/pull/530) on 2026-11-16 | it only requests a Copilot review with `pull-requests: write` |
+| frostyard/homebrew-tap | `publish.yml` | Lucilla | done: removed in [homebrew-tap#49](https://github.com/frostyard/homebrew-tap/pull/49) on 2026-11-16 | every pull request head is a branch of the tap, and the job had never run (51 runs, all skipped) |
 | bketelsen forks: bluefin-1 (`cherry-pick-to-stable.yml`), dakota (`pr-triage.yml`), hive (`ai-fix.yml`, `copilot-automation.yml`, `greetings.yml`, `pr-verifier.yml`), incus (`triage.yml`), openchamber (`label-merge-conflict.yml`, `pr-review.yml`) | upstream workflows | bketelsen (account owner) | leave blocked | forks with 0 `pull_request_target` runs; no policy |
 
 Not a trigger: frostyard/core `pr-triage.yml` (`workflow_call` only) and
@@ -218,10 +227,49 @@ list, at core `781c8b1` and on each caller:
 | Least-privilege token | Pass. Each caller has `permissions: {}` at the top and `contents: read`, `pull-requests: write` on the job. The job uses no secret except `github.token` and saves no cache. frostyard/updex has 1 more job in the caller, `actions/labeler` at a SHA pin, with the same permissions. |
 | Caller and core pin protected | Pass. Every caller pins `frostyard/core/.github/workflows/pr-triage.yml` to a 40-character SHA (core uses the local path). The caller path is at L1 in 9 repositories and at L2 in the others, through the org floor `.github/workflows/**`; both levels add `risk:high`. In core, `pr-triage.yml` and its 2 libraries are at L2. |
 
-With this policy, the 2 caller paths are the only files that can run on
-`pull_request_target`. A pull request that changes a caller gets `risk:high`
-(L1 or L2), and under `pull_request_target` the caller of the base branch
-runs, not the caller of the pull request.
+The policy keeps the caller running. In the brownout on 2026-11-16
+(16:00 to 18:00 UTC), other `pull_request_target` workflows ran with the org
+policy for the 2 caller paths in place: frostyard/homebrew-tap `publish.yml`
+([run 43903240515](https://github.com/frostyard/homebrew-tap/actions/runs/43903240515),
+[run 43903995882](https://github.com/frostyard/homebrew-tap/actions/runs/43903995882))
+and frostyard/updex `claude-code-review.yml`
+([run 43902843283](https://github.com/frostyard/updex/actions/runs/43902843283)).
+The runs alone do not prove the cause: the policy can take the default
+block off the whole repository, or GitHub did not enforce the brownout in
+those minutes. The annotations point to the first cause: these runs have no
+"Workflow execution policy warning", which a caller run without a policy
+had on 2026-11-09
+([run 42673050077](https://github.com/frostyard/core/actions/runs/42673050077))
+([core#273](https://github.com/frostyard/core/issues/273)). So this runbook
+does not count on GitHub to stop a new `pull_request_target` workflow
+outside the caller. A pull request that
+changes a caller gets `risk:high` (L1 or L2), and under `pull_request_target`
+the caller of the base branch runs, not the caller of the pull request.
+
+### Code guard
+
+`npm run check:fleet`, CI's required `fleet-conventions` job, fails a
+repository when a workflow other than `risk-paths.yml` or
+`risk-paths-caller.yml` lists `pull_request_target` under its top-level
+`on:` key. `pullRequestTargetGaps` in `scripts/lib/fleet-conventions.mjs`
+implements the check; `test/fleet-conventions.test.mjs` tests it. It closes
+the gap of [core#273](https://github.com/frostyard/core/issues/273) only in
+the repositories it reads.
+
+The rule holds in a private repository too. There the default policy does
+not apply, but a `pull_request_target` job still runs with a write token in
+the base repository's context, and
+[ADR-0020](../adr/0020-ai-automation-trust-boundaries.md) keeps pull request
+code out of such a job. Move such a workflow to `pull_request`.
+
+The fleet check covers only `fleet_state: enabled` repositories on their
+default branch: 7 on 2026-11-17 (`organization/repositories/*/*.json`), of
+the 34 repositories with a caller in the inventory above. The others are
+not covered. `node scripts/check-fleet-conventions.mjs OWNER/REPO...`
+checks any other repository, also on its default branch. A workflow added
+on a pull request branch is not seen before it merges. The review of
+`.github/workflows/**` still covers that change: the L2 floor adds
+`risk:high` ([risk paths](../specs/risk-paths.md)).
 
 ### The API (extra)
 
@@ -282,9 +330,10 @@ gh api -H "X-GitHub-Api-Version: 2026-03-10" \
 - A new caller path (a renamed file) is blocked until it is in the policy.
   Keep the file names `risk-paths.yml` (and `risk-paths-caller.yml` in core
   and problem-intake), or change the policy in the same change.
-- A new `pull_request_target` workflow outside the 2 paths stays blocked.
-  That is the intended state; move it to `pull_request`, or give it its own
-  policy with the same review as this one.
+- A new `pull_request_target` workflow outside the 2 caller paths may not
+  be blocked when the repository's caller is allowed
+  ([core#273](https://github.com/frostyard/core/issues/273)). The code guard
+  fails it in a `fleet_state: enabled` repository. Move it to `pull_request`.
 - Policy changes are owner settings, as are rulesets
   ([PR triage rollout](pr-triage-rollout.md)).
 
