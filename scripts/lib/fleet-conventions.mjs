@@ -17,6 +17,11 @@ export function pullRequestTargetGaps(workflows) {
     .sort();
 }
 
+export function summaryLine(results) {
+  const total = results.reduce((sum, { workflows = 0 }) => sum + workflows, 0);
+  return `${results.length} repositories checked, ${total} workflow files read`;
+}
+
 const CONTENTS_API = "https://api.github.com/repos";
 
 export class FleetConventionsError extends Error {}
@@ -176,6 +181,7 @@ export async function checkFleetConventions(fetchImpl, repositoriesRoot, only = 
     try {
       results.push(await checkRepository(fetchImpl, owner, name));
     } catch (error) {
+      // A repository whose check failed counts 0 files, also when it read some before the error.
       results.push({ label: `${owner}/${name}`, failures: [error.message], workflows: 0 });
     }
   }

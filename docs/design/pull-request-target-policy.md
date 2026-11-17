@@ -49,8 +49,8 @@ pull_request_target event
   │     └── the policy of this runbook allows the event ──► PR triage runs
   └── any other workflow
         └── intended: the default policy blocks the run
-            (core#273: not blocked in a repository whose caller is allowed;
-             check:fleet fails it)
+            (core#273: some runs were not blocked in a repository whose
+             caller is allowed, cause not proven; check:fleet fails it)
 ```
 
 ## Design
@@ -146,7 +146,12 @@ needs this step when it is created.
 frostyard/homebrew-tap is public and has 2 `pull_request_target` workflows:
 the caller (`risk-paths.yml`, workflow `PR triage`) and `publish.yml`
 (workflow `brew pr-pull`, type `labeled`). 1 label event starts both, so 1
-action shows the allow and the block.
+action shows the allow and the block. The test ran in the brownout of
+2026-11-16; its result is in [Hardening](#hardening-of-the-caller-and-pr-triage)
+and [core#273](https://github.com/frostyard/core/issues/273). `publish.yml`
+is gone since
+[homebrew-tap#49](https://github.com/frostyard/homebrew-tap/pull/49), so a
+repeat of this test needs another unrelated `pull_request_target` workflow.
 
 When: the default policy is enforced only in the brownout of 2026-11-16,
 16:00 to 18:00 UTC, and from 2026-12-02. At other times it evaluates only,
@@ -247,11 +252,20 @@ the caller of the base branch runs, not the caller of the pull request.
 repository when a workflow other than `risk-paths.yml` or
 `risk-paths-caller.yml` lists `pull_request_target` under its top-level
 `on:` key. `pullRequestTargetGaps` in `scripts/lib/fleet-conventions.mjs`
-implements the check; `test/fleet-conventions.test.mjs` tests it. The guard
-covers the gap in [core#273](https://github.com/frostyard/core/issues/273).
+implements the check; `test/fleet-conventions.test.mjs` tests it. It closes
+the gap of [core#273](https://github.com/frostyard/core/issues/273) only in
+the repositories it reads.
+
+The rule holds in a private repository too. There the default policy does
+not apply, but a `pull_request_target` job still runs with a write token in
+the base repository's context, and
+[ADR-0020](../adr/0020-ai-automation-trust-boundaries.md) keeps pull request
+code out of such a job. Move such a workflow to `pull_request`.
 
 The fleet check covers only `fleet_state: enabled` repositories on their
-default branch. `node scripts/check-fleet-conventions.mjs OWNER/REPO...`
+default branch: 7 on 2026-11-17 (`organization/repositories/*/*.json`), of
+the 34 repositories with a caller in the inventory above. The others are
+not covered. `node scripts/check-fleet-conventions.mjs OWNER/REPO...`
 checks any other repository, also on its default branch. A workflow added
 on a pull request branch is not seen before it merges. The review of
 `.github/workflows/**` still covers that change: the L2 floor adds

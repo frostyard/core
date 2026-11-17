@@ -8,7 +8,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { checkFleetConventions } from "./lib/fleet-conventions.mjs";
+import { checkFleetConventions, summaryLine } from "./lib/fleet-conventions.mjs";
 
 const repoRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -40,8 +40,7 @@ for (const { label, failures } of results) {
 }
 
 // A gate that read no repository proves nothing.
-const total = results.reduce((sum, { workflows }) => sum + workflows, 0);
-console.log(`${results.length} repositories checked, ${total} workflow files read`);
+console.log(summaryLine(results));
 if (results.length === 0) {
   console.log("FAIL no repository to check");
   failed = true;

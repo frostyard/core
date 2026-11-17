@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { checkFleetConventions, pullRequestTargetGaps } from "../scripts/lib/fleet-conventions.mjs";
+import { checkFleetConventions, pullRequestTargetGaps, summaryLine } from "../scripts/lib/fleet-conventions.mjs";
 
 async function makeRepositoriesRoot(declarations) {
   const root = await mkdtemp(path.join(os.tmpdir(), "core-fleet-"));
@@ -304,6 +304,30 @@ test("a non-caller pull_request_target workflow fails with its file name", async
     failures: ["pull_request_target: publish.yml runs on pull_request_target; only the PR triage caller (risk-paths.yml, risk-paths-caller.yml) may"],
     workflows: 2,
   }]);
+});
+
+test("a .yaml pull_request_target workflow fails with its file name and counts workflows", async () => {
+  const root = await makeRepositoriesRoot([
+    { repository: { owner: "frostyard", name: "repo" }, fleet_state: "enabled" },
+  ]);
+  const fetchImpl = fakeFetch(conformant("frostyard", "repo", {
+    ".github/workflows/x.yaml": "on: pull_request_target\n",
+  }));
+
+  const results = await checkFleetConventions(fetchImpl, root);
+
+  assert.deepEqual(results, [{
+    label: "frostyard/repo",
+    failures: ["pull_request_target: x.yaml runs on pull_request_target; only the PR triage caller (risk-paths.yml, risk-paths-caller.yml) may"],
+    workflows: 2,
+  }]);
+});
+
+test("summaryLine counts repositories and workflow files, including zero and missing counts", () => {
+  assert.equal(summaryLine([]), "0 repositories checked, 0 workflow files read");
+  assert.equal(summaryLine([{ workflows: 2 }]), "1 repositories checked, 2 workflow files read");
+  assert.equal(summaryLine([{ workflows: 3 }, { workflows: 0 }]), "2 repositories checked, 3 workflow files read");
+  assert.equal(summaryLine([{}]), "1 repositories checked, 0 workflow files read");
 });
 
 test("a PR triage caller on pull_request_target passes and counts workflows", async () => {
