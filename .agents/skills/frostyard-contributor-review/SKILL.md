@@ -29,8 +29,10 @@ gh api repos/OWNER/REPO/pulls/N \
 - **Use it** when `type` is `User`, the login is not the bot account
   (`frostyard-machines`) or a maintainer, and `association` is
   `FIRST_TIMER`, `FIRST_TIME_CONTRIBUTOR`, `CONTRIBUTOR` or `NONE`.
-  `FIRST_TIMER` and `FIRST_TIME_CONTRIBUTOR` mean a first pull request:
-  welcome them (step 4).
+  `FIRST_TIMER` and `FIRST_TIME_CONTRIBUTOR` are signals of a first
+  contribution, not a count: welcome the person (step 4), and before you
+  call it their first pull request, check for earlier ones
+  (`gh pr list -R OWNER/REPO --author LOGIN --state all`).
 - **Do not use it** for the bot account's own pull requests, a
   maintainer's (`OWNER`, `MEMBER`, `COLLABORATOR`), or a dependency bot's
   (`type` is `Bot`, such as `dependabot[bot]`). Those get the repository's
@@ -59,11 +61,18 @@ gh api repos/OWNER/REPO/pulls/N \
    - **Security and suspicious changes:** read every change to workflows,
      build and install scripts, package scripts, lockfiles, new
      dependencies, binary or minified files, and network or file access.
-     A pull request that touches a path in `.github/risk-paths.json` gets
-     `risk:high`
-     ([ADR-0068](https://github.com/frostyard/core/blob/main/docs/adr/0068-label-pull-requests-that-touch-high-risk-paths.md)):
-     check it line by line. A change that the description does not
-     explain is a question, every time.
+     Read the level label that the risk-path workflow set
+     ([risk-paths spec](https://github.com/frostyard/core/blob/main/docs/specs/risk-paths.md),
+     [ADR-0068](https://github.com/frostyard/core/blob/main/docs/adr/0068-label-pull-requests-that-touch-high-risk-paths.md)).
+     A pull request at L1 or L2 gets `risk:high`: it touches an L1 or L2
+     glob of `.github/risk-paths.json` at the base, or an organization
+     floor puts it there. A version 1 list has no levels, and each of its
+     matches counts as L1. With no list at the base, as in the pull
+     request that adds the first list, the workflow adds no label: match
+     the files by hand, and a maintainer adds `risk:high` when the new
+     list puts a changed file at L1 or L2. Check each L1 or L2 file line
+     by line. A change that the description does not explain is a
+     question, every time.
    - **Tests:** a bug fix has a test that fails without it; new behavior
      has a test of each case it adds.
    - **Scope:** the change does 1 thing, fits the repository's purpose
@@ -133,8 +142,8 @@ gh api repos/OWNER/REPO/pulls/N \
      bot account approves or merges, never both: once it approved at any
      head, it does not merge, even after the approval is dismissed. The
      bot approves only a pull request that it did not open or push to,
-     and only when the repository's rules allow a bot approval, a
-     maintainer asked for the review, the review at the current head has
+     and only when the repository's rules allow a bot approval, a human
+     or a brief asked for the review, the review at the current head has
      no blocking point, and the required checks pass; a person then
      merges it. In every other case, post a comment review, as above. Do not use "Request
      changes" as the bot: it stays on the pull request until someone
@@ -246,8 +255,9 @@ if !filepath.IsLocal(name) {
 }
 ```
 
-issue (blocking): Please add a test for that case, so the check stays in
-place. 1 more row with `../x` in the table in `config_test.go` is enough.
+issue (blocking): Could we add a test for that case, so the check stays
+in place? 1 more row with `../x` in the table in `config_test.go` is
+enough.
 
 suggestion (non-blocking): The flag could reuse `resolveDir()` instead of
 its own lookup; then both paths stay in step.
@@ -255,7 +265,8 @@ its own lookup; then both paths stay in step.
 The `lint` check fails on `main` too, after a new golangci-lint release.
 That is not from your change, and we will fix it on our side.
 
-Happy to help if anything here is unclear. This review comes from
+The 2 blocking points need a change before this can merge; the rest is
+up to you. Happy to help if anything here is unclear. This review comes from
 frostyard-machines, the project's bot account; a maintainer decides the
 merge.
 ````
