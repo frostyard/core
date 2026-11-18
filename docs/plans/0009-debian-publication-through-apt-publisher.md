@@ -461,7 +461,7 @@ until that queue is processed.
     listing `trixie,forky`: updex, intuneme, firn, chairlift and
     omarchy-apps in `main`; incus and bootc-debian in `image`. The 8th
     producer of 2026-10-25, first-setup, left the registry with
-    frostyard/apt-publisher#32 on 2026-11-05. `config/codenames.tsv`
+    frostyard/apt-publisher#32 on 2026-11-06. `config/codenames.tsv`
     supplies the architectures: `amd64`, `arm64` and `all`.
   - It also compares
     `https://repository.frostyard.org/debian/frostyard.gpg` with
