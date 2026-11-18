@@ -445,6 +445,7 @@ until that queue is processed.
     passed the same day, at apt-publisher `c1696ce`. It found every `.deb`
     of all eight producers' latest releases, firn now at v0.9.0.
 - [x] The nightly audit passes. The records below were read on 2026-11-18.
+  All dates in this record are UTC dates.
   - apt-publisher `main` was `49f436a`
     (`49f436adfbe164a1ed066fa1707ca253899728a5`), the merge of
     frostyard/apt-publisher#56 on 2026-11-17.
@@ -453,12 +454,15 @@ until that queue is processed.
     2 independent steps: `scripts/audit-producers.sh` and
     `scripts/audit-debian-names.sh`.
   - `audit-producers.sh` reads each producer's latest GitHub release. Each
-    `.deb` asset must appear in the `Packages` index of at least 1 codename
-    of its row, in that row's component. `config/producers.tsv` at
-    `49f436a` has 7 rows, all listing `trixie,forky`: updex, intuneme,
-    firn, chairlift and omarchy-apps in `main`; incus and bootc-debian in
-    `image`. `config/codenames.tsv` supplies the architectures: `amd64`,
-    `arm64` and `all`.
+    `.deb` asset must be listed, by name, version and architecture, in the
+    `Packages` index of at least 1 codename of its row, in that row's
+    component. The version is compared without its epoch, and with `~`
+    read as `.`. `config/producers.tsv` at `49f436a` has 7 rows, all
+    listing `trixie,forky`: updex, intuneme, firn, chairlift and
+    omarchy-apps in `main`; incus and bootc-debian in `image`. The 8th
+    producer of 2026-10-25, first-setup, left the registry with
+    frostyard/apt-publisher#32 on 2026-11-05. `config/codenames.tsv`
+    supplies the architectures: `amd64`, `arm64` and `all`.
   - It also compares
     `https://repository.frostyard.org/debian/frostyard.gpg` with
     `keys/frostyard.gpg` byte for byte (frostyard/apt-publisher#18,
@@ -500,14 +504,17 @@ until that queue is processed.
 - [x] Keep `trixie` published beside `forky`: `forky` is not promoted, so
   `trixie` has no end date in this plan. Keep signed `stable` unchanged
   through at least 2027-09-30.
-  - This holds on 2026-11-18. The `trixie` and `forky` `InRelease` files
-    were readable at 00:07 UTC, with the dates recorded below.
+  - This is a standing rule. The tick records that it held when checked
+    on 2026-11-18, not that it ended. It stays in force: `stable` through
+    at least 2027-09-30, and `trixie` until at least 90 days after a
+    `forky` promotion (ADR-0055).
+  - The `trixie` and `forky` `InRelease` files were readable on
+    2026-11-18 at 00:07 UTC, with the dates recorded below.
   - Core's weekly `stable-repository-drift.yml` checks legacy `stable`
     (cron `23 5 * * 1`, Monday at 05:23 UTC;
     [drift alarm](../design/stable-repository-drift-alarm.md)). Its latest
     scheduled [run 43878961484](https://github.com/frostyard/core/actions/runs/43878961484)
     passed on 2026-11-16 at core `17b49ba`.
-  - This is a standing rule, not a one-time step.
 - [x] The retention windows are recorded on 2026-11-18.
   - Policy: [ADR-0055](../adr/0055-publish-debian-packages-through-the-apt-publisher.md),
     "Retention windows",
@@ -524,7 +531,8 @@ until that queue is processed.
       `Date: Mon, 16 Nov 2026 18:26:44 UTC`.
     - [Legacy `stable`](https://repository.frostyard.org/dists/stable/InRelease):
       `Date: Thu, 01 Oct 2026 12:29:12 +0000`. This is the date of the
-      drift alarm's baseline.
+      signed update that the drift alarm's baseline records (observed on
+      2026-10-03).
     - `https://repository.frostyard.org/debian/dists/stable/InRelease`
       returned HTTP 404. No `stable` exists under `/debian/`; no alias
       points it at a codename (ADR-0055).
@@ -568,7 +576,11 @@ until that queue is processed.
     `.github/workflows/build.yml`. It calls `publish-to-r2` 2 times, for
     the `trixie` and `forky` sysext publications, at repogen v0.7.4
     (released 2026-11-17).
-  - Repogen's `publish-to-r2` refuses Debian input (repogen ADR-0019).
+  - Repogen's `publish-to-r2` refuses Debian input: at v0.7.4
+    (`c2f9f54`), its
+    [`action.yml`](https://github.com/frostyard/repogen/blob/c2f9f54931520d7801c8339db8b9931d8737f395/.github/actions/publish-to-r2/action.yml)
+    stops on `package-type: deb`, and on any Debian package in
+    `packages-dir`.
   - Phase 7 is done; this question is still open.
 - **What happens to legacy `stable` after 2027-09-30.** Expiry alone
   authorizes no removal; it needs its own decision.
