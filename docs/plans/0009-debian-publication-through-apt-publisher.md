@@ -13,8 +13,9 @@ legacy `stable` suite to explicit codenames at
 - **Done:** the writer, the seeded `trixie` suite, CDN caching, every
   producer whose packages Snosi installs, Snosi itself (Phases 1–5),
   the validation of `forky` (Phase 6), and steady state (Phase 7).
-- **What remains:** the open question "What Repogen becomes", which this
-  plan said to decide by Phase 7, is not decided.
+- **What remains:** the open question on legacy `stable` after
+  2027-09-30. "What Repogen becomes" was decided on 2026-11-17 (see
+  [Resolved questions](#resolved-questions)).
 - **Suites:** `forky` is a 2nd suite beside `trixie`, not its successor.
   `trixie` stays, and it stays the default; nothing is promoted or moved.
   The aim is a pipeline that works for `forky` the day Debian releases it,
@@ -567,10 +568,15 @@ until that queue is processed.
   (`--signer-workflow` or a tag pattern). firn's and updex's release
   workflows run on any tag, while their tag rulesets protect only `v*`.
 
-## Open questions
+## Resolved questions
 
-- **What Repogen becomes,** whether it keeps only sysexts or is replaced by a
-  small sign-and-upload step. Decide by Phase 7.
+- **What Repogen becomes** (decided on 2026-11-17, within Phase 7). Repogen
+  stays the sysext publisher only, and Debian packages stay with
+  apt-publisher. No sign-and-upload step replaces Repogen. This is the
+  split that
+  [ADR-0055](../adr/0055-publish-debian-packages-through-the-apt-publisher.md)
+  already states: "Repogen no longer publishes Debian packages. It
+  continues to publish sysexts". So no new ADR is necessary.
   - On 2026-11-18, a GitHub code search of the frostyard organization for
     `frostyard/repogen` in workflow files found 1 caller: frostyard/snosi
     `.github/workflows/build.yml`. It calls `publish-to-r2` 2 times, for
@@ -581,7 +587,9 @@ until that queue is processed.
     [`action.yml`](https://github.com/frostyard/repogen/blob/c2f9f54931520d7801c8339db8b9931d8737f395/.github/actions/publish-to-r2/action.yml)
     stops on `package-type: deb`, and on any Debian package in
     `packages-dir`.
-  - Phase 7 is done; this question is still open.
+
+## Open questions
+
 - **What happens to legacy `stable` after 2027-09-30.** Expiry alone
   authorizes no removal; it needs its own decision.
 
