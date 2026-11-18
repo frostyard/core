@@ -11,9 +11,10 @@ legacy `stable` suite to explicit codenames at
 [`frostyard/apt-publisher`](https://github.com/frostyard/apt-publisher).
 
 - **Done:** the writer, the seeded `trixie` suite, CDN caching, every
-  producer whose packages Snosi installs, Snosi itself (Phases 1–5), and
-  the validation of `forky` (Phase 6).
-- **What remains:** steady state (Phase 7).
+  producer whose packages Snosi installs, Snosi itself (Phases 1–5),
+  the validation of `forky` (Phase 6), and steady state (Phase 7).
+- **What remains:** the open question "What Repogen becomes", which this
+  plan said to decide by Phase 7, is not decided.
 - **Suites:** `forky` is a 2nd suite beside `trixie`, not its successor.
   `trixie` stays, and it stays the default; nothing is promoted or moved.
   The aim is a pipeline that works for `forky` the day Debian releases it,
@@ -427,7 +428,7 @@ until that queue is processed.
   - Snowfield on representative Surface hardware: not tested.
   - frostyard/snosi#1130 (an upstream btrfs defect) is open.
 
-## Phase 7 — Steady state
+## Phase 7 — Steady state (done 2026-11-18)
 
 - [x] Set apt-publisher's `APT_AUDIT_ENABLED=true` once its producers publish
   through it.
@@ -443,11 +444,118 @@ until that queue is processed.
     [audit run 40188675832](https://github.com/frostyard/apt-publisher/actions/runs/40188675832)
     passed the same day, at apt-publisher `c1696ce`. It found every `.deb`
     of all eight producers' latest releases, firn now at v0.9.0.
-- [ ] Keep `trixie` published beside `forky`: `forky` is not promoted, so
+- [x] The nightly audit passes. The records below were read on 2026-11-18.
+  All dates in this record are UTC dates.
+  - apt-publisher `main` was `49f436a`
+    (`49f436adfbe164a1ed066fa1707ca253899728a5`), the merge of
+    frostyard/apt-publisher#56 on 2026-11-17.
+  - At that commit, `.github/workflows/audit.yml` runs daily at 06:17 UTC
+    (cron `17 6 * * *`) while `APT_AUDIT_ENABLED` is `true`. It runs
+    2 independent steps: `scripts/audit-producers.sh` and
+    `scripts/audit-debian-names.sh`.
+  - `audit-producers.sh` reads each producer's latest GitHub release. Each
+    `.deb` asset must be listed, by name, version and architecture, in the
+    `Packages` index of at least 1 codename of its row, in that row's
+    component. The version is compared without its epoch, and with `~`
+    read as `.`. `config/producers.tsv` at `49f436a` has 7 rows, all
+    listing `trixie,forky`: updex, intuneme, firn, chairlift and
+    omarchy-apps in `main`; incus and bootc-debian in `image`. The 8th
+    producer of 2026-10-25, first-setup, left the registry with
+    frostyard/apt-publisher#32 on 2026-11-06. `config/codenames.tsv`
+    supplies the architectures: `amd64`, `arm64` and `all`.
+  - It also compares
+    `https://repository.frostyard.org/debian/frostyard.gpg` with
+    `keys/frostyard.gpg` byte for byte (frostyard/apt-publisher#18,
+    2026-10-28).
+  - `audit-debian-names.sh` reads `main` only, not `image`, for each
+    codename of `config/codenames.tsv`: `trixie` and `forky`. It reports
+    package names that Debian also ships in CODENAME, CODENAME-updates,
+    CODENAME-security or CODENAME-backports
+    ([ADR-0059](../adr/0059-publish-image-only-packages-in-a-separate-apt-component.md)).
+    frostyard/apt-publisher#19 added it on 2026-10-28.
+    frostyard/apt-publisher#33 changed it to fetch Debian indexes by hash
+    on 2026-11-05.
+  - Limits: only the latest release of each producer is audited, not older
+    releases. incus releases its Debian 13 and Debian 14 builds separately;
+    run 44120229831 audited Debian 13 release `7.6-debian13-202611140125`.
+    A `.deb` passes when any 1 codename of its row lists it, not each
+    codename. The audit does not read legacy `stable`; the drift alarm
+    below does.
+  - Source: `gh run list -R frostyard/apt-publisher -w audit -L 10`, read
+    on 2026-11-18. All 10 listed runs, from 2026-11-08 to 2026-11-17,
+    were scheduled runs on `main` and passed. The 5 latest were:
+    - [44120229831](https://github.com/frostyard/apt-publisher/actions/runs/44120229831),
+      2026-11-17, at `49f436a`;
+    - [43899157794](https://github.com/frostyard/apt-publisher/actions/runs/43899157794),
+      2026-11-16, at `f62e4ee`;
+    - [43721405405](https://github.com/frostyard/apt-publisher/actions/runs/43721405405),
+      2026-11-15, at `f62e4ee`;
+    - [43599933175](https://github.com/frostyard/apt-publisher/actions/runs/43599933175),
+      2026-11-14, at `f62e4ee`;
+    - [43443542322](https://github.com/frostyard/apt-publisher/actions/runs/43443542322),
+      2026-11-13, at `e255194`.
+  - The log of run 44120229831 lists updex v2.3.1, incus
+    `7.6-debian13-202611140125`, intuneme v0.24.0, firn v0.12.0,
+    chairlift v0.17.1, bootc-debian
+    `bootc-1.17.4-ostree-2026.6-202611132023` and omarchy-apps
+    `main-20261113192000-4de76c0`. Its Debian-name step audited `trixie`
+    and `forky`, each against the 4 Debian suites named above, with no
+    finding.
+- [x] Keep `trixie` published beside `forky`: `forky` is not promoted, so
   `trixie` has no end date in this plan. Keep signed `stable` unchanged
   through at least 2027-09-30.
+  - This is a standing rule. The tick records that it held when checked
+    on 2026-11-18, not that it ended. It stays in force: `stable` through
+    at least 2027-09-30, and `trixie` until at least 90 days after a
+    `forky` promotion (ADR-0055).
+  - The `trixie` and `forky` `InRelease` files were readable on
+    2026-11-18 at 00:07 UTC, with the dates recorded below.
+  - Core's weekly `stable-repository-drift.yml` checks legacy `stable`
+    (cron `23 5 * * 1`, Monday at 05:23 UTC;
+    [drift alarm](../design/stable-repository-drift-alarm.md)). Its latest
+    scheduled [run 43878961484](https://github.com/frostyard/core/actions/runs/43878961484)
+    passed on 2026-11-16 at core `17b49ba`.
+- [x] The retention windows are recorded on 2026-11-18.
+  - Policy: [ADR-0055](../adr/0055-publish-debian-packages-through-the-apt-publisher.md),
+    "Retention windows",
+    keeps signed `stable` readable and unchanged through at least
+    2027-09-30, with every pool byte its indexes reference. No redirect,
+    symlink or alias points `stable` at a codename. `trixie` stays readable
+    for at least 90 days after `forky` is promoted. `forky` is not
+    promoted, so `trixie` has no end date.
+  - Metadata: the following `InRelease` files were read on 2026-11-18 at
+    00:07 UTC. None had a `Valid-Until` field:
+    - [`trixie`](https://repository.frostyard.org/debian/dists/trixie/InRelease):
+      `Date: Mon, 16 Nov 2026 18:25:44 UTC`.
+    - [`forky`](https://repository.frostyard.org/debian/dists/forky/InRelease):
+      `Date: Mon, 16 Nov 2026 18:26:44 UTC`.
+    - [Legacy `stable`](https://repository.frostyard.org/dists/stable/InRelease):
+      `Date: Thu, 01 Oct 2026 12:29:12 +0000`. This is the date of the
+      signed update that the drift alarm's baseline records (observed on
+      2026-10-03).
+    - `https://repository.frostyard.org/debian/dists/stable/InRelease`
+      returned HTTP 404. No `stable` exists under `/debian/`; no alias
+      points it at a codename (ADR-0055).
+    - No suite's metadata expires: apt never refuses these indexes as out
+      of date. A search of apt-publisher's `scripts/`, `config/` and
+      `docs/` at `49f436a` finds no `Valid-Until`.
+  - Version retention: column 7, `keep`, of `config/producers.tsv` at
+    apt-publisher `49f436a` gives omarchy-apps `2`. The 6 other rows have
+    `-`, no limit. The column and value came with
+    frostyard/apt-publisher#27 on 2026-11-02 (core ADR-0067, linked in
+    Phase 4; apt-publisher ADR-0003). Retention removes a version from the
+    index only. Pool files stay, and rollback can restore a pruned version.
+  - Index counts read on 2026-11-18 (a count is the number of entries of
+    that package name): the `main` amd64 `Packages` index of
+    [`trixie`](https://repository.frostyard.org/debian/dists/trixie/main/binary-amd64/Packages)
+    lists 2 versions each of `voxtype` and `moonlight-qt`; that of
+    [`forky`](https://repository.frostyard.org/debian/dists/forky/main/binary-amd64/Packages)
+    lists 1 each.
 - **Done when:** the nightly audit passes, and the retention windows are
   recorded in this plan.
+  Both held on 2026-11-18:
+  - the nightly-audit item above records the passing scheduled runs;
+  - the retention-windows item above records policy, metadata and versions.
 
 ## Later / ideas
 
@@ -463,6 +571,17 @@ until that queue is processed.
 
 - **What Repogen becomes,** whether it keeps only sysexts or is replaced by a
   small sign-and-upload step. Decide by Phase 7.
+  - On 2026-11-18, a GitHub code search of the frostyard organization for
+    `frostyard/repogen` in workflow files found 1 caller: frostyard/snosi
+    `.github/workflows/build.yml`. It calls `publish-to-r2` 2 times, for
+    the `trixie` and `forky` sysext publications, at repogen v0.7.4
+    (released 2026-11-17).
+  - Repogen's `publish-to-r2` refuses Debian input: at v0.7.4
+    (`c2f9f54`), its
+    [`action.yml`](https://github.com/frostyard/repogen/blob/c2f9f54931520d7801c8339db8b9931d8737f395/.github/actions/publish-to-r2/action.yml)
+    stops on `package-type: deb`, and on any Debian package in
+    `packages-dir`.
+  - Phase 7 is done; this question is still open.
 - **What happens to legacy `stable` after 2027-09-30.** Expiry alone
   authorizes no removal; it needs its own decision.
 
