@@ -226,8 +226,12 @@ removed. -->
   fails when a workflow other than the PR triage caller (`risk-paths.yml`,
   `risk-paths-caller.yml`) runs on `pull_request_target`
   ([pull_request_target policy](docs/design/pull-request-target-policy.md#code-guard)).
+  It also fails a job that calls `pr-triage.yml` without its own narrow
+  `permissions` mapping ([ADR-0086](docs/adr/0086-let-each-pr-triage-caller-grant-the-triage-token.md)),
+  read with the `yaml` parser.
   It runs as CI's required `fleet-conventions` job, not part of `check`/`verify`;
-  `node scripts/check-fleet-conventions.mjs OWNER/REPO...` checks other
+  run `npm ci` first in the core checkout, then
+  `node scripts/check-fleet-conventions.mjs OWNER/REPO...` to check other
   repositories. Its readers live in `scripts/lib/ci-gate.mjs` and are
   tested in `test/ci-gate.test.mjs`.
 - Declare every GitHub Actions secret's expiry in

@@ -1,5 +1,6 @@
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
+import { parse } from "yaml";
 
 import { ciCoverageGaps, lintGaps, lintScriptPaths, namesMakeCi, runsOnPullRequest } from "./ci-gate.mjs";
 import { triggerEvents } from "./workflow-triggers.mjs";
@@ -15,6 +16,58 @@ export function pullRequestTargetGaps(workflows) {
       && !PULL_REQUEST_TARGET_CALLERS.includes(name))
     .map(([name]) => name)
     .sort();
+}
+
+export const TRIAGE_CALLER_GRANT = Object.freeze({
+  contents: Object.freeze(["read"]),
+  "pull-requests": Object.freeze(["write"]),
+  checks: Object.freeze(["read", "none"]),
+  statuses: Object.freeze(["read", "none"]),
+});
+export const TRIAGE_CALLER_REQUIRED = Object.freeze({ contents: "read", "pull-requests": "write" });
+
+const isPlainObject = (value) => value !== null && typeof value === "object"
+  && (Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null);
+
+// ADR-0086: the reusable workflow sets no permissions. Each calling job must
+// grant a narrow token; a workflow-level permissions key does not count.
+export function triageCallerGrantGaps(workflows) {
+  const gaps = [];
+  for (const [file, text] of Object.entries(workflows)) {
+    let workflow;
+    try {
+      workflow = parse(text);
+    } catch {
+      if (/pr-triage\.ya?ml/i.test(text)) gaps.push(`${file}: not valid YAML`);
+      continue;
+    }
+    if (!isPlainObject(workflow) || !isPlainObject(workflow.jobs)) continue;
+    for (const [jobId, job] of Object.entries(workflow.jobs)) {
+      if (!isPlainObject(job) || typeof job.uses !== "string"
+        || !/(^|\/)\.github\/workflows\/pr-triage\.ya?ml(@|$)/i.test(job.uses)) continue;
+      const prefix = `${file}: job ${jobId}: `;
+      if (!Object.hasOwn(job, "permissions")) {
+        gaps.push(`${prefix}no job permissions; the job would get the default token`);
+        continue;
+      }
+      const permissions = job.permissions;
+      if (!isPlainObject(permissions)) {
+        gaps.push(`${prefix}permissions must be a mapping, not ${JSON.stringify(permissions)}`);
+        continue;
+      }
+      for (const [key, value] of Object.entries(permissions)) {
+        if (!Object.hasOwn(TRIAGE_CALLER_GRANT, key)) {
+          gaps.push(`${prefix}permission ${key} is not allowed`);
+        } else if (!TRIAGE_CALLER_GRANT[key].includes(value)) {
+          gaps.push(`${prefix}permission ${key}: ${JSON.stringify(value)} is not allowed`);
+        }
+      }
+      for (const [key, required] of Object.entries(TRIAGE_CALLER_REQUIRED)) {
+        if (!Object.hasOwn(permissions, key)) gaps.push(`${prefix}needs ${key}: ${required}`);
+      }
+    }
+  }
+  return gaps.sort();
 }
 
 export function summaryLine(results) {
@@ -111,6 +164,9 @@ export async function checkRepository(fetchImpl, owner, name) {
   failures.push(...(await checkCiGate(fetchImpl, owner, name, makefile, workflows)));
   for (const file of pullRequestTargetGaps(workflows)) {
     failures.push(`pull_request_target: ${file} runs on pull_request_target; only the PR triage caller (risk-paths.yml, risk-paths-caller.yml) may`);
+  }
+  for (const gap of triageCallerGrantGaps(workflows)) {
+    failures.push(`triage caller grant: ${gap}`);
   }
 
   return { label, failures, workflows: Object.keys(workflows).length };

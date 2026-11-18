@@ -199,8 +199,10 @@ decision to build it needs all of these:
   writes no comment and still ends green.
 - The job summary holds a `## Dependabot shadow` section with 1 row for each
   criterion, so a run's result is readable without the job log.
-- The job permissions stay `contents: read` and `pull-requests: write`. The
-  step needs no other permission, and it uses `github.token` only.
+- The step needs only `contents: read` and `pull-requests: write` and uses
+  `github.token` only. The job gets the calling job's grant
+  ([ADR-0086](../adr/0086-let-each-pr-triage-caller-grant-the-triage-token.md)).
+  The step runs only on `pull_request_target`.
 
 ## References
 

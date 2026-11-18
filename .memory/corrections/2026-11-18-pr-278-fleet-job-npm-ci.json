@@ -1,0 +1,7 @@
+{
+  "date": "2026-11-18",
+  "scope": "ci",
+  "correction": "A CI job that runs a script which imports an npm package runs npm ci first; the fleet-conventions job ran npm run check:fleet with mise only, so a new dependency of scripts/lib/fleet-conventions.mjs failed with ERR_MODULE_NOT_FOUND on a clean runner while every local run passed with node_modules present",
+  "evidence": "Cross-review of frostyard/core#278 (github-copilot/claude-sonnet-5.5) at e3ee192 and the fleet-conventions run 44208991438 (Cannot find package 'yaml'); fixed in frostyard/core#278 with npm ci in the job and a test that reads ci.yml and requires npm ci before npm run check:fleet",
+  "promoted_to": "test/fleet-conventions.test.mjs"
+}

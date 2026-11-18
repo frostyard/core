@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -454,6 +454,7 @@ const v1List = JSON.stringify({ schema_version: 1, paths: [{ glob: "secure/**", 
 
 // A fake API. `existing` lists the labels that exist in the repository, `current` the labels on the pull request.
 function levelsApi({
+  pullRequest = { number: 7, state: "open", base: { sha: BASE_SHA }, head: { sha: HEAD } },
   lists = { [BASE_SHA]: levelsList() },
   files = [],
   existing = ["risk:high", ...Object.values(LEVEL_LABELS)],
@@ -462,6 +463,10 @@ function levelsApi({
 } = {}) {
   const calls = [];
   const api = {
+    async getPullRequest(...args) {
+      calls.push({ method: "getPullRequest", args });
+      return pullRequest;
+    },
     async getFileAtRef(owner, repo, filePath, ref) {
       calls.push({ method: "getFileAtRef", args: [owner, repo, filePath, ref] });
       return Object.hasOwn(lists, ref) ? lists[ref] : null;
@@ -489,13 +494,14 @@ function levelsApi({
   return { api, calls };
 }
 
-async function levels(api, { eventName = "pull_request_target", ev = levelsEvent() } = {}) {
+async function levels(api, { eventName = "pull_request_target", ev = levelsEvent(), prNumber } = {}) {
   const summaries = [];
   const logs = [];
   const result = await runLevelsStep({
     api,
     eventName,
     event: ev,
+    prNumber,
     summary: (markdown) => summaries.push(markdown),
     log: (line) => logs.push(line),
   });
@@ -506,6 +512,120 @@ const file = (filename) => ({ filename, status: "modified" });
 const callsOf = (calls, method) => calls.filter((call) => call.method === method);
 const addedLabels = (calls) => callsOf(calls, "addLabels").flatMap((call) => call.args[3]);
 const removedLabels = (calls) => callsOf(calls, "removeIssueLabel").map((call) => call.args[3]);
+
+const dispatchEvent = () => ({ repository: { name: "core", owner: { login: "frostyard" } } });
+const dispatchLevels = (api, prNumber, ev = dispatchEvent()) =>
+  levels(api, { eventName: "workflow_dispatch", ev, prNumber });
+
+test("levels dispatch reads the live base SHA and shares the label ratchet", async () => {
+  const liveBase = "e".repeat(40);
+  const { api, calls } = levelsApi({
+    pullRequest: { number: 7, state: "open", base: { sha: liveBase }, get head() { throw new Error("must not read head"); } },
+    lists: { [liveBase]: levelsList("L4"), [BASE_SHA]: levelsList("L1") },
+    files: [file("src/a.go")],
+    current: ["level:L3"],
+  });
+  const { result, summary, logs } = await dispatchLevels(api, "7");
+  assert.equal(result.level, "L4");
+  assert.equal(result.outcome, "kept");
+  assert.deepEqual(calls.slice(0, 2), [
+    { method: "getPullRequest", args: ["frostyard", "core", 7] },
+    { method: "getFileAtRef", args: ["frostyard", "core", ".github/risk-paths.json", liveBase] },
+  ]);
+  assert.deepEqual(callsOf(calls, "getPullRequest"), [calls[0]]);
+  assert.deepEqual(callsOf(calls, "listPullFiles"), [{ method: "listPullFiles", args: ["frostyard", "core", 7] }]);
+  assert.deepEqual(addedLabels(calls), []);
+  assert.deepEqual(removedLabels(calls), []);
+  assert.match(summary, /computed L4, kept L3/);
+  assert.ok(logs.includes('risk-paths: event "workflow_dispatch"'));
+
+  const strict = levelsApi({ files: [file("secure/a.sh")], current: ["level:L3"] });
+  assert.equal((await dispatchLevels(strict.api, "7")).result.level, "L1");
+  assert.deepEqual(addedLabels(strict.calls), ["level:L1", "risk:high"]);
+  assert.deepEqual(removedLabels(strict.calls), ["level:L3"]);
+});
+
+for (const prNumber of [
+  undefined, "", "0", "007", "-1", "+1", "1.0", "1e3", "0x10", " 7", "7 ", "7\n", "7a", "٧", "9007199254740993",
+  null, 7,
+]) {
+  test(`levels dispatch refuses invalid pr input ${JSON.stringify(prNumber)} before any API call`, async () => {
+    const { api, calls } = levelsApi();
+    await assert.rejects(dispatchLevels(api, prNumber), {
+      message: `the pr input must be a pull request number, digits only, not ${JSON.stringify(prNumber)}`,
+    });
+    assert.deepEqual(calls, []);
+  });
+}
+
+for (const prNumber of ["1", String(Number.MAX_SAFE_INTEGER)]) {
+  test(`levels dispatch accepts safe integer edge ${prNumber}`, async () => {
+    const { api, calls } = levelsApi({ pullRequest: { state: "closed" } });
+    assert.deepEqual((await dispatchLevels(api, prNumber)).result, { outcome: "not-open" });
+    assert.deepEqual(calls, [{ method: "getPullRequest", args: ["frostyard", "core", Number(prNumber)] }]);
+  });
+}
+
+test("levels dispatch skips a closed pull request without reading its base", async () => {
+  const { api, calls } = levelsApi({ pullRequest: { state: "closed" } });
+  const { result, summary, logs } = await dispatchLevels(api, "7");
+  assert.deepEqual(result, { outcome: "not-open" });
+  assert.deepEqual(calls, [{ method: "getPullRequest", args: ["frostyard", "core", 7] }]);
+  assert.match(summary, /^## Levels\n\nthe pull request is not open\. No label change\./);
+  assert.ok(logs.some((line) => line.includes("the pull request is not open")));
+  assert.ok(logs.includes('risk-paths: pull request state "closed"'));
+});
+
+for (const sha of [undefined, "D".repeat(40), "d".repeat(39)]) {
+  test(`levels dispatch refuses invalid live base SHA ${JSON.stringify(sha)} before the list read`, async () => {
+    const { api, calls } = levelsApi({ pullRequest: { state: "open", base: { sha } } });
+    await assert.rejects(dispatchLevels(api, "7"), {
+      message: "the pulls API returned no valid base.sha (40 hex characters)",
+    });
+    assert.deepEqual(calls, [{ method: "getPullRequest", args: ["frostyard", "core", 7] }]);
+  });
+}
+
+test("levels dispatch refuses an invalid repository owner before any API call", async () => {
+  const { api, calls } = levelsApi();
+  await assert.rejects(dispatchLevels(api, "7", { repository: { name: "core", owner: { login: "a b" } } }), /owner and name/);
+  assert.deepEqual(calls, []);
+});
+
+test("levels pull_request_target refuses a non-empty dispatch input before any API call", async () => {
+  const { api, calls } = levelsApi();
+  await assert.rejects(levels(api, { prNumber: "7" }), {
+    message: "the pr input is only for workflow_dispatch; a pull_request_target caller must not set it",
+  });
+  assert.deepEqual(calls, []);
+});
+
+for (const prNumber of ["", undefined]) {
+  test(`levels pull_request_target accepts empty dispatch input ${JSON.stringify(prNumber)}`, async () => {
+    const { api, calls } = levelsApi({ files: [file("src/a.go")] });
+    assert.equal((await levels(api, { prNumber })).result.level, "L3");
+    assert.equal(callsOf(calls, "getPullRequest").length, 0);
+    assert.deepEqual(calls[0], { method: "getFileAtRef", args: ["frostyard", "core", ".github/risk-paths.json", BASE_SHA] });
+    assert.deepEqual(addedLabels(calls), ["level:L3"]);
+  });
+}
+
+test("levels refuses push before any API call", async () => {
+  const { api, calls } = levelsApi();
+  await assert.rejects(levels(api, { eventName: "push" }), {
+    message: 'the caller must run on pull_request_target or workflow_dispatch, not "push"',
+  });
+  assert.deepEqual(calls, []);
+});
+
+test("readiness and shadow still refuse workflow_dispatch before any API call", async () => {
+  const readiness = fakeApi();
+  await assert.rejects(step(readiness.api, { eventName: "workflow_dispatch", ev: labeledEvent() }), /must run on pull_request_target,/);
+  assert.deepEqual(readiness.calls, []);
+  const shadowFake = shadowApi();
+  await assert.rejects(shadow(shadowFake.api, { eventName: "workflow_dispatch" }), /must run on pull_request_target,/);
+  assert.deepEqual(shadowFake.calls, []);
+});
 
 test("LEVEL_LABELS names the 4 level labels", () => {
   assert.deepEqual(LEVEL_LABELS, { L1: "level:L1", L2: "level:L2", L3: "level:L3", L4: "level:L4" });
@@ -1482,6 +1602,57 @@ test("main on labeled with HTTP 403 on the check runs passes with a notice and m
   assert.match(await readFile(summaryPath, "utf8"), /## Readiness\n\nreadiness unknown: .*HTTP 403/);
 });
 
+for (const prNumber of ["7", "7x"]) {
+  test(`main levels dispatch with PR_TRIAGE_PR=${prNumber} ${prNumber === "7" ? "skips a closed PR" : "fails before any request"}`, async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "pr-triage-dispatch-"));
+    const eventPath = path.join(dir, "event.json");
+    const summaryPath = path.join(dir, "summary.md");
+    await writeFile(eventPath, JSON.stringify({ ...dispatchEvent(), inputs: { pr: "7" } }));
+    const saved = process.exitCode;
+    const write = process.stdout.write;
+    const savedFetch = globalThis.fetch;
+    const requests = [];
+    let out = "";
+    process.stdout.write = (chunk) => {
+      out += chunk;
+      return true;
+    };
+    globalThis.fetch = async (url, init) => {
+      requests.push(`${init.method} ${url}`);
+      return response(200, { number: 7, state: "closed" });
+    };
+    try {
+      const result = await main({
+        GITHUB_TOKEN: "secret-token",
+        GITHUB_API_URL: "https://api.example.test",
+        GITHUB_EVENT_PATH: eventPath,
+        GITHUB_STEP_SUMMARY: summaryPath,
+        GITHUB_EVENT_NAME: "workflow_dispatch",
+        PR_TRIAGE_STEP: "levels",
+        PR_TRIAGE_PR: prNumber,
+      });
+      const lines = out.trimEnd().split("\n");
+      if (prNumber === "7") {
+        assert.deepEqual(result, { outcome: "not-open" });
+        assert.deepEqual(requests, ["GET https://api.example.test/repos/frostyard/core/pulls/7"]);
+        assert.equal(process.exitCode, saved);
+        assert.ok(!lines.some((line) => line.startsWith("::error::")), out);
+        assert.match(await readFile(summaryPath, "utf8"), /## Levels\n\nthe pull request is not open/);
+      } else {
+        assert.equal(result, undefined);
+        assert.equal(process.exitCode, 1);
+        assert.deepEqual(requests, []);
+        assert.ok(lines.some((line) => line.startsWith("::error::the pr input must be a pull request number, digits only")), out);
+      }
+    } finally {
+      process.stdout.write = write;
+      process.exitCode = saved;
+      globalThis.fetch = savedFetch;
+      await rm(dir, { recursive: true });
+    }
+  });
+}
+
 // ---- GitHub API client: the new methods -----------------------------------
 
 function response(status, body, headers = {}) {
@@ -1725,11 +1896,11 @@ const JOB_IF =
   "(github.event.action != 'labeled' || github.event.label.name == 'ready-for-human') }}";
 const LEVELS_IF = "${{ github.event.action != 'labeled' }}";
 const READINESS_IF =
-  "${{ !cancelled() && (github.event.action == 'synchronize' || " +
+  "${{ !cancelled() && github.event_name == 'pull_request_target' && (github.event.action == 'synchronize' || " +
   "(github.event.action == 'labeled' && github.event.label.name == 'ready-for-human')) }}";
 // The deps and shadow steps share 1 condition.
 const SHADOW_IF =
-  "${{ !cancelled() && inputs.dependabot-shadow && github.event.pull_request.user.login == 'dependabot[bot]' && " +
+  "${{ !cancelled() && github.event_name == 'pull_request_target' && inputs.dependabot-shadow && github.event.pull_request.user.login == 'dependabot[bot]' && " +
   "contains(fromJSON('[\"opened\",\"synchronize\",\"reopened\"]'), github.event.action) }}";
 
 function escapeRegExp(text) {
@@ -1989,24 +2160,24 @@ test("the pr-triage library reads the head SHA only as an API query value", asyn
   assert.equal((library.match(/head\??\.sha/g) ?? []).length, 1);
 });
 
-test("the workflow has the input, the job, the permissions and no checkout", async () => {
+test("the workflow has the inputs and the job, sets no permissions and has no checkout", async () => {
   const workflow = await readFile(workflowPath, "utf8");
   const lines = outsideBlocks(workflow);
   const code = codeLines(lines.join("\n")).join("\n");
   assert.match(code, /^name: PR triage$/m);
   assert.match(
     code,
-    /^on:\n {2}workflow_call:\n {4}inputs:\n {6}dependabot-shadow:\n {8}description: [^\n]+\n {8}type: boolean\n {8}default: true\n\npermissions: \{\}$/m,
+    /^on:\n {2}workflow_call:\n {4}inputs:\n {6}dependabot-shadow:\n {8}description: [^\n]+\n {8}type: boolean\n {8}default: true\n {6}pr:\n {8}description: The pull request number, digits only, for a caller on workflow_dispatch \(ADR-0087\)\. Leave it empty on pull_request_target\.\n {8}type: string\n {8}default: ""$/m,
   );
   assert.match(
     code,
     new RegExp(
-      `^jobs:\\n {2}pr-triage:\\n {4}if: ${escapeRegExp(JOB_IF)}\\n {4}runs-on: ubuntu-latest\\n {4}timeout-minutes: 5\\n {4}permissions:`,
+      `^jobs:\\n {2}pr-triage:\\n {4}if: ${escapeRegExp(JOB_IF)}\\n {4}runs-on: ubuntu-latest\\n {4}timeout-minutes: 5\\n {4}steps:`,
       "m",
     ),
   );
   assert.ok(lines.includes(`    if: ${JOB_IF}`), "the job if: is exactly the expected line");
-  assert.deepEqual(jobPermissions(codeLines(lines.join("\n"))), ["contents: read", "pull-requests: write"]);
+  assert.ok(!lines.some((line) => /^\s*permissions:/.test(line)), "the reusable workflow sets no permissions");
   assert.ok(!workflow.includes("actions/checkout"));
   assert.match(code, /node-version: "22"/);
   assert.equal((code.match(/^ {2}[a-z-]+:$/gm) ?? []).filter((line) => line.trim() === "pr-triage:").length, 1);
@@ -2024,6 +2195,9 @@ test("the workflow writes the scripts, then runs the levels, readiness and shado
   assert.ok(text.includes("      - name: Write the triage scripts\n        run: |\n"));
   assert.ok(text.indexOf("risk-paths.mjs") < text.indexOf("pr-triage/pr-triage.mjs\" <<"));
   assert.ok(text.includes("      - name: Add level labels and risk:high\n        id: levels\n"));
+  assert.deepEqual(text.split("\n").filter((line) => /PR_TRIAGE_PR:/.test(line)), [
+    "          PR_TRIAGE_PR: ${{ inputs.pr }}",
+  ], "only levels receives the pr input");
   assert.ok(
     text.includes(
       "        id: levels\n" +
@@ -2031,6 +2205,7 @@ test("the workflow writes the scripts, then runs the levels, readiness and shado
         "        env:\n" +
         "          GITHUB_TOKEN: ${{ github.token }}\n" +
         "          PR_TRIAGE_STEP: levels\n" +
+        "          PR_TRIAGE_PR: ${{ inputs.pr }}\n" +
         '        run: node "$RUNNER_TEMP/pr-triage/pr-triage.mjs"\n',
     ),
   );
@@ -2070,6 +2245,37 @@ test("the workflow writes the scripts, then runs the levels, readiness and shado
     text.includes("        description: Run the Dependabot shadow step (docs/design/dependabot-shadow.md). " +
       "It only writes a comment; it never enables auto-merge.\n"),
   );
+});
+
+test("workflow_dispatch runs only the scripts and levels; pull_request_target synchronize still runs readiness", async () => {
+  const text = outsideBlocks(await readFile(workflowPath, "utf8")).join("\n");
+  assert.ok(text.includes("      - name: Write the triage scripts\n        run: |\n"), "scripts has no condition");
+  for (const expression of [JOB_IF, LEVELS_IF, READINESS_IF, SHADOW_IF]) {
+    assert.ok(text.includes(`if: ${expression}\n`), `the workflow uses ${expression}`);
+  }
+  const steps = [
+    ["scripts", "${{ true }}"],
+    ["levels", LEVELS_IF],
+    ["readiness", READINESS_IF],
+    ["metadata", SHADOW_IF],
+    ["shadow", SHADOW_IF],
+  ];
+  const dispatch = {
+    github: { event_name: "workflow_dispatch", event: { ...dispatchEvent(), inputs: { pr: "7" } } },
+    inputs: { "dependabot-shadow": true, pr: "7" },
+  };
+  assert.equal(evaluateExpression(JOB_IF, dispatch), true);
+  assert.deepEqual(
+    Object.fromEntries(steps.map(([name, expression]) => [name, evaluateExpression(expression, dispatch)])),
+    { scripts: true, levels: true, readiness: false, metadata: false, shadow: false },
+  );
+  const synchronize = {
+    github: { event_name: "pull_request_target", event: syncEvent() },
+    inputs: { "dependabot-shadow": true, pr: "" },
+  };
+  assert.equal(evaluateExpression(JOB_IF, synchronize), true);
+  assert.equal(evaluateExpression(LEVELS_IF, synchronize), true);
+  assert.equal(evaluateExpression(READINESS_IF, synchronize), true);
 });
 
 test("the expression evaluator follows the GitHub Actions comparison and truthiness rules", () => {
@@ -2322,7 +2528,7 @@ test("the caller runs only on pull_request_target with the 5 types", async () =>
   const triggers = text.split(/^on:\n/m)[1].split(/^\S/m)[0].split("\n").filter((line) => /^ {2}\S/.test(line));
   assert.deepEqual(triggers, ["  pull_request_target:"]);
   assert.match(text, /^jobs:\n {2}pr-triage:\n {4}permissions:/m);
-  assert.deepEqual(jobPermissions(lines), ["contents: read", "pull-requests: write"]);
+  assert.deepEqual(jobPermissions(lines), ["checks: read", "contents: read", "pull-requests: write", "statuses: read"]);
   assert.match(text, /^ {4}uses: \.\/\.github\/workflows\/pr-triage\.yml$/m);
   assert.ok(!/actions\/checkout|head\.sha|head\.ref/.test(caller));
 });

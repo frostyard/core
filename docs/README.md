@@ -104,6 +104,8 @@ which baseline rows do not apply here.
 - [0083 — Run the CI gate locally as `make ci`](adr/0083-run-the-ci-gate-locally-as-make-ci.md)
 - [0084 — Accept a tool's own site or a frostyard.org guide as its docs home](adr/0084-accept-a-tools-own-site-or-a-frostyard-org-guide-as-its-docs-home.md)
 - [0085 — Build new first-party apps on hearth, with lodge as their hub](adr/0085-build-new-first-party-apps-on-hearth-with-lodge-as-their-hub.md)
+- [0086 — Let each PR triage caller grant the triage token](adr/0086-let-each-pr-triage-caller-grant-the-triage-token.md)
+- [0087 — Start PR triage by dispatch for bot pull requests](adr/0087-start-pr-triage-by-dispatch-for-bot-pull-requests.md)
 
 ### Design
 

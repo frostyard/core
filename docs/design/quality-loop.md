@@ -76,7 +76,8 @@ PR template ──► review rubric ──► CI gates ──► corrections ─
   names it. The organization gate checks the mechanical part (baseline
   rows B12 and B19) with the readers in `scripts/lib/ci-gate.mjs`; with
   `OWNER/REPO` arguments, `node scripts/check-fleet-conventions.mjs`
-  checks any repository, not only the enabled ones.
+  checks any repository, not only the enabled ones. Run `npm ci` first in
+  the core checkout.
   - **Rollouts.** A change rolled out to many repositories runs
     `make ci` in each clone before it pushes there. A pass in 1
     repository proves nothing for another, and a push that CI fails costs

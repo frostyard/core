@@ -290,6 +290,11 @@ test("B5: every workflow pins its actions by SHA, starts from no permissions and
   const dir = path.join(root, ".github/workflows");
   const workflows = readdirSync(dir).filter((name) => /\.ya?ml$/.test(name));
   assert.ok(workflows.length > 0);
+  // ADR-0086: only this reusable workflow inherits the calling job's grant.
+  const noPermissionsWorkflows = ["pr-triage.yml"];
+  for (const name of noPermissionsWorkflows) {
+    assert.ok(workflows.includes(name), `${name}: the permission exemption must name an existing workflow`);
+  }
   let checkouts = 0;
   for (const name of workflows) {
     const text = read(path.join(".github/workflows", name));
@@ -297,11 +302,24 @@ test("B5: every workflow pins its actions by SHA, starts from no permissions and
       if (/uses:\s*\.\//.test(line)) continue;
       assert.match(line, /uses:\s*[\w.-]+\/[\w./-]+@[0-9a-f]{40} # v\S+/, `${name}: unpinned action: ${line.trim()}`);
     }
-    assert.match(text, /^permissions:\s*\{\}\s*$/m, `${name}: no top-level permissions: {}`);
+    if (noPermissionsWorkflows.includes(name)) {
+      assert.match(text, /^on:\n {2}workflow_call:\n/m, `${name}: the permission exemption requires workflow_call`);
+      assert.equal((text.match(/^on:/gm) ?? []).length, 1, `${name}: exactly 1 trigger block`);
+      const triggers = text.split(/^on:\n/m)[1].split(/^\S/m)[0].split("\n").filter((line) => /^ {2}\S/.test(line));
+      assert.deepEqual(triggers, ["  workflow_call:"], `${name}: no other trigger may inherit the caller's grant`);
+      assert.ok(!/^\s*permissions:/m.test(text), `${name}: the reusable workflow must set no permissions`);
+    } else {
+      assert.match(text, /^permissions:\s*\{\}\s*$/m, `${name}: no top-level permissions: {}`);
+    }
     const result = checkoutCredentials(text);
     assert.deepEqual(result.offenders, [], `${name}: a checkout keeps credentials`);
     checkouts += result.checkouts;
   }
+  assert.deepEqual(
+    workflows.filter((name) => !/^permissions:\s*\{\}\s*$/m.test(read(path.join(".github/workflows", name)))).sort(),
+    ["pr-triage.yml"],
+    "only pr-triage.yml omits top-level permissions: {}",
+  );
   assert.ok(checkouts > 0, "no actions/checkout step found: the credentials check checked nothing");
 });
 

@@ -21,7 +21,9 @@ names what the decision binds in core and where it lives here.
   [.github/pull_request_template.md](../.github/pull_request_template.md).
 - [ADR-0021 — SHA-pinned actions and least-privilege CI workflows](adr/0021-sha-pinned-actions-and-least-privilege-ci.md)
   — every `uses:` in [.github/workflows/](../.github/workflows/) is a full
-  commit SHA; workflows start from `permissions: {}`.
+  commit SHA; workflows start from `permissions: {}`, except
+  [pr-triage.yml](../.github/workflows/pr-triage.yml)
+  ([ADR-0086](adr/0086-let-each-pr-triage-caller-grant-the-triage-token.md)).
 - [ADR-0025 — One docs/ tree per repository, in core's four-category shape](adr/0025-consolidate-repository-docs-into-docs.md)
   — this [docs/](README.md) tree holds adr, design, specs and plans, each with
   its `TEMPLATE.md`.
@@ -86,6 +88,16 @@ names what the decision binds in core and where it lives here.
   GitHub API read, a pip install) and run on their own. Core's
   [AGENTS.md](../AGENTS.md) names `make ci`, and
   `test/repository-baseline.test.mjs` holds core to row B19.
+- [ADR-0086 — Let each PR triage caller grant the triage token](adr/0086-let-each-pr-triage-caller-grant-the-triage-token.md)
+  — [pr-triage.yml](../.github/workflows/pr-triage.yml) has no
+  `permissions` key; core's caller
+  [risk-paths-caller.yml](../.github/workflows/risk-paths-caller.yml) grants
+  the job token, and `npm run check:fleet` fails a caller job without an
+  explicit grant.
+- [ADR-0087 — Start PR triage by dispatch for bot pull requests](adr/0087-start-pr-triage-by-dispatch-for-bot-pull-requests.md)
+  — [pr-triage.yml](../.github/workflows/pr-triage.yml) takes the input `pr`
+  and runs only the `levels` step on `workflow_dispatch`. Core opens no PR
+  with `GITHUB_TOKEN`, so it has no dispatch caller.
 
 ## Rows that do not apply to core
 

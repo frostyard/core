@@ -1213,7 +1213,10 @@ WOULD  POST repos/bketelsen/truenas-mcp/labels (create label level:L4)
   `node scripts/pr-triage-backfill.mjs OWNER/REPO... [--apply]`: it runs the
   same `levels` step on each open pull request. Without `--apply` it is a dry
   run that writes nothing; a second run after `--apply` prints no change.
-- Every caller runs on `pull_request_target`. GitHub adds a default Actions
+- The callers `risk-paths.yml` and `risk-paths-caller.yml` run on
+  `pull_request_target`. Repositories with bot PRs also use the separate
+  [dispatch caller](../specs/pr-triage.md#a2-the-dispatch-caller) for `levels`
+  on `workflow_dispatch`. GitHub adds a default Actions
   policy that blocks `pull_request_target` in public repositories that have
   no Actions event policy of their own, and enforces it on 2026-12-02
   ([Securely using pull_request_target](https://docs.github.com/en/actions/reference/security/securely-using-pull_request_target#default-policy-for-pull_request_target)).
