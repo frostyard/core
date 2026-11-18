@@ -9,14 +9,15 @@ The reusable workflow is `frostyard/core/.github/workflows/pr-triage.yml`, with 
 | Input | Type | Default | Use |
 | --- | --- | --- | --- |
 | `dependabot-shadow` | boolean | `true` | Turns the `shadow` step and its metadata step on or off. It only writes a comment. |
+| `pr` | string | `""` | The PR number for a caller on `workflow_dispatch`, digits only. Empty on `pull_request_target`. |
 
 | Part | Value |
 | --- | --- |
 | Workflow name | `PR triage` |
-| Top-level permissions | `{}` |
+| Top-level permissions | none (no `permissions` key) |
 | Job | `pr-triage`: `runs-on: ubuntu-latest`, `timeout-minutes: 5` |
 | Job `if:` | `${{ (github.event.action != 'edited' \|\| github.event.changes.base != null) && (github.event.action != 'labeled' \|\| github.event.label.name == 'ready-for-human') }}` |
-| Job permissions | `contents: read` and `pull-requests: write`, no other |
+| Job permissions | none in the workflow: the job gets the calling job's grant ([ADR-0086](../adr/0086-let-each-pr-triage-caller-grant-the-triage-token.md)) |
 | Secrets | None. The steps use `github.token` only. |
 | Checkout | None |
 
@@ -26,9 +27,11 @@ The job runs these steps in order:
 | --- | --- | --- |
 | Write the triage scripts | always | not set |
 | `levels` | `${{ github.event.action != 'labeled' }}` | `levels` |
-| `readiness` | `${{ !cancelled() && (github.event.action == 'synchronize' \|\| (github.event.action == 'labeled' && github.event.label.name == 'ready-for-human')) }}` | `readiness` |
-| Fetch the Dependabot metadata | `${{ !cancelled() && inputs.dependabot-shadow && github.event.pull_request.user.login == 'dependabot[bot]' && contains(fromJSON('["opened","synchronize","reopened"]'), github.event.action) }}` | not set |
-| `shadow` | `${{ !cancelled() && inputs.dependabot-shadow && github.event.pull_request.user.login == 'dependabot[bot]' && contains(fromJSON('["opened","synchronize","reopened"]'), github.event.action) }}` | `shadow` |
+| `readiness` | `${{ !cancelled() && github.event_name == 'pull_request_target' && (github.event.action == 'synchronize' \|\| (github.event.action == 'labeled' && github.event.label.name == 'ready-for-human')) }}` | `readiness` |
+| Fetch the Dependabot metadata | `${{ !cancelled() && github.event_name == 'pull_request_target' && inputs.dependabot-shadow && github.event.pull_request.user.login == 'dependabot[bot]' && contains(fromJSON('["opened","synchronize","reopened"]'), github.event.action) }}` | not set |
+| `shadow` | `${{ !cancelled() && github.event_name == 'pull_request_target' && inputs.dependabot-shadow && github.event.pull_request.user.login == 'dependabot[bot]' && contains(fromJSON('["opened","synchronize","reopened"]'), github.event.action) }}` | `shadow` |
+
+The `levels` step sets `PR_TRIAGE_PR: ${{ inputs.pr }}` in its `env:`. The other script steps do not receive `PR_TRIAGE_PR`.
 
 A step after `levels` uses `!cancelled()` in its `if:`, so that it runs after an earlier step failed. A new step goes in this job in the same way.
 
@@ -39,7 +42,7 @@ A skipped job starts no runner and runs no step. The job `if:` skips 2 events th
 | `edited` | `github.event.changes.base` is missing, so the edit changed only the title or the body. |
 | `labeled` | `github.event.label.name` is not `ready-for-human`. |
 
-The job runs on `opened`, `synchronize` and `reopened`, and on `labeled` with `ready-for-human`, as before.
+The job runs on `opened`, `synchronize` and `reopened`, and on `labeled` with `ready-for-human`, as before. On `workflow_dispatch`, the job writes the scripts and runs only `levels`.
 
 ## Rules
 
@@ -49,10 +52,11 @@ The job runs on `opened`, `synchronize` and `reopened`, and on `labeled` with `r
 - In a reusable workflow, `github.event` is the caller's event, so the job `if:` reads the caller's event and no caller changes. An `edited` event runs the job only when the base branch changed, and the job then reads the list at the new base SHA. The job skips an edit of the title or the body, and skips `labeled` with a label other than `ready-for-human` ([core#237](https://github.com/frostyard/core/issues/237)).
 - The caller pins the reusable workflow to a full 40-character core commit SHA (ADR-0021): `frostyard/core/.github/workflows/pr-triage.yml@<SHA>`.
 - Core's own caller, `.github/workflows/risk-paths-caller.yml`, uses the local path `./.github/workflows/pr-triage.yml`. Under `pull_request_target`, the local path resolves to the base branch commit, not to the PR head.
+- Each job that calls `pr-triage.yml` sets its own `permissions` mapping ([ADR-0086](../adr/0086-let-each-pr-triage-caller-grant-the-triage-token.md)). It grants `contents: read` and `pull-requests: write`. It may add `checks` and `statuses`, each with `read` or `none`, and nothing else. A private repository adds both reads. The reusable workflow sets no permissions and takes the calling job's grant; a called workflow can only reduce a grant. Workflow-level `permissions` does not replace the job grant: a calling job without its own grant passes the default token, which can allow writes to every scope. `npm run check:fleet` fails a caller job that breaks this rule in the enabled declarations. `triageCallerGrantGaps` in `scripts/lib/fleet-conventions.mjs` implements the check. Core's caller grants all 4 scopes with the values `read`, `write`, `read` and `read`, respectively.
 - The caller's job id is `pr-triage`. The check is named `pr-triage / pr-triage`. The `readiness` step leaves out check runs whose name starts with `pr-triage`.
 - The caller has no `merge_group` trigger.
 - The caller is not a required check.
-- A PR that a workflow opens or pushes with `GITHUB_TOKEN` starts no workflow ([GitHub](https://docs.github.com/en/actions/using-workflows/triggering-a-workflow#triggering-a-workflow-from-a-workflow)): the caller and CI do not run on it, so the PR gets no level label, no readiness check and no required check until a person or another token pushes to it or sends another event.
+- A PR that a workflow opens or pushes with `GITHUB_TOKEN` starts no `pull_request_target` or CI run ([GitHub](https://docs.github.com/en/actions/using-workflows/triggering-a-workflow#triggering-a-workflow-from-a-workflow)). The dispatch caller in rule A2 gives such a PR its level label: only `levels` runs, not readiness. Without a dispatch or another event, the PR gets no level label, no readiness check and no required check until a person or another token pushes to it or sends another event.
 - [Risk-paths rule C](risk-paths.md#c-required-entries) still covers the caller: the list has a glob that matches `.github/workflows/risk-paths-caller.yml`.
 - The workflow embeds 2 libraries verbatim, each in 1 heredoc of the step "Write the triage scripts". The step writes them to `$RUNNER_TEMP/pr-triage/`. `risk-paths.mjs` has no trailer. `pr-triage.mjs` has the trailer line `await main(process.env);`. `pr-triage.mjs` imports `./risk-paths.mjs`.
 - `npm run check:risk-paths` fails when 1 embedded copy differs from its library, and names the library. `npm run sync:risk-paths-workflow` rewrites both copies.
@@ -60,9 +64,55 @@ The job runs on `opened`, `synchronize` and `reopened`, and on `labeled` with `r
 - The job checks out nothing. It runs no code from the PR. The workflow lines outside the heredocs name no head ref, merge ref or head SHA.
 - Actions are SHA-pinned.
 
+### A2. The dispatch caller
+
+A repository whose workflows open or update PRs with `GITHUB_TOKEN` adds `.github/workflows/pr-triage-dispatch.yml` ([ADR-0087](../adr/0087-start-pr-triage-by-dispatch-for-bot-pull-requests.md)). The caller uses this template:
+
+```yaml
+name: PR triage dispatch
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: The number of the pull request to triage
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+  pr-triage:
+    permissions:
+      contents: read
+      pull-requests: write
+    uses: frostyard/core/.github/workflows/pr-triage.yml@<40-character SHA>
+    with:
+      pr: ${{ inputs.pr }}
+      dependabot-shadow: false
+```
+
+The dispatch caller is a separate file. The [Actions event policy for the caller paths](../design/pull-request-target-policy.md#how-the-policy-works) is an allowlist of events. The `pull_request_target` caller keeps its 1 trigger.
+
+The bot job grants `actions: write` and dispatches after it creates or updates the PR. It passes the PR number through `env:`, never through `${{ }}` inside `run:`. For a PR step with id `pr` and output `number`:
+
+```yaml
+      - name: Run PR triage
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+        run: gh workflow run pr-triage-dispatch.yml --repo "$GITHUB_REPOSITORY" -f pr="$PR_NUMBER"
+```
+
+Only `levels` runs on the dispatch. Readiness and shadow need `pull_request_target` event data and do not run.
+
 ### B. The `levels` step
 
 The step computes the level of the PR and sets the level label by the ratchet, with `risk:high` as the alias of L1 and L2 ([ADR-0078](../adr/0078-sort-pull-requests-by-levels-l1-to-l4.md)). Its behavior is the behavior of [risk-paths rules D and E](risk-paths.md#e-workflow-contract). It does not run on the type `labeled`: a label change moves no file.
+
+On `workflow_dispatch`, the step reads the raw `pr` input from `PR_TRIAGE_PR`. Before any API call, it refuses a value that does not match `^[1-9][0-9]*$` or whose number is not a safe integer. It validates the repository owner and name from the event, then reads `GET /repos/{owner}/{repo}/pulls/{number}` once. A PR whose `state` is not `open` gives the outcome `not-open`, logs the live state, writes a `## Levels` summary and makes no other API call. The base SHA comes from that answer's `base.sha` and must be 40 lowercase hex characters. An invalid base SHA fails before the list read. The step then reads the list at that SHA and labels the PR as on `pull_request_target`.
+
+On `pull_request_target`, a non-empty `pr` input fails the step before any API call. An empty input uses the event's `pull_request.base.sha` as before. Any other event name fails the step.
 
 ### C. The `readiness` step: triggers
 
@@ -71,7 +121,7 @@ The step computes the level of the PR and sets the level label by the ratchet, w
 - A `synchronize` event on a PR without the label: no API call, no change.
 - Any other action: no change.
 - A `labeled` event with another label: no change. The job `if:` skips the job, so the step does not run.
-- The event name must be `pull_request_target`. Another event name fails the step.
+- The step `if:` requires `github.event_name == 'pull_request_target'`. The library also requires this event name; another event name fails the step.
 - No sender is exempt. This includes GitHub's "Update branch" button and a bot.
 
 ### D. The `readiness` step: check evaluation
@@ -86,7 +136,7 @@ The step computes the level of the PR and sets the level label by the ratchet, w
 - With 1 or more checks that are not green, the step revokes the label.
 - With every check green, the label stays.
 - With no check run left and no status, the label stays.
-- Readiness unknown. When the check-run read or the commit-status read gets HTTP 403, the token cannot read checks. This happens in a private repository: there, the job permissions `contents: read` and `pull-requests: write` do not cover check runs and commit statuses ([bketelsen/fleet run 42646228960](https://github.com/bketelsen/fleet/actions/runs/42646228960)). The step then stops with the outcome `unknown`. It writes a `::notice::` annotation and a `## Readiness` section that start with `readiness unknown`, changes no label, writes no comment, and passes. After a 403 on the check runs, it does not read the statuses.
+- Readiness unknown. The workflow takes the calling job's grant. A private caller grants `checks: read` and `statuses: read` so trigger 2 can read checks and commit statuses. Without them, the reads can return HTTP 403 ([bketelsen/fleet run 42646228960](https://github.com/bketelsen/fleet/actions/runs/42646228960)). When the check-run read or the commit-status read gets HTTP 403, the step stops with the outcome `unknown`. It writes a `::notice::` annotation and a `## Readiness` section that start with `readiness unknown`, changes no label, writes no comment, and passes. After a 403 on the check runs, it does not read the statuses.
 - Only HTTP 403 gives `unknown`. The step reads the status from the `status` field of the client error, not from its message. Any other HTTP status, or a network error, on these reads fails the step.
 
 ### E. The `readiness` step: revoke
@@ -123,13 +173,13 @@ The step writes a `## Readiness` section to the job summary with the result. For
 - Open case: review at A, push B, CI on B green, then the label. The step keeps the label, because nothing moved after it and CI is green.
 - A workflow that itself runs on `labeled` can be pending at that moment. The step then revokes the label.
 - The workflow never adds `ready-for-human`. A person or an agent adds it again.
-- In a private repository, only trigger 1 (`head-moved`) works. Trigger 2 gives readiness unknown (rule D). The workflow does not ask for `checks: read` and `statuses: read`: a reusable workflow cannot get more permissions than its caller grants, so each caller would need a change first. A secondary rate limit also answers HTTP 403. It then gives readiness unknown and not a red run. In both cases, the label stays, as it does after a failed run.
+- The workflow takes the calling job's grant. In a private repository, trigger 2 works when the caller grants `checks: read` and `statuses: read`. Without them, HTTP 403 gives readiness unknown (rule D); trigger 1 (`head-moved`) still works. A secondary rate limit also answers HTTP 403. It then gives readiness unknown and not a red run. In both 403 cases, the label stays, as it does after a failed run.
 
 ### G. The shadow step
 
 The step is a measurement. It writes 1 comment that says what a narrow auto-merge class would do. It never enables auto-merge, approves, merges or labels, and it reads no label of the PR ([ADR-0019](../adr/0019-governance-as-code-and-risk-tiers.md) still holds).
 
-**When it runs.** `pull_request.user.login` is `dependabot[bot]`, `event.action` is `opened`, `synchronize` or `reopened`, and the PR is not a draft (`pull_request.draft` is not `true`). Otherwise the step makes no API call and writes no comment; its job summary says why.
+**When it runs.** The step `if:` requires `github.event_name == 'pull_request_target'`. `pull_request.user.login` is `dependabot[bot]`, `event.action` is `opened`, `synchronize` or `reopened`, and the PR is not a draft (`pull_request.draft` is not `true`). Otherwise the step makes no API call and writes no comment; its job summary says why.
 
 **Event validation.** The event name is `pull_request_target`. The owner and the repository name match the name pattern, the PR number is a positive integer, `pull_request.head.sha` and `pull_request.base.sha` are 40 lowercase hex characters, and `pull_request.base.ref` is a non-empty string. A bad value fails the step.
 
@@ -198,10 +248,12 @@ Shadow call: auto-merge would be enabled at `<head 12>` (patch or minor; manifes
 | Gate (`scripts/check-risk-paths.mjs`, `npm run check:risk-paths`) | Fail when 1 embedded copy drifts |
 | Core's caller (`.github/workflows/risk-paths-caller.yml`) | Rule A, with the local reusable workflow path |
 | Caller in each repository | Rule A, with the pinned reusable workflow |
+| Dispatch caller (`.github/workflows/pr-triage-dispatch.yml`) in repositories with bot PRs | Rule A2, with the pinned reusable workflow and the `pr` input |
+| Caller grant check (`scripts/lib/fleet-conventions.mjs`, `triageCallerGrantGaps`) | Rule A: fail a caller job without its own narrow permissions mapping |
 
-Tests: `test/pr-triage.test.mjs`, `test/risk-paths.test.mjs`. These artifacts MUST match this spec.
+Tests: `test/pr-triage.test.mjs`, `test/risk-paths.test.mjs`, `test/fleet-conventions.test.mjs`, `test/repository-baseline.test.mjs`. These artifacts MUST match this spec.
 
 ## References
 
-- Rationale: [ADR-0077](../adr/0077-bind-ready-for-human-to-the-head-commit.md), [ADR-0068](../adr/0068-label-pull-requests-that-touch-high-risk-paths.md), [ADR-0078](../adr/0078-sort-pull-requests-by-levels-l1-to-l4.md), [ADR-0021](../adr/0021-sha-pinned-actions-and-least-privilege-ci.md)
+- Rationale: [ADR-0077](../adr/0077-bind-ready-for-human-to-the-head-commit.md), [ADR-0068](../adr/0068-label-pull-requests-that-touch-high-risk-paths.md), [ADR-0078](../adr/0078-sort-pull-requests-by-levels-l1-to-l4.md), [ADR-0021](../adr/0021-sha-pinned-actions-and-least-privilege-ci.md), [ADR-0086](../adr/0086-let-each-pr-triage-caller-grant-the-triage-token.md), [ADR-0087](../adr/0087-start-pr-triage-by-dispatch-for-bot-pull-requests.md)
 - Context: [risk-paths spec](risk-paths.md), [Dependabot shadow](../design/dependabot-shadow.md), [quality loop](../design/quality-loop.md), [autonomy gate](https://airlock.lunareng.com/docs/autonomy-gate.md)

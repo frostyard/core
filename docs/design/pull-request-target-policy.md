@@ -23,11 +23,17 @@ applicable Actions event policy allows the event
 [changelog 2026-11-02](https://github.blog/changelog/2026-11-02-pull_request_target-blocked-by-default-december-2)).
 Private and internal repositories are not affected.
 
-The PR triage caller of each repository runs only on `pull_request_target`
+The caller `risk-paths.yml` or `risk-paths-caller.yml` of each repository
+runs only on `pull_request_target`
 (ADR-0068, [PR triage spec](../specs/pr-triage.md)). A blocked caller run
 has no job: no level label, no `risk:high`, and no removal of
 `ready-for-human` after a push. Merges are not blocked, because the caller is
 not a required check. The guard of ADR-0077 then stops without a signal.
+
+A repository with bot PRs also uses a separate
+[dispatch caller](../specs/pr-triage.md#a2-the-dispatch-caller) for `levels`
+on `workflow_dispatch` (ADR-0087). It does not run readiness or shadow and
+is not 1 of the caller paths that this event policy targets.
 
 This runbook keeps the caller running. It was meant to keep the default
 block for every other workflow, but the test of 2026-11-16 points to a
@@ -224,7 +230,7 @@ list, at core `781c8b1` and on each caller:
 | Pull request text is data | Pass. No `run:` step expands a title, a branch name or a path with `${{ }}`. The scripts read the event from `GITHUB_EVENT_PATH`; `if:` expressions use only the action, the label name and the author login. |
 | Readiness uses the head and rejects pending checks | Pass. On `synchronize` with the label, the label comes off. On `labeled`, the step reads the check runs and statuses at `pull_request.head.sha`; a check that is queued, in progress or pending, or that is not success, neutral or skipped, takes the label off. |
 | Readiness and missing checks | Known gap, by the spec: a head with 0 check runs and 0 statuses keeps the label, and HTTP 403 (private repositories) gives "unknown". A missing required check still blocks the merge through the required-checks ruleset (ADR-0076). A blocked run (`startup_failure`) makes no check run, so readiness cannot see it. |
-| Least-privilege token | Pass. Each caller has `permissions: {}` at the top and `contents: read`, `pull-requests: write` on the job. The job uses no secret except `github.token` and saves no cache. frostyard/updex has 1 more job in the caller, `actions/labeler` at a SHA pin, with the same permissions. |
+| Least-privilege token | Pass. Each caller has `permissions: {}` at the top and `contents: read`, `pull-requests: write` on the job. The job uses no secret except `github.token` and saves no cache. frostyard/updex has 1 more job in the caller, `actions/labeler` at a SHA pin, with the same permissions. From [ADR-0086](../adr/0086-let-each-pr-triage-caller-grant-the-triage-token.md), the reusable workflow sets no permissions; the calling job's grant is the whole token. Private callers add `checks: read` and `statuses: read`. `check:fleet` fails a caller job without its own narrow grant in the enabled repositories. |
 | Caller and core pin protected | Pass. Every caller pins `frostyard/core/.github/workflows/pr-triage.yml` to a 40-character SHA (core uses the local path). The caller path is at L1 in 9 repositories and at L2 in the others, through the org floor `.github/workflows/**`; both levels add `risk:high`. In core, `pr-triage.yml` and its 2 libraries are at L2. |
 
 The policy keeps the caller running. In the brownout on 2026-11-16
@@ -255,6 +261,16 @@ repository when a workflow other than `risk-paths.yml` or
 implements the check; `test/fleet-conventions.test.mjs` tests it. It closes
 the gap of [core#273](https://github.com/frostyard/core/issues/273) only in
 the repositories it reads.
+
+`triageCallerGrantGaps` in `scripts/lib/fleet-conventions.mjs` also checks
+each job that calls `pr-triage.yml`
+([ADR-0086](../adr/0086-let-each-pr-triage-caller-grant-the-triage-token.md)).
+It reads YAML with the `yaml` parser and fails a job without its own narrow
+`permissions` mapping. The required grants are `contents: read` and
+`pull-requests: write`; only `checks` and `statuses`, each `read` or `none`,
+may be added. This check has the same scope: enabled declarations, default
+branch only. Explicit `OWNER/REPO` arguments can check other default
+branches. `test/fleet-conventions.test.mjs` tests it.
 
 The rule holds in a private repository too. There the default policy does
 not apply, but a `pull_request_target` job still runs with a write token in
@@ -344,7 +360,9 @@ gh api -H "X-GitHub-Api-Version: 2026-03-10" \
   [ADR-0078](../adr/0078-sort-pull-requests-by-levels-l1-to-l4.md),
   [ADR-0076](../adr/0076-require-status-checks-on-every-default-branch.md),
   [ADR-0020](../adr/0020-ai-automation-trust-boundaries.md),
-  [ADR-0021](../adr/0021-sha-pinned-actions-and-least-privilege-ci.md)
+  [ADR-0021](../adr/0021-sha-pinned-actions-and-least-privilege-ci.md),
+  [ADR-0086](../adr/0086-let-each-pr-triage-caller-grant-the-triage-token.md),
+  [ADR-0087](../adr/0087-start-pr-triage-by-dispatch-for-bot-pull-requests.md)
 - Contracts: [specs/pr-triage.md](../specs/pr-triage.md),
   [specs/risk-paths.md](../specs/risk-paths.md)
 - GitHub: [securely using pull_request_target](https://docs.github.com/en/actions/reference/security/securely-using-pull_request_target),

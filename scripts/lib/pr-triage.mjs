@@ -6,7 +6,9 @@
 // shadow step that writes 1 comment "would auto-merge" on a Dependabot pull
 // request that a narrow auto-merge class would take, and enables nothing
 // (docs/design/dependabot-shadow.md). `main` picks the step from
-// PR_TRIAGE_STEP: `levels`, `readiness` or `shadow`.
+// PR_TRIAGE_STEP: `levels`, `readiness` or `shadow`. Levels runs on
+// pull_request_target or workflow_dispatch; readiness and shadow run only on
+// pull_request_target.
 //
 // The reusable workflow .github/workflows/pr-triage.yml embeds this file
 // verbatim, plus 1 trailer line, and scripts/lib/risk-paths.mjs beside it. It
@@ -282,24 +284,46 @@ const levelRank = (level) => LEVELS.indexOf(level);
 // level label only gets stricter: a looser computed level keeps the stricter
 // label that the pull request has. Never removes risk:high. Never creates a
 // label: the add-labels API creates a missing one, so the step checks first.
-export async function runLevelsStep({ api, eventName, event, summary, log }) {
+// Runs on pull_request_target, or on workflow_dispatch with an explicit PR number.
+export async function runLevelsStep({ api, eventName, event, prNumber, summary, log }) {
   const say = (message, value) =>
     log(value === undefined ? `${LEVELS_PREFIX}${message}` : `${LEVELS_PREFIX}${message} ${JSON.stringify(value)}`);
 
-  if (eventName !== "pull_request_target") {
-    throw new Error(`the caller must run on pull_request_target, not ${JSON.stringify(eventName)}`);
+  say("event", eventName);
+  if (eventName !== "pull_request_target" && eventName !== "workflow_dispatch") {
+    throw new Error(`the caller must run on pull_request_target or workflow_dispatch, not ${JSON.stringify(eventName)}`);
   }
-  const pr = event?.pull_request;
+  const dispatch = eventName === "workflow_dispatch";
+  if (!dispatch && typeof prNumber === "string" && prNumber !== "") {
+    throw new Error("the pr input is only for workflow_dispatch; a pull_request_target caller must not set it");
+  }
+  if (dispatch && (
+    typeof prNumber !== "string" ||
+    !/^[1-9][0-9]*$/.test(prNumber) ||
+    !Number.isSafeInteger(Number(prNumber))
+  )) {
+    throw new Error(`the pr input must be a pull request number, digits only, not ${JSON.stringify(prNumber)}`);
+  }
   const owner = event?.repository?.owner?.login;
   const repo = event?.repository?.name;
-  const number = pr?.number;
-  const baseSha = pr?.base?.sha;
+  const number = dispatch ? Number(prNumber) : event?.pull_request?.number;
   if (typeof owner !== "string" || !NAME_PATTERN.test(owner) || typeof repo !== "string" || !NAME_PATTERN.test(repo)) {
     throw new Error("the event has no valid repository owner and name");
   }
   if (!Number.isSafeInteger(number) || number < 1) throw new Error("the event has no valid pull request number");
+  const pr = dispatch ? await api.getPullRequest(owner, repo, number) : event?.pull_request;
+  if (dispatch && pr?.state !== "open") {
+    say("pull request state", pr?.state ?? null);
+    const text = "the pull request is not open. No label change.";
+    say(text);
+    await summary(`## Levels\n\n${text}\n`);
+    return { outcome: "not-open" };
+  }
+  const baseSha = pr?.base?.sha;
   if (typeof baseSha !== "string" || !SHA_PATTERN.test(baseSha)) {
-    throw new Error("the event has no valid pull_request.base.sha (40 hex characters)");
+    throw new Error(dispatch
+      ? "the pulls API returned no valid base.sha (40 hex characters)"
+      : "the event has no valid pull_request.base.sha (40 hex characters)");
   }
   const fullName = `${owner}/${repo}`;
   say("repository", fullName);
@@ -766,6 +790,7 @@ export async function main(env) {
       process.stdout.write(`::notice::${commandValue(text)}\n`);
     };
     const options = { api, eventName: env.GITHUB_EVENT_NAME, event, summary, log, notice };
+    if (step === "levels") options.prNumber = env.PR_TRIAGE_PR;
     if (step === "shadow") options.updates = env.DEPENDABOT_UPDATES;
     return await run(options);
   } catch (error) {

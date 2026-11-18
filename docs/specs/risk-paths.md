@@ -154,12 +154,11 @@ The reusable workflow is `frostyard/core/.github/workflows/pr-triage.yml`, with 
 - Core's own caller, `.github/workflows/risk-paths-caller.yml`, is the 1 exception to the SHA pin. It uses the local path `./.github/workflows/pr-triage.yml`. Under `pull_request_target`, the local path resolves to the base branch commit, not to the PR head.
 - The caller has no `merge_group` trigger.
 - The caller is not a required check.
-- The workflow has top-level `permissions: {}`.
-- The job has `contents: read` and `pull-requests: write`. It has no other permission.
+- The reusable workflow sets no permissions. Each calling job grants its token through its own `permissions` mapping ([ADR-0086](../adr/0086-let-each-pr-triage-caller-grant-the-triage-token.md), [PR triage rule A](pr-triage.md#a-workflow-and-caller)): `contents: read` and `pull-requests: write` are required. Only `checks` and `statuses` may be added, each with `read` or `none`. A private caller grants both reads. Workflow-level permissions do not replace the job grant.
 - Actions are SHA-pinned.
 - The job checks out nothing. The reusable workflow embeds `scripts/lib/risk-paths.mjs` and `scripts/lib/pr-triage.mjs` verbatim in 2 heredocs, writes them to files, and runs `pr-triage.mjs` with Node. `npm run check:risk-paths` fails when an embedded copy differs from its library. Under a `--root` that has `scripts/lib/risk-paths.mjs` but no `.github/workflows/pr-triage.yml` (a repository that vendors the library), the gate skips this check, and its ok line says `workflow sync skipped` instead of `workflow in sync`. Only a missing path (`ENOENT` from `lstat`) skips it: any other error on that path, such as a symlink loop, a dangling symlink or a file in place of `.github/workflows`, fails the gate. Core's own run MUST say `workflow in sync`; `test/risk-paths.test.mjs` checks it.
 - Code that the job runs comes only from `frostyard/core` at a pinned commit, never from the PR's repository.
-- The job reads `.github/risk-paths.json` at `github.event.pull_request.base.sha`.
+- The job reads `.github/risk-paths.json` at the PR's base SHA: from `github.event.pull_request.base.sha` on `pull_request_target`, or from the pulls API on `workflow_dispatch` ([ADR-0087](../adr/0087-start-pr-triage-by-dispatch-for-bot-pull-requests.md)). A repository with bot PRs adds the separate [dispatch caller](pr-triage.md#a2-the-dispatch-caller).
 - The job MUST NOT check out, read as code or run anything from the PR head or the merge ref.
 - The changed files come from `GET /repos/{owner}/{repo}/pulls/{number}/files`, all pages.
 - The GitHub API returns at most 3000 files for 1 PR. When the list has 3000 or more entries, the level is L1 and the job summary says that the file list is truncated. This behavior is fail safe.
@@ -229,5 +228,5 @@ Tests: `test/risk-paths.test.mjs`, `test/pr-triage.test.mjs`. These artifacts MU
 
 ## References
 
-- Rationale: [ADR-0068](../adr/0068-label-pull-requests-that-touch-high-risk-paths.md), [ADR-0078](../adr/0078-sort-pull-requests-by-levels-l1-to-l4.md), [ADR-0019](../adr/0019-governance-as-code-and-risk-tiers.md), [ADR-0020](../adr/0020-ai-automation-trust-boundaries.md), [ADR-0021](../adr/0021-sha-pinned-actions-and-least-privilege-ci.md), [ADR-0077](../adr/0077-bind-ready-for-human-to-the-head-commit.md)
+- Rationale: [ADR-0068](../adr/0068-label-pull-requests-that-touch-high-risk-paths.md), [ADR-0078](../adr/0078-sort-pull-requests-by-levels-l1-to-l4.md), [ADR-0019](../adr/0019-governance-as-code-and-risk-tiers.md), [ADR-0020](../adr/0020-ai-automation-trust-boundaries.md), [ADR-0021](../adr/0021-sha-pinned-actions-and-least-privilege-ci.md), [ADR-0077](../adr/0077-bind-ready-for-human-to-the-head-commit.md), [ADR-0086](../adr/0086-let-each-pr-triage-caller-grant-the-triage-token.md), [ADR-0087](../adr/0087-start-pr-triage-by-dispatch-for-bot-pull-requests.md)
 - Context: [PR triage spec](pr-triage.md), [Airlock levels](https://airlock.lunareng.com/docs/levels.md), [quality loop](../design/quality-loop.md), [PR review rubric](pr-review-rubric.md), [organization repository enrollment](organization-repository-enrollment.md) (the `risk-paths` surface)

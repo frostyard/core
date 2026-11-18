@@ -19,8 +19,11 @@ on:
 permissions: {}
 
 jobs:
+  # The job grants the reusable workflow's token (ADR-0086); checks: read and statuses: read let readiness read checks in a private repository.
   pr-triage:
     permissions:
       contents: read
       pull-requests: write
+      checks: read
+      statuses: read
     uses: ./.github/workflows/pr-triage.yml

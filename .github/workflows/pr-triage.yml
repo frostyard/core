@@ -15,6 +15,12 @@
 # github.event.pull_request.base.sha through the contents API, the changed
 # files through the pulls API, the required checks of the base branch through
 # the rulesets API, and the checks of the head through the checks API.
+# A second caller on workflow_dispatch passes `pr`. Only levels runs then; it
+# reads the PR and its base SHA from the pulls API (ADR-0087).
+#
+# This workflow sets no permissions. The job gets the calling job's grant:
+# contents: read and pull-requests: write, plus checks: read and statuses: read
+# in a private repository (ADR-0086). A called workflow can only reduce a grant.
 #
 # GENERATED BLOCKS: the 2 heredocs below are scripts/lib/risk-paths.mjs
 # verbatim, and scripts/lib/pr-triage.mjs verbatim plus 1 trailer line. Edit the
@@ -37,17 +43,16 @@ on:
         description: Run the Dependabot shadow step (docs/design/dependabot-shadow.md). It only writes a comment; it never enables auto-merge.
         type: boolean
         default: true
-
-permissions: {}
+      pr:
+        description: The pull request number, digits only, for a caller on workflow_dispatch (ADR-0087). Leave it empty on pull_request_target.
+        type: string
+        default: ""
 
 jobs:
   pr-triage:
     if: ${{ (github.event.action != 'edited' || github.event.changes.base != null) && (github.event.action != 'labeled' || github.event.label.name == 'ready-for-human') }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    permissions:
-      contents: read
-      pull-requests: write
     steps:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -837,7 +842,9 @@ jobs:
           // shadow step that writes 1 comment "would auto-merge" on a Dependabot pull
           // request that a narrow auto-merge class would take, and enables nothing
           // (docs/design/dependabot-shadow.md). `main` picks the step from
-          // PR_TRIAGE_STEP: `levels`, `readiness` or `shadow`.
+          // PR_TRIAGE_STEP: `levels`, `readiness` or `shadow`. Levels runs on
+          // pull_request_target or workflow_dispatch; readiness and shadow run only on
+          // pull_request_target.
           //
           // The reusable workflow .github/workflows/pr-triage.yml embeds this file
           // verbatim, plus 1 trailer line, and scripts/lib/risk-paths.mjs beside it. It
@@ -1113,24 +1120,46 @@ jobs:
           // level label only gets stricter: a looser computed level keeps the stricter
           // label that the pull request has. Never removes risk:high. Never creates a
           // label: the add-labels API creates a missing one, so the step checks first.
-          export async function runLevelsStep({ api, eventName, event, summary, log }) {
+          // Runs on pull_request_target, or on workflow_dispatch with an explicit PR number.
+          export async function runLevelsStep({ api, eventName, event, prNumber, summary, log }) {
             const say = (message, value) =>
               log(value === undefined ? `${LEVELS_PREFIX}${message}` : `${LEVELS_PREFIX}${message} ${JSON.stringify(value)}`);
 
-            if (eventName !== "pull_request_target") {
-              throw new Error(`the caller must run on pull_request_target, not ${JSON.stringify(eventName)}`);
+            say("event", eventName);
+            if (eventName !== "pull_request_target" && eventName !== "workflow_dispatch") {
+              throw new Error(`the caller must run on pull_request_target or workflow_dispatch, not ${JSON.stringify(eventName)}`);
             }
-            const pr = event?.pull_request;
+            const dispatch = eventName === "workflow_dispatch";
+            if (!dispatch && typeof prNumber === "string" && prNumber !== "") {
+              throw new Error("the pr input is only for workflow_dispatch; a pull_request_target caller must not set it");
+            }
+            if (dispatch && (
+              typeof prNumber !== "string" ||
+              !/^[1-9][0-9]*$/.test(prNumber) ||
+              !Number.isSafeInteger(Number(prNumber))
+            )) {
+              throw new Error(`the pr input must be a pull request number, digits only, not ${JSON.stringify(prNumber)}`);
+            }
             const owner = event?.repository?.owner?.login;
             const repo = event?.repository?.name;
-            const number = pr?.number;
-            const baseSha = pr?.base?.sha;
+            const number = dispatch ? Number(prNumber) : event?.pull_request?.number;
             if (typeof owner !== "string" || !NAME_PATTERN.test(owner) || typeof repo !== "string" || !NAME_PATTERN.test(repo)) {
               throw new Error("the event has no valid repository owner and name");
             }
             if (!Number.isSafeInteger(number) || number < 1) throw new Error("the event has no valid pull request number");
+            const pr = dispatch ? await api.getPullRequest(owner, repo, number) : event?.pull_request;
+            if (dispatch && pr?.state !== "open") {
+              say("pull request state", pr?.state ?? null);
+              const text = "the pull request is not open. No label change.";
+              say(text);
+              await summary(`## Levels\n\n${text}\n`);
+              return { outcome: "not-open" };
+            }
+            const baseSha = pr?.base?.sha;
             if (typeof baseSha !== "string" || !SHA_PATTERN.test(baseSha)) {
-              throw new Error("the event has no valid pull_request.base.sha (40 hex characters)");
+              throw new Error(dispatch
+                ? "the pulls API returned no valid base.sha (40 hex characters)"
+                : "the event has no valid pull_request.base.sha (40 hex characters)");
             }
             const fullName = `${owner}/${repo}`;
             say("repository", fullName);
@@ -1597,6 +1626,7 @@ jobs:
                 process.stdout.write(`::notice::${commandValue(text)}\n`);
               };
               const options = { api, eventName: env.GITHUB_EVENT_NAME, event, summary, log, notice };
+              if (step === "levels") options.prNumber = env.PR_TRIAGE_PR;
               if (step === "shadow") options.updates = env.DEPENDABOT_UPDATES;
               return await run(options);
             } catch (error) {
@@ -1616,24 +1646,25 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
           PR_TRIAGE_STEP: levels
+          PR_TRIAGE_PR: ${{ inputs.pr }}
         run: node "$RUNNER_TEMP/pr-triage/pr-triage.mjs"
       - name: Remove ready-for-human when the head moved or CI is not green
         id: readiness
-        if: ${{ !cancelled() && (github.event.action == 'synchronize' || (github.event.action == 'labeled' && github.event.label.name == 'ready-for-human')) }}
+        if: ${{ !cancelled() && github.event_name == 'pull_request_target' && (github.event.action == 'synchronize' || (github.event.action == 'labeled' && github.event.label.name == 'ready-for-human')) }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
           PR_TRIAGE_STEP: readiness
         run: node "$RUNNER_TEMP/pr-triage/pr-triage.mjs"
       - name: Fetch the Dependabot metadata
         id: deps
-        if: ${{ !cancelled() && inputs.dependabot-shadow && github.event.pull_request.user.login == 'dependabot[bot]' && contains(fromJSON('["opened","synchronize","reopened"]'), github.event.action) }}
+        if: ${{ !cancelled() && github.event_name == 'pull_request_target' && inputs.dependabot-shadow && github.event.pull_request.user.login == 'dependabot[bot]' && contains(fromJSON('["opened","synchronize","reopened"]'), github.event.action) }}
         continue-on-error: true
         uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
         with:
           github-token: ${{ github.token }}
       - name: Write the Dependabot shadow call
         id: shadow
-        if: ${{ !cancelled() && inputs.dependabot-shadow && github.event.pull_request.user.login == 'dependabot[bot]' && contains(fromJSON('["opened","synchronize","reopened"]'), github.event.action) }}
+        if: ${{ !cancelled() && github.event_name == 'pull_request_target' && inputs.dependabot-shadow && github.event.pull_request.user.login == 'dependabot[bot]' && contains(fromJSON('["opened","synchronize","reopened"]'), github.event.action) }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
           PR_TRIAGE_STEP: shadow

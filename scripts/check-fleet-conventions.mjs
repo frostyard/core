@@ -2,8 +2,8 @@
 // Organization gate (ADR-0043, ADR-0044, ADR-0083): reads each enabled
 // declaration's default branch over the GitHub API, or each OWNER/REPO given
 // as an argument, and prints 1 line per repository. The gate also checks that
-// only the PR triage caller runs on pull_request_target. Exit 1 when a
-// repository fails, 2 on a usage error. Read only.
+// only the PR triage caller runs on pull_request_target and grants a narrow
+// token (ADR-0086). Exit 1 when a repository fails, 2 on a usage error. Read only.
 
 import path from "node:path";
 import { fileURLToPath } from "node:url";
