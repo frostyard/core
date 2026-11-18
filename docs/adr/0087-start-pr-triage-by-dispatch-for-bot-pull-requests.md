@@ -67,10 +67,16 @@ workflows it targets.
   [ADR-0077](0077-bind-ready-for-human-to-the-head-commit.md) still does not
   run for bot pushes made with `GITHUB_TOKEN`. A person or an agent that
   adds `ready-for-human` starts the `labeled` run as before.
-- New obligations: after the core release that carries this change, the
-  owners of frostyard/bootc-debian, frostyard/omarchy-apps, frostyard/snosi
-  and frostyard/incus add the dispatch caller where a bot workflow opens
-  PRs with `GITHUB_TOKEN`.
+- New obligations: after the core release that carries this change, each
+  repository whose bot workflow opens PRs with `GITHUB_TOKEN` adds the
+  dispatch caller. On the default branches read on 2026-11-18:
+  frostyard/bootc-debian and frostyard/omarchy-apps
+  (`check-dependencies.yml`, `GITHUB_TOKEN`); frostyard/snosi
+  (`check-dependencies.yml` and `check-packages.yml`, token
+  `secrets.WORKFLOW_PAT || secrets.GITHUB_TOKEN`, so only while the secret
+  `WORKFLOW_PAT` is not set). frostyard/incus opens its sync PRs with the
+  token `UPSTREAM_SYNC_TOKEN` (`sync-upstream.yml`), so its PRs start the
+  usual events.
 
 ## Alternatives considered
 

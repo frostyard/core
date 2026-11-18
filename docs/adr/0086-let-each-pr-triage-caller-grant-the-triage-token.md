@@ -22,8 +22,6 @@ The `readiness` step reads `GET commits/{sha}/check-runs` and
 the grant. Without it, the step gets HTTP 403 and reports readiness unknown
 ([core#227](https://github.com/frostyard/core/issues/227),
 [bketelsen/fleet run 42646228960](https://github.com/bketelsen/fleet/actions/runs/42646228960)).
-2 callers are private: frostyard/apt-publisher and bketelsen/fleet.
-
 GitHub's rules for a reusable workflow
 ([reusing workflow configurations](https://docs.github.com/en/actions/reference/workflows-and-actions/reusing-workflow-configurations)):
 
@@ -31,16 +29,19 @@ GitHub's rules for a reusable workflow
   downgraded, not elevated, by the called workflow.
 - A top-level `permissions: {}` in the called workflow downgrades every job
   that sets no permissions of its own to no permissions.
-- When the calling job sets no `jobs.<job_id>.permissions`, the called
-  workflow gets the default `GITHUB_TOKEN` permissions. A repository or
-  organization can set that default to read and write for every scope.
+- "If `jobs.<job_id>.permissions` is not specified in the calling job, the
+  called workflow will have the default permissions for the `GITHUB_TOKEN`."
+  A repository or organization can set that default to read and write for
+  every scope. The page does not say whether a workflow-level `permissions`
+  of the caller counts as that default.
 
 So a fixed grant in `pr-triage.yml` that adds `checks: read` and
 `statuses: read` asks for more than a caller with only `contents: read` and
 `pull-requests: write` grants, public callers included. 34 repositories
-have a caller (the inventory in
-[the pull_request_target policy](../design/pull-request-target-policy.md#code-guard)
-on 2026-11-17).
+have a caller, 2 of them private: frostyard/apt-publisher and
+bketelsen/fleet (section "Inventory of pull_request_target workflows" of
+[the pull_request_target policy](../design/pull-request-target-policy.md),
+read on 2026-11-09).
 
 ## Decision
 
@@ -52,7 +53,9 @@ on 2026-11-17).
   permission. A private repository adds `checks: read` and
   `statuses: read`, so that the `readiness` step can read the checks.
 - `npm run check:fleet` fails a repository when a job that calls
-  `pr-triage.yml` has no job-level `permissions`, has a string such as
+  `pr-triage.yml` has no job-level `permissions` (a workflow-level
+  `permissions` does not count, so the rule holds whatever GitHub takes as
+  the default), has a string such as
   `write-all` or `read-all`, or grants a scope or a value outside the list
   above. The [PR triage spec](../specs/pr-triage.md) states the same rule
   for every caller, also for callers outside the enabled declarations that
@@ -72,9 +75,9 @@ on 2026-11-17).
   its own job permissions. A public caller needs no change, and no caller
   breaks when core releases this workflow.
 - Harder or negative: the least privilege of the triage job now rests on
-  each caller, not on core. A caller that sets no job grant hands the
-  default token, which can be read and write for every scope, to a job on
-  `pull_request_target`. `check:fleet` catches this only in the enabled
+  each caller, not on core. A caller that sets no permissions at all hands
+  the default token, which can be read and write for every scope, to a job
+  on `pull_request_target`. `check:fleet` catches this only in the enabled
   declarations; other callers rely on the spec and on review. The job still
   checks out nothing and runs no code from the PR
   ([ADR-0020](0020-ai-automation-trust-boundaries.md)), so a wide grant

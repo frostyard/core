@@ -30,7 +30,7 @@ const isPlainObject = (value) => value !== null && typeof value === "object"
   && (Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null);
 
 // ADR-0086: the reusable workflow sets no permissions. Each calling job must
-// grant a narrow token; workflow-level permissions do not replace this grant.
+// grant a narrow token; a workflow-level permissions key does not count.
 export function triageCallerGrantGaps(workflows) {
   const gaps = [];
   for (const [file, text] of Object.entries(workflows)) {
