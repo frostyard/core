@@ -22,6 +22,7 @@ The `readiness` step reads `GET commits/{sha}/check-runs` and
 the grant. Without it, the step gets HTTP 403 and reports readiness unknown
 ([core#227](https://github.com/frostyard/core/issues/227),
 [bketelsen/fleet run 42646228960](https://github.com/bketelsen/fleet/actions/runs/42646228960)).
+
 GitHub's rules for a reusable workflow
 ([reusing workflow configurations](https://docs.github.com/en/actions/reference/workflows-and-actions/reusing-workflow-configurations)):
 
