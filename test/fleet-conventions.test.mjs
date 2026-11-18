@@ -5,6 +5,8 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
+import { parse } from "yaml";
+
 import {
   TRIAGE_CALLER_GRANT,
   TRIAGE_CALLER_REQUIRED,
@@ -593,4 +595,18 @@ test("a repository request error reports zero workflow files read", async () => 
     failures: ["frostyard/repo: mise.toml request failed with status 503"],
     workflows: 0,
   }]);
+});
+
+// fleet-conventions.mjs imports the npm package yaml, so the CI job that runs
+// check:fleet must install the dependencies first (core#278: the job ran without
+// npm ci and failed with ERR_MODULE_NOT_FOUND).
+test("the fleet-conventions CI job runs npm ci before npm run check:fleet", async () => {
+  const ciPath = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", ".github", "workflows", "ci.yml");
+  const ci = parse(await readFile(ciPath, "utf8"));
+  const runs = ci.jobs["fleet-conventions"].steps.map((step) => step.run).filter((run) => typeof run === "string");
+  const install = runs.indexOf("npm ci");
+  const check = runs.indexOf("npm run check:fleet");
+  assert.notEqual(check, -1, "the job runs npm run check:fleet");
+  assert.notEqual(install, -1, "the job runs npm ci");
+  assert.ok(install < check, "npm ci runs before npm run check:fleet");
 });
