@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Tell whether a GitHub Actions workflow lists an event under its `on:` key.
-// Core carries no YAML dependency (package.json: ajv and jsonc-parser only), so
-// this reads the one shape that matters: the top-level `on:` key and the event
+// This reader stays free of dependencies by design: its CLI runs without
+// npm ci, so it reads the one shape that matters: the top-level `on:` key and the event
 // names it holds. Supported forms:
 //   on: merge_group                      (scalar)
 //   on: [pull_request, merge_group]      (flow list; may span lines)

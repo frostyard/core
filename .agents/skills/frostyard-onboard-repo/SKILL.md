@@ -97,7 +97,8 @@ assigning the repository to an agent's roster (Brian's decision: an ask).
    write a LICENSE or description: relay their `NOTE` lines as PRs or asks.
 
 6. **Prove it.** After both PRs merge and Brian ran step 5:
-   - `npm run check:fleet` in core reports `ok OWNER/NAME`.
+   - Run `npm ci` first in core, then `npm run check:fleet`; it reports
+     `ok OWNER/NAME`.
    - The dry run of `apply-repo-settings.sh` with the same checks prints no
      `WOULD` line.
    - The next skills-sync run (a dispatch, or the daily run at 05:23 UTC;

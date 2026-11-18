@@ -292,7 +292,6 @@ test("B5: every workflow pins its actions by SHA, starts from no permissions and
   assert.ok(workflows.length > 0);
   // ADR-0086: only this reusable workflow inherits the calling job's grant.
   const noPermissionsWorkflows = ["pr-triage.yml"];
-  assert.deepEqual(noPermissionsWorkflows, ["pr-triage.yml"]);
   for (const name of noPermissionsWorkflows) {
     assert.ok(workflows.includes(name), `${name}: the permission exemption must name an existing workflow`);
   }
@@ -316,6 +315,11 @@ test("B5: every workflow pins its actions by SHA, starts from no permissions and
     assert.deepEqual(result.offenders, [], `${name}: a checkout keeps credentials`);
     checkouts += result.checkouts;
   }
+  assert.deepEqual(
+    workflows.filter((name) => !/^permissions:\s*\{\}\s*$/m.test(read(path.join(".github/workflows", name)))).sort(),
+    ["pr-triage.yml"],
+    "only pr-triage.yml omits top-level permissions: {}",
+  );
   assert.ok(checkouts > 0, "no actions/checkout step found: the credentials check checked nothing");
 });
 

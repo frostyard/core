@@ -230,7 +230,8 @@ removed. -->
   `permissions` mapping ([ADR-0086](docs/adr/0086-let-each-pr-triage-caller-grant-the-triage-token.md)),
   read with the `yaml` parser.
   It runs as CI's required `fleet-conventions` job, not part of `check`/`verify`;
-  `node scripts/check-fleet-conventions.mjs OWNER/REPO...` checks other
+  run `npm ci` first in the core checkout, then
+  `node scripts/check-fleet-conventions.mjs OWNER/REPO...` to check other
   repositories. Its readers live in `scripts/lib/ci-gate.mjs` and are
   tested in `test/ci-gate.test.mjs`.
 - Declare every GitHub Actions secret's expiry in

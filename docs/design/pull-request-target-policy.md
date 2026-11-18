@@ -281,8 +281,9 @@ code out of such a job. Move such a workflow to `pull_request`.
 The fleet check covers only `fleet_state: enabled` repositories on their
 default branch: 7 on 2026-11-17 (`organization/repositories/*/*.json`), of
 the 34 repositories with a caller in the inventory above. The others are
-not covered. `node scripts/check-fleet-conventions.mjs OWNER/REPO...`
-checks any other repository, also on its default branch. A workflow added
+not covered. In a core checkout, run `npm ci` first. Then
+`node scripts/check-fleet-conventions.mjs OWNER/REPO...` checks any other
+repository, also on its default branch. A workflow added
 on a pull request branch is not seen before it merges. The review of
 `.github/workflows/**` still covers that change: the L2 floor adds
 `risk:high` ([risk paths](../specs/risk-paths.md)).

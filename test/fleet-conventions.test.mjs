@@ -456,6 +456,30 @@ test("triageCallerGrantGaps accepts flow mappings, quoted keys and values, comme
   )), []);
 });
 
+test("triageCallerGrantGaps checks flow-mapping jobs with and without permissions", () => {
+  assert.deepEqual(grantGaps(`jobs:\n  pr-triage: { uses: "${TRIAGE_USE}", permissions: { contents: read, pull-requests: write } }\n`), []);
+  assert.deepEqual(grantGaps(`jobs:\n  pr-triage: { uses: "${TRIAGE_USE}" }\n`), [
+    `${gapPrefix}no job permissions; the job would get the default token`,
+  ]);
+});
+
+test("triageCallerGrantGaps checks quoted uses and permissions keys", () => {
+  assert.deepEqual(grantGaps(`jobs:\n  pr-triage:\n    "uses": "${TRIAGE_USE}"\n    'permissions': {}\n`), [
+    `${gapPrefix}needs contents: read`, `${gapPrefix}needs pull-requests: write`,
+  ]);
+});
+
+test("triageCallerGrantGaps fails closed on YAML 1.2 merge keys", () => {
+  assert.deepEqual(grantGaps(`x: &grant { permissions: { contents: read, pull-requests: write } }
+jobs:
+  pr-triage:
+    <<: *grant
+    uses: ${TRIAGE_USE}
+`), [
+    `${gapPrefix}no job permissions; the job would get the default token`,
+  ]);
+});
+
 test("triageCallerGrantGaps checks both jobs with an anchored permissions mapping", () => {
   const text = `on: pull_request_target
 jobs:
