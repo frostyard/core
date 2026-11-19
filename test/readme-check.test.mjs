@@ -244,6 +244,25 @@ test("R6: an allowed source name inside another host is not allowed", () => {
   assert.ok(rules(bad).includes("R6"));
 });
 
+test("R6: the Awesome MyGo listing badge is allowed", () => {
+  const listed = broke(
+    valid,
+    "[![CI](https://github.com/frostyard/nsl/actions/workflows/ci.yml/badge.svg)](https://github.com/frostyard/nsl/actions/workflows/ci.yml)",
+    "[![CI](https://github.com/frostyard/nsl/actions/workflows/ci.yml/badge.svg)](https://github.com/frostyard/nsl/actions/workflows/ci.yml)\n[![Listed on Awesome MyGo](https://awesomemygo.dev/badge.svg)](https://awesomemygo.dev/apps/nsl)",
+  );
+  assert.deepEqual(check(listed, allFiles), []);
+
+  for (const image of [
+    "https://awesomemygo.dev/other.svg",
+    "https://example.org/awesomemygo.dev/badge.svg",
+    "https://awesomemygo.dev.example.org/badge.svg",
+    "https://img.shields.io/badge/MyGo-listed-blue",
+  ]) {
+    const bad = broke(listed, "https://awesomemygo.dev/badge.svg", image);
+    assert.ok(rules(bad).includes("R6"), image);
+  }
+});
+
 test("R7: the sections match the kind's table", () => {
   const unknownName = broke(valid, "## What it does", "## Overview");
   assert.ok(rules(unknownName).includes("R7"));

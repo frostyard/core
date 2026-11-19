@@ -161,7 +161,7 @@ rule and exits 1, or prints `ok` and exits 0. It writes nothing.
 | R3 | Top block | The top block has a lead paragraph before the status line, and at most 130 words, without the marker, images and badges. |
 | R4 | Status line | The top block has 1 line that starts with `**Status:**`, then 1 of `pre-release`, `stable`, `in production`, `maintenance` or `deprecated`; the line has at most 40 words. |
 | R5 | Documentation line | The top block has 1 line that starts with `**Documentation:**` and holds at least 1 link. A `library` links `https://pkg.go.dev/`. |
-| R6 | Badges | At most 3 badges (`[![`), all in the top block, each 1 of: a GitHub Actions workflow badge, OpenSSF Scorecard (`api.scorecard.dev`), Go reference (`pkg.go.dev/badge`), coverage (`codecov.io`), latest release (`img.shields.io/github/v/release`). |
+| R6 | Badges | At most 3 badges (`[![`), all in the top block, each 1 of: a GitHub Actions workflow badge, OpenSSF Scorecard (`api.scorecard.dev`), Go reference (`pkg.go.dev/badge`), coverage (`codecov.io`), latest release (`img.shields.io/github/v/release`), Awesome MyGo listing (`awesomemygo.dev/badge.svg`) for an app built on MyGo. |
 | R7 | Sections | The `##` headings outside fenced code match the kind's sections table: every required section in order, only allowed names, `Develop` then `Where to go next` last. |
 | R8 | Heading depth | Outside fenced code, no heading is deeper than `##`. |
 | R9 | Develop | The `Develop` section has a fenced code block with a `make ci`, `make check` or `make verify` line. |
