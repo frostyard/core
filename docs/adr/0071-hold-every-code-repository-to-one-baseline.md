@@ -191,3 +191,5 @@ against.
   (the organization gate checks rows B12 and B19, not presence only)
 - Amended in part by: [ADR-0084](0084-accept-a-tools-own-site-or-a-frostyard-org-guide-as-its-docs-home.md)
   (item 9: 1 user documentation home)
+- Amended in part by: [ADR-0089](0089-run-dependabot-version-updates-monthly-in-one-entry-per-ecosystem.md)
+  (item 13, Dependabot: monthly, 1 entry for each ecosystem)

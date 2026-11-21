@@ -93,3 +93,5 @@ a day. The cost is the number of pull requests, not the merge time of each.
 - Builds on: [ADR-0071](0071-hold-every-code-repository-to-one-baseline.md),
   [ADR-0026](0026-distribute-core-skills-via-sync-prs.md)
 - Replay: [core#218 — merge-lane: feasibility replay](https://github.com/frostyard/core/issues/218)
+- Amended in part by: [ADR-0089](0089-run-dependabot-version-updates-monthly-in-one-entry-per-ecosystem.md)
+  (Dependabot runs monthly, in 1 entry for each ecosystem)
