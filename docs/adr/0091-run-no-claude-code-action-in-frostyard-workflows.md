@@ -16,6 +16,11 @@
   holds `pull-requests: write` and runs on `pull_request`; chairlift splits a
   read-only review job from a publish job and starts on
   `workflow_dispatch`.
+- None of the 3 has an `ANTHROPIC_API_KEY` repository secret, and the
+  workflows have not run a model: the runs of 2026-11-21 in lab (run
+  44866361893) and pilothouse (run 44893195473) logged that the secret is
+  not configured and skipped the review, and chairlift's workflow has 0
+  runs.
 - No other non-archived repository of frostyard or bketelsen that is not a
   fork (204 repositories, default branches, read on 2026-11-21) uses
   `anthropics/claude-code-action` or `anthropics/claude-code-base-action` in
@@ -50,8 +55,12 @@
   frostyard pull request is pocketd's cross-review (Context). A repository
   that runs the action removes the workflow, the tests that pin it, the
   Dependabot entries or groups that exist only for it, and the docs that
-  describe the Claude review as live. The `ANTHROPIC_API_KEY` Actions secret
-  then has no reader, and an owner deletes it.
+  describe the Claude review as live. An `ANTHROPIC_API_KEY` Actions secret
+  that exists then has no reader, and an owner deletes it.
+- **A repository-local guard may sit beside row B20.** A test in the
+  repository's own CI that fails on the action, the secret name or a
+  Claude Code CLI in `.github/` catches them before the merge and can cover
+  more than row B20; row B20 stays the organization's check.
 - **Baseline row B20** records the rule in the
   [repository baseline](../specs/repository-baseline.md). A `uses:` value
   (under any mapping, `with:` included) counts when, read with the `yaml`
@@ -73,8 +82,9 @@
 
 ## Consequences
 
-- No frostyard workflow holds an Anthropic API key or gives a model a token
-  in a pull request job; the Dependabot bumps of the action stop.
+- No frostyard workflow can give a model an Anthropic API key or a token in
+  a pull request job; the Dependabot bumps of the action, and 3 workflows
+  that skip the review on every run, go away.
 - No AI review comment comes from CI. A pull request that no pocketd agent
   reviews (for example one from an outside contributor) gets the Copilot
   review where the repository requests it, and the owner's review.
@@ -101,8 +111,9 @@
 ## Alternatives considered
 
 - **Keep the Claude review as an advisory check:** it repeats the
-  cross-review, keeps an API key in Actions secrets, and in 2 of the 3
-  repositories gives the model a job with `pull-requests: write`.
+  cross-review, works only once an API key is put in Actions secrets, and
+  in 2 of the 3 repositories gives the model a job with
+  `pull-requests: write`.
 - **Split each Claude review into an analysis job and a publish job
   (ADR-0020's shape, as chairlift has):** removes the write token from the
   model's job but keeps the secret, the bumps and a second review of what the
@@ -112,8 +123,10 @@
   [pull_request_target policy](../design/pull-request-target-policy.md), so
   core cannot test it; it covers no bketelsen repository. It can be added
   beside row B20 and is not needed for it.
-- **A check in each repository's own CI:** 1 copy per repository drifts;
-  the organization gate and the sweep hold the rule once.
+- **A check in each repository's own CI instead of row B20:** 1 copy per
+  repository drifts, and a repository without the copy is not checked; the
+  organization gate and the sweep hold the rule once. A local guard beside
+  row B20 is allowed (Decision).
 
 ## References
 
