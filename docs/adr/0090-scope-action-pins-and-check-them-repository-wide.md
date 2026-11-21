@@ -4,7 +4,9 @@
 - **Date:** 2026-11-21
 - **Amends in part:** [ADR-0088](0088-read-the-action-pin-in-workflow-tests-never-hard-code-it.md)
   (what a pin test asserts, the online tag check and its script, the
-  correction record that overrides an old one)
+  correction record that overrides an old one),
+  [ADR-0021](0021-sha-pinned-actions-and-least-privilege-ci.md) (the
+  `# vX.Y.Z` comment form)
 
 ## Context
 
@@ -46,6 +48,14 @@ job that checks each `# vX.Y.Z` comment against its tag upstream.
   reusable workflow. On lab it is 2. snosi's `systemd/mkosi` pin runs in the
   `build` job of `build.yml`, the job that later gets the R2 credentials and
   `REPOGEN_GPG_KEY`.
+- Some upstreams tag their releases with 2 parts.
+  `ryand56/r2-upload-action` has the release tag `v1.5` and no `v1.5.x`
+  tag; snosi pins its commit `33ebb7a…` with `# v1.5`, in the jobs that
+  get the R2 credentials. `github/issue-labeler` tags every release
+  `vX.Y`; lab pins `v3.5`, its newest release, with `# v3.5`. Such a pin
+  has no true `# vX.Y.Z` comment. A major-only tag moves:
+  `oras-project/setup-oras` tag `v2` names `v2.0.4`, while snosi's pin
+  `# v2` is the commit of `v2.0.3`.
 - GitHub's compare API (`GET /repos/OWNER/REPO/compare/BASE...HEAD`)
   resolves a commit across the fork network. A commit of a fork's pull
   request branch, compared with `systemd/mkosi`'s `main`, has status
@@ -72,25 +82,28 @@ job that checks each `# vX.Y.Z` comment against its tag upstream.
   a test may keep them literal:
   - container image digests (`IMAGE@sha256:…`) in a matrix, a `container:`
     or a `services:` key;
-  - hash pins of vendored core files, such as the sync pin of
-    `scripts/check-template.mjs`.
+  - hash pins of vendored core files, such as the vendored-file pins in
+    `scripts/check-template.mjs` (a core commit and a sha256 for each
+    file).
 - **A repository that removes a literal SHA from a test or check has, or
   adds in the same pull request, 1 repository-wide check** over every file
   in `.github/workflows/` (and `.github/actions/`, where it exists). For
   each action pin `OWNER/REPO[/PATH]@SHA`, it asserts:
-  - the version comment of ADR-0021, `# vX.Y.Z`, or the comment that the
-    repository's pin rule allows for an action it names as having no
-    release tag;
-  - 1 SHA for each `OWNER/REPO[/PATH]` across all those files.
+  - the version comment: `# vX.Y.Z`, or `# vX.Y` when upstream's release
+    tags have 2 parts, or the comment that the repository's pin rule allows
+    for an action that the rule names as pinned to a branch commit. A
+    major-only `# vN` is not a version comment;
+  - 1 SHA, at least for each `OWNER/REPO[/PATH]`, across all those files.
+    A repository may key the check on `OWNER/REPO`, which is stricter.
 
   A pin of a frostyard/core reusable workflow
   (`frostyard/core/.github/workflows/FILE@SHA`) is exempt from the
-  `# vX.Y.Z` form, because core has no release tags. Its comment names the
+  version comment, because core has no release tags. Its comment names the
   core commit on `main`, for example
   `# core#246 (frostyard/core main, 2026-11-14; core has no release tags)`,
   and the check needs to assert only that a comment is there. The pin stays
-  in the 1-SHA check. With the repository-wide check in place, a test of 1 job may
-  assert only the action, the 40-hex form and the step.
+  in the 1-SHA check. With the repository-wide check in place, a test of 1
+  job needs to assert only the action, the 40-hex form and the step.
 - **The repository-wide check belongs in the walker that already checks
   ADR-0021** in the repository (pilothouse
   `internal/workflowcheck/actions_test.go`, chairlift
@@ -99,20 +112,26 @@ job that checks each `# vX.Y.Z` comment against its tag upstream.
   the comment from the parsed node in Go (`yaml.Node.LineComment` of
   `gopkg.in/yaml.v3`) and from the raw line with a regular expression in
   Python, because PyYAML drops comments.
-- **The version comment may name the tag with or without its leading `v`.**
-  `# v4.1.0` names the upstream tag `v4.1.0` or, when upstream has no such
-  tag, `4.1.0`. A `v4.1.0` tag that names another commit fails; the check
-  does not fall back to `4.1.0` then.
+- **The version comment names the release's tag, and may name it with or
+  without its leading `v`.** `# v4.1.0` names the upstream tag `v4.1.0` or,
+  when upstream has no such tag, `4.1.0`; `# v1.5` names `v1.5` or `1.5`.
+  A `v4.1.0` tag that names another commit fails; the check does not fall
+  back to `4.1.0` then.
+- This amends 1 statement of ADR-0021, "with the human-readable version
+  kept as a trailing comment (`# vX.Y.Z`)": the comment may also be
+  `# vX.Y` when upstream's release tags have 2 parts. Everything else in
+  ADR-0021 stands.
 - **The online check of ADR-0088 is the script below.** It:
-  - checks a `# vX.Y.Z` pin against the tag upstream, as above;
+  - checks a `# vX.Y.Z` or `# vX.Y` pin against the tag upstream, as
+    above;
   - checks a pin to a branch commit, comment `# BRANCH YYYY-MM-DD`, and a
     core reusable workflow pin (branch `main`) with the compare API: the
     status of `compare/BRANCH...SHA` is `identical` or `behind`, so the
     commit is on the upstream branch and not only in a fork;
   - reads each `uses:` key that has its value on the same line, the key
     and the value plain or quoted, in files with LF or CRLF line ends;
-  - prints each pin it does not check (a `# v2` or `# v1.5` comment, any
-    other comment, a ref that is not a 40-hex SHA), and the file and line
+  - prints each pin it does not check (a major-only `# v2`, any other
+    comment, a ref that is not a 40-hex SHA), and the file and line
     of each `uses:` key it cannot read (a flow mapping, a block scalar,
     `uses:` inside a `run:` text), then the count of pins checked and
     skipped. A line that is a YAML comment is not read.
@@ -121,6 +140,12 @@ job that checks each `# vX.Y.Z` comment against its tag upstream.
   ADR-0088 and this ADR, and says that it replaces the old record. The old
   record stays as it is.
 - This amends ADR-0088 in these statements, and only these:
+  - "the line carries its version comment, `# vX.Y.Z` (or the comment the
+    repository's pin rule allows for a pin that has no release tag …)" and,
+    in Consequences, "pins keep the full `# vX.Y.Z` comment that ADR-0021
+    asks for": `# vX.Y` is also a version comment when upstream's release
+    tags have 2 parts, and the exception names actions pinned to a branch
+    commit, which may have release tags.
   - "It may assert, for each pin it guards: … the line carries its version
     comment … the same action has 1 SHA across all workflows of the
     repository": for a repository that removes a literal SHA, the
@@ -154,7 +179,7 @@ that already parses each workflow with `gopkg.in/yaml.v3`:
 ```go
 var (
 	actionPin      = regexp.MustCompile(`^([^@]+)@([0-9a-f]{40})$`)
-	versionComment = regexp.MustCompile(`^# v\d+\.\d+\.\d+$`)
+	versionComment = regexp.MustCompile(`^# v\d+\.\d+(\.\d+)?$`)
 )
 
 // checkPin runs on the value node of every uses: key of every workflow.
@@ -173,7 +198,7 @@ func checkPin(t *testing.T, path string, value *yaml.Node, shas map[string]map[s
 			t.Errorf("%s:%d: %s has no comment", path, value.Line, action)
 		}
 	case !versionComment.MatchString(value.LineComment):
-		t.Errorf("%s:%d: %s has comment %q, want # vX.Y.Z", path, value.Line, action, value.LineComment)
+		t.Errorf("%s:%d: %s has comment %q, want # vX.Y.Z or # vX.Y", path, value.Line, action, value.LineComment)
 	}
 	if shas[action] == nil {
 		shas[action] = map[string]bool{}
@@ -199,7 +224,7 @@ cannot read, it reports instead of passing over:
 ```bash
 #!/usr/bin/env bash
 # Online check of the action pins in .github/workflows and .github/actions (ADR-0088, ADR-0090):
-#   OWNER/REPO[/PATH]@SHA # vX.Y.Z             tag vX.Y.Z (X.Y.Z if vX.Y.Z is missing) names SHA
+#   OWNER/REPO[/PATH]@SHA # vX.Y[.Z]           tag vX.Y[.Z] (X.Y[.Z] if it is missing) names SHA
 #   OWNER/REPO[/PATH]@SHA # BRANCH YYYY-MM-DD  SHA is on BRANCH (compare: identical or behind)
 #   frostyard/core/.github/workflows/F@SHA     SHA is on core's main
 # It prints every other pin, and every uses: key on a line it cannot read, as skipped.
@@ -228,14 +253,14 @@ while IFS= read -r hit; do
 	tag='' branch='' why=''
 	if [[ ! $ref =~ ^[^./][^@]*/[^@]+@[0-9a-f]{40}$ ]]; then
 		why="not OWNER/REPO[/PATH]@SHA"
-	elif [[ $comment =~ ^v?[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+	elif [[ $comment =~ ^v?[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
 		tag=$comment
 	elif [[ $ref == frostyard/core/.github/workflows/* ]]; then
 		branch=main
 	elif [[ $comment =~ ^([A-Za-z0-9._/-]+)\ [0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
 		branch=${BASH_REMATCH[1]}
 	else
-		why="the comment names no vX.Y.Z tag and no BRANCH YYYY-MM-DD"
+		why="the comment names no vX.Y[.Z] tag and no BRANCH YYYY-MM-DD"
 	fi
 	if [[ -n $why ]]; then
 		echo "skipped: $ref # $comment ($why)"
@@ -281,18 +306,18 @@ exit "$status"
   rests on. A class or a go-live that would merge such a bump without that
   review needs an ADR that amends this one.
 - Core's `test/repository-baseline.test.mjs` (row B5) asserts the
-  `# vX.Y.Z` comment and 1 SHA for each action across core's workflows,
-  since core dropped its literal `dependabot/fetch-metadata` SHA with
-  ADR-0088. `test/pin-check-script.test.mjs` runs the script above, read
+  `# vX.Y.Z` or `# vX.Y` comment and 1 SHA for each action across core's
+  workflows, since core dropped its literal `dependabot/fetch-metadata` SHA
+  with ADR-0088. `test/pin-check-script.test.mjs` runs the script above, read
   from this file, with stand-ins for `git` and `gh`.
 - New obligations: the owners of the files listed in the pull request that
   adds this ADR change them, each with the repository-wide check in the
   same pull request; a repository with an opposite correction record adds
   the new record.
-- Stays open: a pin whose comment names neither a full version tag nor a
-  `BRANCH YYYY-MM-DD` (snosi's `# v2` and `# v1.5`, lab's `# v3.5`) is
-  printed as skipped, not checked. A full `# vX.Y.Z` comment brings it
-  under the check.
+- Stays open: a pin whose comment names neither a `vX.Y[.Z]` tag nor a
+  `BRANCH YYYY-MM-DD` (snosi's `# v2`) is printed as skipped, not checked.
+  The comment of the release it pins (`# v2.0.3`) brings it under the
+  check.
 
 ## Alternatives considered
 
@@ -306,10 +331,15 @@ exit "$status"
   for which the tag check proves nothing, and a pin like snosi's
   `systemd/mkosi` runs in a job with publication secrets. The job is online
   already, and the compare API answers in 1 call.
-- **Check `# v2` and `# v1.5` against their tags:** such a tag moves with
-  each upstream release (`oras-project/setup-oras` tag `v2` already names a
+- **Check a major-only `# v2` against its tag:** that tag moves with each
+  upstream release (`oras-project/setup-oras` tag `v2` already names a
   newer commit than snosi's pin, which is `v2.0.3`), so the check fails on
-  each upstream release; a full `# vX.Y.Z` comment fixes the pin instead.
+  each upstream release; the comment of the pinned release fixes the pin
+  instead. A `vX.Y` release tag such as `v1.5` or `v3.5` names 1 release
+  and is checked.
+- **Require `# vX.Y.Z` only:** a pin of an upstream whose releases are
+  tagged `vX.Y` then has no true comment: a false comment fails the online
+  check, and any other comment is skipped for good.
 - **A "superseded" field in correction records:** ADR-0081 keeps records
   append-only, and a field would need a schema change in every repository;
   the new record's text says which record wins.
@@ -319,9 +349,9 @@ exit "$status"
 - Shapes: [spec: PR review rubric](../specs/pr-review-rubric.md) (row
   "Pin tests read the pin"), core's `test/repository-baseline.test.mjs`
   and `test/pin-check-script.test.mjs`
-- Amends in part: [ADR-0088](0088-read-the-action-pin-in-workflow-tests-never-hard-code-it.md)
-- Builds on: [ADR-0021](0021-sha-pinned-actions-and-least-privilege-ci.md),
-  [ADR-0081](0081-store-each-correction-in-a-file-of-its-own.md),
+- Amends in part: [ADR-0088](0088-read-the-action-pin-in-workflow-tests-never-hard-code-it.md),
+  [ADR-0021](0021-sha-pinned-actions-and-least-privilege-ci.md)
+- Builds on: [ADR-0081](0081-store-each-correction-in-a-file-of-its-own.md),
   [ADR-0083](0083-run-the-ci-gate-locally-as-make-ci.md)
 - Related: [design: Dependabot shadow](../design/dependabot-shadow.md)
 - External: [GitHub REST API, compare two

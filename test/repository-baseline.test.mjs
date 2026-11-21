@@ -277,7 +277,7 @@ test("B5: checkoutCredentials flags each checkout step that keeps credentials", 
 });
 
 // B5 (ADR-0090): read with the yaml parser, every OWNER/REPO[/PATH]@SHA pin of
-// the given workflows carries a # vX.Y.Z comment on its line (a frostyard/core
+// the given workflows carries a # vX.Y.Z or # vX.Y comment on its line (a frostyard/core
 // reusable workflow pin only a comment, as core has no release tags), and each
 // action has 1 SHA across all of them. Returns the gaps and the pins counted.
 export function actionPinGaps(files) {
@@ -295,8 +295,8 @@ export function actionPinGaps(files) {
         pins++;
         if (action.startsWith("frostyard/core/.github/workflows/")) {
           if (!comment) gaps.push(`${name}: ${action} has no comment`);
-        } else if (!/^v\d+\.\d+\.\d+$/.test(comment)) {
-          gaps.push(`${name}: ${action} has comment "${comment}", want # vX.Y.Z`);
+        } else if (!/^v\d+\.\d+(\.\d+)?$/.test(comment)) {
+          gaps.push(`${name}: ${action} has comment "${comment}", want # vX.Y.Z or # vX.Y`);
         }
         if (!shas.has(action)) shas.set(action, new Set());
         shas.get(action).add(sha);
@@ -309,13 +309,15 @@ export function actionPinGaps(files) {
   return { gaps, pins };
 }
 
-test("B5: actionPinGaps wants a # vX.Y.Z comment and 1 SHA for each action", () => {
+test("B5: actionPinGaps wants a # vX.Y.Z or # vX.Y comment and 1 SHA for each action", () => {
   const a = "a".repeat(40);
   const b = "b".repeat(40);
   const wf = (...steps) => `jobs:\n  j:\n    steps:\n${steps.map((s) => `      - ${s}\n`).join("")}`;
   const one = (text) => actionPinGaps([{ name: "w.yml", text }]);
   assert.deepEqual(one(wf(`uses: actions/checkout@${a} # v7.0.1`)), { gaps: [], pins: 1 });
   assert.deepEqual(one(wf(`uses: "actions/checkout@${a}" # v7.0.1`)), { gaps: [], pins: 1 });
+  // ADR-0090: an upstream whose releases have 2 parts (r2-upload-action v1.5).
+  assert.deepEqual(one(wf(`uses: ryand56/r2-upload-action@${a} # v1.5`)), { gaps: [], pins: 1 });
   assert.deepEqual(
     actionPinGaps([
       { name: "a.yml", text: wf(`uses: actions/checkout@${a} # v7.0.1`) },
@@ -330,7 +332,7 @@ test("B5: actionPinGaps wants a # vX.Y.Z comment and 1 SHA for each action", () 
   const comment = {
     none: `uses: actions/checkout@${a}`,
     major: `uses: actions/checkout@${a} # v7`,
-    minor: `uses: actions/checkout@${a} # v7.1`,
+    fourParts: `uses: actions/checkout@${a} # v7.0.1.2`,
     branch: `uses: actions/checkout@${a} # main 2026-11-09`,
     nextLine: `uses: actions/checkout@${a}\n        # v7.0.1`,
     trailingText: `uses: actions/checkout@${a} # v7.0.1 (latest)`,
@@ -338,7 +340,7 @@ test("B5: actionPinGaps wants a # vX.Y.Z comment and 1 SHA for each action", () 
   for (const [name, step] of Object.entries(comment)) {
     const { gaps } = one(wf(step));
     assert.equal(gaps.length, 1, name);
-    assert.match(gaps[0], /^w\.yml: actions\/checkout has comment ".*", want # vX\.Y\.Z$/, name);
+    assert.match(gaps[0], /^w\.yml: actions\/checkout has comment ".*", want # vX\.Y\.Z or # vX\.Y$/, name);
   }
   assert.deepEqual(
     actionPinGaps([

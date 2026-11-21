@@ -112,6 +112,30 @@ test("a # vX.Y.Z pin falls back to the tag without the v only when vX.Y.Z is mis
   assert.equal(shadowed.stderr, `bats-core/bats-action@${A}: tag v4.1.0 is ${C} upstream\n`);
 });
 
+test("a # vX.Y pin is checked like # vX.Y.Z, for upstreams whose releases have 2 parts", () => {
+  // ryand56/r2-upload-action tags v1.5 (annotated); github/issue-labeler tags v3.5.
+  const r2 = [`tag ${url("ryand56/r2-upload-action")} refs/tags/v1.5 ${D}`, `tag ${url("ryand56/r2-upload-action")} refs/tags/v1.5^{} ${A}`];
+  const ok = run({ workflows: { "r.yml": steps(`uses: ryand56/r2-upload-action@${A} # v1.5`) }, fixture: r2 });
+  assert.equal(ok.stderr, "");
+  assert.equal(ok.stdout, "checked 1 pins, skipped 0\n");
+  assert.equal(ok.status, 0);
+  const plain = run({
+    workflows: { "l.yml": steps(`uses: github/issue-labeler@${B} # v3.5`) },
+    fixture: [`tag ${url("github/issue-labeler")} refs/tags/3.5 ${B}`],
+  });
+  assert.equal(plain.status, 0, "falls back to 3.5 when v3.5 is missing");
+  const wrong = run({
+    workflows: { "l.yml": steps(`uses: github/issue-labeler@${B} # v3.5`) },
+    fixture: [`tag ${url("github/issue-labeler")} refs/tags/v3.5 ${C}`],
+  });
+  assert.equal(wrong.status, 1);
+  assert.equal(wrong.stderr, `github/issue-labeler@${B}: tag v3.5 is ${C} upstream\n`);
+  // A major-only or a 4-part comment is no version comment: printed, not checked.
+  const other = run({ workflows: { "o.yml": steps(`uses: oras-project/setup-oras@${A} # v2`, `uses: actions/checkout@${B} # v7.0.1.2`) } });
+  assert.equal(other.status, 0);
+  assert.equal(other.stdout.trimEnd().split("\n").at(-1), "checked 0 pins, skipped 2");
+});
+
 test("a # vX.Y.Z pin fails when the tag names another commit or is missing", () => {
   const wrong = run({
     workflows: { "a.yml": steps(`uses: actions/checkout@${A} # v7.0.0`) },
@@ -172,20 +196,24 @@ test("the script prints each pin it does not check and counts them", () => {
       ),
     },
     actions: { "x/action.yml": `runs:\n  using: composite\n  steps:\n    - uses: actions/cache@${A} # v5.0.0\n` },
-    fixture: [`tag ${url("actions/checkout")} refs/tags/v7.0.1 ${D}`, `tag ${url("actions/cache")} refs/tags/v5.0.0 ${A}`],
+    fixture: [
+      `tag ${url("actions/checkout")} refs/tags/v7.0.1 ${D}`,
+      `tag ${url("actions/cache")} refs/tags/v5.0.0 ${A}`,
+      `tag ${url("ryand56/r2-upload-action")} refs/tags/v1.5 ${B}`,
+    ],
   });
   assert.equal(out.stderr, "");
   assert.equal(out.status, 0);
   const lines = out.stdout.trimEnd().split("\n");
   assert.deepEqual(lines.slice(0, -1).sort(), [
     "skipped: actions/checkout@v7 #  (not OWNER/REPO[/PATH]@SHA)",
-    `skipped: actions/setup-node@${C} #  (the comment names no vX.Y.Z tag and no BRANCH YYYY-MM-DD)`,
+    `skipped: actions/setup-node@${C} #  (the comment names no vX.Y[.Z] tag and no BRANCH YYYY-MM-DD)`,
     `skipped: docker://alpine@sha256:${"e".repeat(64)} #  (not OWNER/REPO[/PATH]@SHA)`,
-    `skipped: oras-project/setup-oras@${A} # v2 (the comment names no vX.Y.Z tag and no BRANCH YYYY-MM-DD)`,
-    `skipped: ryand56/r2-upload-action@${B} # v1.5 (the comment names no vX.Y.Z tag and no BRANCH YYYY-MM-DD)`,
+    `skipped: oras-project/setup-oras@${A} # v2 (the comment names no vX.Y[.Z] tag and no BRANCH YYYY-MM-DD)`,
   ]);
-  // The quoted checkout pin and the action metadata pin are checked; the local action is not a pin.
-  assert.equal(lines.at(-1), "checked 2 pins, skipped 5");
+  // The # v1.5 pin, the quoted checkout pin and the action metadata pin are
+  // checked; the local action is not a pin.
+  assert.equal(lines.at(-1), "checked 3 pins, skipped 4");
 });
 
 test("a failing pin does not stop the check of the others", () => {
@@ -223,7 +251,7 @@ test("the script reads quoted keys and values, CRLF, a BOM and a missing final n
   assert.equal(wrong.stderr, `actions/cache@${C}: tag v5.0.0 is missing upstream\n`);
   // A CRLF line with a quoted value and no comment is read as that pin.
   const bare = run({ workflows: { "crlf.yml": steps(`uses: "actions/cache@${C}"`).replaceAll("\n", "\r\n") } });
-  assert.equal(bare.stdout, `skipped: actions/cache@${C} #  (the comment names no vX.Y.Z tag and no BRANCH YYYY-MM-DD)\nchecked 0 pins, skipped 1\n`);
+  assert.equal(bare.stdout, `skipped: actions/cache@${C} #  (the comment names no vX.Y[.Z] tag and no BRANCH YYYY-MM-DD)\nchecked 0 pins, skipped 1\n`);
 });
 
 test("the script reports each uses: key it cannot read, with its file and line", () => {

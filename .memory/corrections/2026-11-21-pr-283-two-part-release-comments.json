@@ -1,0 +1,7 @@
+{
+  "date": "2026-11-21",
+  "scope": "adr",
+  "correction": "A version-comment rule matches the tags upstreams really publish: ADR-0090 first required # vX.Y.Z and called # v1.5 a moving tag, but ryand56/r2-upload-action (v1.5) and github/issue-labeler (v3.5) tag releases with 2 parts, so those pins had no true comment and were skipped for good; # vX.Y is now a version comment and the online check resolves it, while a major-only # vN stays skipped",
+  "evidence": "Owner re-check of frostyard/core#283 for lab and snosi (https://github.com/frostyard/core/pull/283#issuecomment-7056637609, point 4, blocking); fixed in frostyard/core#283 with the regex ^v?[0-9]+\\.[0-9]+(\\.[0-9]+)?$ in the ADR's script, # vX.Y in the B5 check, and tests for v1.5, v3.5, v2 and a 4-part comment",
+  "promoted_to": "test/pin-check-script.test.mjs"
+}
