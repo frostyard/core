@@ -1,0 +1,7 @@
+{
+  "date": "2026-11-21",
+  "scope": "adr",
+  "correction": "A rule that lets a test drop a literal SHA keeps what the literal protected: ADR-0088 said a pin test may assert the version comment and 1 SHA for each action, so a migration could swap each literal for a 40-hex pattern and lose the only check that kept an action on 1 commit; ADR-0090 requires a repository-wide check of both in the same pull request, and core's own B5 test now has it",
+  "evidence": "Owner review of frostyard/core#281 for pilothouse and chairlift (https://github.com/frostyard/core/pull/281#issuecomment-7056384896, point 1, blocking, backed by the lab and snosi review); fixed in frostyard/core#283 (ADR-0090) with the rule and actionPinGaps in the B5 test over core's workflows",
+  "promoted_to": "test/repository-baseline.test.mjs"
+}
