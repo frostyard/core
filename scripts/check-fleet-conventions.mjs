@@ -3,7 +3,8 @@
 // declaration's default branch over the GitHub API, or each OWNER/REPO given
 // as an argument, and prints 1 line per repository. The gate also checks that
 // only the PR triage caller runs on pull_request_target and grants a narrow
-// token (ADR-0086). Exit 1 when a repository fails, 2 on a usage error. Read only.
+// token (ADR-0086), and that no workflow or action uses claude-code-action
+// (ADR-0091, row B20). Exit 1 when a repository fails, 2 on a usage error. Read only.
 
 import path from "node:path";
 import { fileURLToPath } from "node:url";

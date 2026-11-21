@@ -109,6 +109,7 @@ which baseline rows do not apply here.
 - [0088 — Read the action pin in workflow tests, never hard-code it](adr/0088-read-the-action-pin-in-workflow-tests-never-hard-code-it.md)
 - [0089 — Run Dependabot version updates monthly, in 1 entry for each ecosystem](adr/0089-run-dependabot-version-updates-monthly-in-one-entry-per-ecosystem.md)
 - [0090 — Scope action pins and check them repository-wide](adr/0090-scope-action-pins-and-check-them-repository-wide.md)
+- [0091 — Run no Claude Code action in frostyard workflows](adr/0091-run-no-claude-code-action-in-frostyard-workflows.md)
 
 ### Design
 

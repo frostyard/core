@@ -51,7 +51,7 @@ itself can carry injected instructions.
 
 ## References
 
-- Shapes: [chairlift `claude-code-review.yml`](https://github.com/frostyard/chairlift/blob/main/.github/workflows/claude-code-review.yml),
+- Shapes: [chairlift `claude-code-review.yml` (historical)](https://github.com/frostyard/chairlift/blob/c21d2d99609c8e32ec3953604240a8bf187c144f/.github/workflows/claude-code-review.yml),
   [snosi `docs/copilot-automation-secret.md`](https://github.com/frostyard/snosi/blob/main/docs/copilot-automation-secret.md),
   [lab `docs/automated-review.md`](https://github.com/frostyard/lab/blob/main/docs/automated-review.md),
   ai-fix workflows in updex/pilothouse
@@ -62,4 +62,6 @@ itself can carry injected instructions.
   publishes strict organization authority without storing provider credentials
   or worker execution state, and
   [ADR-0068](0068-label-pull-requests-that-touch-high-risk-paths.md), which
-  keeps PR-controlled code outside the privileged risk-path labeling job
+  keeps PR-controlled code outside the privileged risk-path labeling job, and
+  [ADR-0091](0091-run-no-claude-code-action-in-frostyard-workflows.md), which
+  runs no Claude Code action in frostyard workflows

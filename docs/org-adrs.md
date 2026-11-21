@@ -114,6 +114,13 @@ names what the decision binds in core and where it lives here.
   workflows, and
   [test/pin-check-script.test.mjs](../test/pin-check-script.test.mjs) runs
   the ADR's online check script with stand-ins for `git` and `gh`.
+- [ADR-0091 — Run no Claude Code action in frostyard workflows](adr/0091-run-no-claude-code-action-in-frostyard-workflows.md)
+  — no file under [.github/workflows/](../.github/workflows/) or
+  `.github/actions/` uses `claude-code-action` or `claude-code-base-action`;
+  row B20 of
+  [test/repository-baseline.test.mjs](../test/repository-baseline.test.mjs)
+  holds core to it, and `npm run check:fleet` checks the enabled
+  repositories.
 
 ## Rows that do not apply to core
 

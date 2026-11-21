@@ -9,6 +9,7 @@ import { isScalar, parseDocument, visit } from "yaml";
 import { parse } from "yaml";
 
 import { ciCoverageGaps, lintGaps, namesMakeCi, workflowCommands } from "../scripts/lib/ci-gate.mjs";
+import { claudeActionGaps, isWorkflowOrActionFile } from "../scripts/lib/fleet-conventions.mjs";
 
 // B12 (ADR-0073): the comparison of `make ci` with a CI workflow lives in
 // scripts/lib/ci-gate.mjs, which the organization gate shares (ADR-0083);
@@ -21,7 +22,8 @@ export { ciCoverageGaps, workflowCommands };
 // tree to the folder form. B6 lives in test/risk-paths.test.mjs and
 // scripts/check-risk-paths.mjs; B16 in
 // test/no-leftover-agent-trees.test.mjs; B17 in test/readme-check.test.mjs. B19 shares
-// scripts/lib/ci-gate.mjs with the organization gate. B8, B9 and B11 do not apply to core
+// scripts/lib/ci-gate.mjs with the organization gate, and B20 shares
+// claudeActionGaps in scripts/lib/fleet-conventions.mjs with it. B8, B9 and B11 do not apply to core
 // (docs/org-adrs.md says why); B10 and B18 are checked by the sweep with gh api.
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -760,4 +762,134 @@ test("B19: core's AGENTS.md names make ci, and no pull-request workflow lints ou
       .map((name) => [name, read(`.github/workflows/${name}`)]),
   );
   assert.deepEqual(lintGaps({ makefile: read("Makefile"), packageJson: read("package.json"), workflows }), []);
+});
+
+// B20 (ADR-0091): no workflow or action uses anthropics/claude-code-action or
+// anthropics/claude-code-base-action. The organization gate runs the same reader.
+const CLAUDE_SHA = "c".repeat(40);
+const step = (uses) => `on: pull_request\njobs:\n  review:\n    runs-on: ubuntu-latest\n    steps:\n      - ${uses}\n`;
+
+test("B20: claudeActionGaps fails each uses of either action, quoted, mixed-case or under another owner", () => {
+  const failing = {
+    plain: `uses: anthropics/claude-code-action@${CLAUDE_SHA} # v1.0.279`,
+    base: `uses: anthropics/claude-code-base-action@${CLAUDE_SHA} # v0.0.63`,
+    doubleQuoted: `uses: "anthropics/claude-code-action@${CLAUDE_SHA}"`,
+    singleQuoted: "uses: 'anthropics/claude-code-action@v1'",
+    mixedCase: "uses: Anthropics/Claude-Code-Action@v1",
+    upperCase: "uses: ANTHROPICS/CLAUDE-CODE-BASE-ACTION@main",
+    noRef: "uses: anthropics/claude-code-action",
+    subPath: "uses: anthropics/claude-code-action/review@v1",
+    fork: "uses: someone/claude-code-action@v1",
+    docker: "uses: docker://ghcr.io/anthropics/claude-code-action:latest",
+    flowMapping: "{ name: review, uses: anthropics/claude-code-action@v1 }",
+    quotedKey: '"uses": anthropics/claude-code-action@v1',
+    upperKey: "USES: anthropics/claude-code-action@v1",
+  };
+  for (const [name, line] of Object.entries(failing)) {
+    const gaps = claudeActionGaps({ ".github/workflows/review.yml": step(line) });
+    assert.equal(gaps.length, 1, name);
+    assert.match(gaps[0], /^\.github\/workflows\/review\.yml: uses \S*claude-code-(base-)?action/i, name);
+  }
+  // A composite action and a reusable workflow call count too.
+  const composite = "runs:\n  using: composite\n  steps:\n    - uses: anthropics/claude-code-action@v1\n";
+  assert.deepEqual(claudeActionGaps({ ".github/actions/review/action.yml": composite }), [
+    ".github/actions/review/action.yml: uses anthropics/claude-code-action@v1",
+  ]);
+  const reusable = "on: pull_request\njobs:\n  review:\n    uses: anthropics/claude-code-action/.github/workflows/review.yml@v1\n";
+  assert.equal(claudeActionGaps({ ".github/workflows/r.yml": reusable }).length, 1);
+  // An anchor and its alias, a merge key and a second document are read.
+  const anchored = "x: &claude anthropics/claude-code-action@v1\njobs:\n  a:\n    steps:\n      - uses: *claude\n";
+  assert.deepEqual(claudeActionGaps({ ".github/workflows/a.yml": anchored }), [".github/workflows/a.yml: uses anthropics/claude-code-action@v1"]);
+  const merged = "base: &s\n  uses: anthropics/claude-code-action@v1\njobs:\n  a:\n    steps:\n      - <<: *s\n";
+  assert.ok(claudeActionGaps({ ".github/workflows/m.yml": merged }).length >= 1, "merge key");
+  const twoDocs = `on: push\n---\n${step("uses: anthropics/claude-code-action@v1")}`;
+  assert.equal(claudeActionGaps({ ".github/workflows/d.yml": twoDocs }).length, 1, "second document");
+  // Fail closed: a file the parser rejects fails when it names the action.
+  assert.deepEqual(claudeActionGaps({ ".github/workflows/bad.yml": "jobs: [\n  uses: anthropics/claude-code-action@v1\n" }), [
+    ".github/workflows/bad.yml: not valid YAML and names claude-code-action",
+  ]);
+  const laughs = `a: &a [x, x, x, x, x, x, x, x, x, x]\nb: &b [*a, *a, *a, *a, *a, *a, *a, *a, *a, *a]\nc: [*b, *b, *b, *b, *b, *b, *b, *b, *b, *b, *b]\nd: anthropics/claude-code-action\n`;
+  assert.deepEqual(claudeActionGaps({ ".github/workflows/l.yml": laughs }), [".github/workflows/l.yml: not valid YAML and names claude-code-action"]);
+  // Gaps are sorted across files.
+  assert.deepEqual(
+    claudeActionGaps({ "b.yml": step("uses: anthropics/claude-code-action@v1"), "a.yml": step("uses: anthropics/claude-code-base-action@v1") }),
+    ["a.yml: uses anthropics/claude-code-base-action@v1", "b.yml: uses anthropics/claude-code-action@v1"],
+  );
+});
+
+test("B20: claudeActionGaps passes a name in a comment, a run step, a step name or a doc", () => {
+  const mention = [
+    "# Replaced anthropics/claude-code-action (ADR-0091).",
+    "on: pull_request",
+    "jobs:",
+    "  review:",
+    "    name: no anthropics/claude-code-action here",
+    "    runs-on: ubuntu-latest",
+    "    steps:",
+    `      - uses: actions/checkout@${CLAUDE_SHA} # v7.0.1 (not anthropics/claude-code-action)`,
+    "        with:",
+    "          persist-credentials: false",
+    "      - run: |",
+    "          echo 'uses: anthropics/claude-code-action@v1'",
+    "        env:",
+    "          NOTE: anthropics/claude-code-action",
+    "",
+  ].join("\n");
+  assert.deepEqual(claudeActionGaps({ ".github/workflows/review.yml": mention }), []);
+  // Near names that are other actions pass.
+  // Only the repository name counts: another repository's subaction or a local
+  // directory of that name is not the action (its action.yml is read itself).
+  for (const uses of [
+    "anthropics/claude-code-actions@v1",
+    "anthropics/claude-code@v1",
+    "x/my-claude-code-action@v1",
+    "owner/tools/claude-code-action@v1",
+    "claude-code-action@v1",
+    "./.github/actions/claude-code-action",
+    "docker://ghcr.io/anthropics/claude-code-action-runner:1",
+  ]) {
+    assert.deepEqual(claudeActionGaps({ ".github/workflows/w.yml": step(`uses: ${uses}`) }), [], uses);
+  }
+  // Invalid YAML that does not name the action is left to the other checks.
+  assert.deepEqual(claudeActionGaps({ ".github/workflows/bad.yml": "jobs: [\n" }), []);
+  assert.deepEqual(claudeActionGaps({ ".github/workflows/empty.yml": "" }), []);
+  // The check reads only workflows and the YAML files under .github/actions.
+  for (const file of [".github/workflows/ci.yml", ".github/workflows/ci.YAML", ".github/actions/review/action.yml", ".github/actions/a/b/action.yaml"]) {
+    assert.ok(isWorkflowOrActionFile(file), file);
+  }
+  for (const file of ["docs/adr/0091-x.md", ".github/actions/review/README.md", ".github/workflows/sub/w.yml", ".github/dependabot.yml", "test/fixtures/w.yml"]) {
+    assert.ok(!isWorkflowOrActionFile(file), file);
+  }
+});
+
+test("B20: claudeActionGaps reads every YAML input shape with the parser", () => {
+  const one = (text) => claudeActionGaps({ "w.yml": text });
+  const hit = ["w.yml: uses anthropics/claude-code-action@v1"];
+  const shapes = {
+    folded: "jobs:\n  a:\n    steps:\n      - uses: >-\n          anthropics/claude-code-action@v1\n",
+    literal: "jobs:\n  a:\n    steps:\n      - uses: |-\n          anthropics/claude-code-action@v1\n",
+    indentless: "jobs:\n  a:\n    steps:\n    - name: review\n      uses: anthropics/claude-code-action@v1\n",
+    notFirstKey: "jobs:\n  a:\n    steps:\n      - name: review\n        id: r\n        uses: anthropics/claude-code-action@v1\n",
+    commentsAndBlanks: "jobs:\n  a:\n    steps:\n      - name: review\n\n        # a comment\n        uses: anthropics/claude-code-action@v1 # v1.0.0\n",
+    flowKey: "jobs: { a: { steps: [ { \"uses\": \"anthropics/claude-code-action@v1\" } ] } }\n",
+    crlf: "jobs:\r\n  a:\r\n    steps:\r\n      - uses: anthropics/claude-code-action@v1\r\n",
+    bom: "\uFEFFjobs:\n  a:\n    steps:\n      - uses: anthropics/claude-code-action@v1\n",
+    noFinalNewline: "jobs:\n  a:\n    steps:\n      - uses: anthropics/claude-code-action@v1",
+    replacementChar: "name: \uFFFD\uFFFD\njobs:\n  a:\n    steps:\n      - uses: anthropics/claude-code-action@v1\n",
+    // A uses key under another mapping counts too: the check fails closed.
+    underWith: "jobs:\n  a:\n    steps:\n      - uses: ./local\n        with:\n          uses: anthropics/claude-code-action@v1\n",
+  };
+  for (const [name, text] of Object.entries(shapes)) assert.deepEqual(one(text), hit, name);
+  // A match inside a longer word or a URL is not the action.
+  for (const uses of ["anthropics/claude-code-actionx@v1", "anthropics/xclaude-code-action@v1", "https://example.com/claude-code-actions"]) {
+    assert.deepEqual(one(step(`uses: ${uses}`)), [], uses);
+  }
+  assert.deepEqual(one("\uFEFF"), []);
+  assert.deepEqual(one("# only a comment naming anthropics/claude-code-action\n"), []);
+});
+
+test("B20: no core workflow or action uses claude-code-action (ADR-0091)", () => {
+  const files = lsFiles().filter(isWorkflowOrActionFile);
+  assert.ok(files.some((file) => file.startsWith(".github/workflows/")), "no workflow found: the check checked nothing");
+  assert.deepEqual(claudeActionGaps(Object.fromEntries(files.map((file) => [file, read(file)]))), []);
 });
