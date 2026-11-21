@@ -4,6 +4,7 @@ import { readFileSync, readdirSync, realpathSync } from "node:fs";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+import { isScalar, parseDocument, visit } from "yaml";
 
 import { parse } from "yaml";
 
@@ -275,6 +276,87 @@ test("B5: checkoutCredentials flags each checkout step that keeps credentials", 
   assert.deepEqual(run(namedEnv), { checkouts: 1, offenders: [2] });
 });
 
+// B5 (ADR-0090): read with the yaml parser, every OWNER/REPO[/PATH]@SHA pin of
+// the given workflows carries a # vX.Y.Z comment on its line (a frostyard/core
+// reusable workflow pin only a comment, as core has no release tags), and each
+// action has 1 SHA across all of them. Returns the gaps and the pins counted.
+export function actionPinGaps(files) {
+  const gaps = [];
+  const shas = new Map();
+  let pins = 0;
+  for (const { name, text } of files) {
+    visit(parseDocument(text), {
+      Pair(_, pair) {
+        if (!isScalar(pair.key) || pair.key.value !== "uses" || !isScalar(pair.value)) return;
+        const match = /^([^@]+)@([0-9a-f]{40})$/.exec(String(pair.value.value));
+        if (!match) return;
+        const [, action, sha] = match;
+        const comment = (pair.value.comment ?? "").trim();
+        pins++;
+        if (action.startsWith("frostyard/core/.github/workflows/")) {
+          if (!comment) gaps.push(`${name}: ${action} has no comment`);
+        } else if (!/^v\d+\.\d+\.\d+$/.test(comment)) {
+          gaps.push(`${name}: ${action} has comment "${comment}", want # vX.Y.Z`);
+        }
+        if (!shas.has(action)) shas.set(action, new Set());
+        shas.get(action).add(sha);
+      },
+    });
+  }
+  for (const [action, set] of shas) {
+    if (set.size !== 1) gaps.push(`${action} has ${set.size} SHAs across the workflows, want 1`);
+  }
+  return { gaps, pins };
+}
+
+test("B5: actionPinGaps wants a # vX.Y.Z comment and 1 SHA for each action", () => {
+  const a = "a".repeat(40);
+  const b = "b".repeat(40);
+  const wf = (...steps) => `jobs:\n  j:\n    steps:\n${steps.map((s) => `      - ${s}\n`).join("")}`;
+  const one = (text) => actionPinGaps([{ name: "w.yml", text }]);
+  assert.deepEqual(one(wf(`uses: actions/checkout@${a} # v7.0.1`)), { gaps: [], pins: 1 });
+  assert.deepEqual(one(wf(`uses: "actions/checkout@${a}" # v7.0.1`)), { gaps: [], pins: 1 });
+  assert.deepEqual(
+    actionPinGaps([
+      { name: "a.yml", text: wf(`uses: actions/checkout@${a} # v7.0.1`) },
+      { name: "b.yml", text: wf(`uses: actions/checkout@${a} # v7.0.1`, `uses: actions/setup-node@${b} # v7.1.0`) },
+    ]),
+    { gaps: [], pins: 3 },
+  );
+  // Not OWNER/REPO@SHA: the B5 pin pattern reports these, this check skips them.
+  assert.deepEqual(one(wf("uses: ./.github/actions/x", "uses: actions/checkout@v7", `uses: docker://alpine@sha256:${"c".repeat(64)}`)), { gaps: [], pins: 0 });
+  // A uses: line inside a run block is text, not a pin.
+  assert.deepEqual(one(wf(`run: |\n          echo "uses: actions/checkout@${a}"`)), { gaps: [], pins: 0 });
+  const comment = {
+    none: `uses: actions/checkout@${a}`,
+    major: `uses: actions/checkout@${a} # v7`,
+    minor: `uses: actions/checkout@${a} # v7.1`,
+    branch: `uses: actions/checkout@${a} # main 2026-11-09`,
+    nextLine: `uses: actions/checkout@${a}\n        # v7.0.1`,
+    trailingText: `uses: actions/checkout@${a} # v7.0.1 (latest)`,
+  };
+  for (const [name, step] of Object.entries(comment)) {
+    const { gaps } = one(wf(step));
+    assert.equal(gaps.length, 1, name);
+    assert.match(gaps[0], /^w\.yml: actions\/checkout has comment ".*", want # vX\.Y\.Z$/, name);
+  }
+  assert.deepEqual(
+    actionPinGaps([
+      { name: "a.yml", text: wf(`uses: actions/checkout@${a} # v7.0.1`) },
+      { name: "b.yml", text: wf(`uses: actions/checkout@${b} # v7.0.2`) },
+    ]).gaps,
+    ["actions/checkout has 2 SHAs across the workflows, want 1"],
+  );
+  assert.deepEqual(one(wf(`uses: actions/checkout@${a} # v7.0.1`, `uses: actions/checkout@${b} # v7.0.1`)).gaps, [
+    "actions/checkout has 2 SHAs across the workflows, want 1",
+  ]);
+  // Nested paths are separate actions.
+  assert.deepEqual(one(wf(`uses: github/codeql-action/init@${a} # v4.1.0`, `uses: github/codeql-action/analyze@${b} # v4.1.0`)).gaps, []);
+  const core = (c) => `jobs:\n  t:\n    uses: frostyard/core/.github/workflows/pr-triage.yml@${a}${c}\n`;
+  assert.deepEqual(one(core(" # core#246 (frostyard/core main, 2026-11-14; core has no release tags)")), { gaps: [], pins: 1 });
+  assert.deepEqual(one(core("")).gaps, ["w.yml: frostyard/core/.github/workflows/pr-triage.yml has no comment"]);
+});
+
 test("B1: AGENTS.md is a regular file and every alias is a symlink to it", () => {
   const modes = lsFilesStaged();
   assert.equal(modes.get("AGENTS.md"), "100644");
@@ -364,6 +446,11 @@ test("B5: every workflow pins its actions by SHA, starts from no permissions and
     "only pr-triage.yml omits top-level permissions: {}",
   );
   assert.ok(checkouts > 0, "no actions/checkout step found: the credentials check checked nothing");
+  // ADR-0090: core dropped its literal SHA (ADR-0088), so it checks the comment
+  // and 1 SHA for each action across every workflow.
+  const pinCheck = actionPinGaps(workflows.map((name) => ({ name, text: read(path.join(".github/workflows", name)) })));
+  assert.deepEqual(pinCheck.gaps, [], "action pins");
+  assert.ok(pinCheck.pins > 0, "no action pin found: the pin check checked nothing");
 });
 
 test("B7: the PR template has a risk tier section", () => {

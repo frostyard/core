@@ -108,6 +108,7 @@ which baseline rows do not apply here.
 - [0087 — Start PR triage by dispatch for bot pull requests](adr/0087-start-pr-triage-by-dispatch-for-bot-pull-requests.md)
 - [0088 — Read the action pin in workflow tests, never hard-code it](adr/0088-read-the-action-pin-in-workflow-tests-never-hard-code-it.md)
 - [0089 — Run Dependabot version updates monthly, in 1 entry for each ecosystem](adr/0089-run-dependabot-version-updates-monthly-in-one-entry-per-ecosystem.md)
+- [0090 — Scope action pins and check them repository-wide](adr/0090-scope-action-pins-and-check-them-repository-wide.md)
 
 ### Design
 

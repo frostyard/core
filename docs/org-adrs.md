@@ -108,6 +108,12 @@ names what the decision binds in core and where it lives here.
   `interval: monthly`, and each ecosystem has 1 entry; `entryGaps` in
   [test/repository-baseline.test.mjs](../test/repository-baseline.test.mjs)
   checks it.
+- [ADR-0090 — Scope action pins and check them repository-wide](adr/0090-scope-action-pins-and-check-them-repository-wide.md)
+  — row B5 of [test/repository-baseline.test.mjs](../test/repository-baseline.test.mjs)
+  asserts the `# vX.Y.Z` comment and 1 SHA for each action across core's
+  workflows, and
+  [test/pin-check-script.test.mjs](../test/pin-check-script.test.mjs) runs
+  the ADR's online check script with stand-ins for `git` and `gh`.
 
 ## Rows that do not apply to core
 

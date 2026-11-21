@@ -224,5 +224,6 @@ exit "$status"
   [ADR-0075](0075-batch-routine-pull-requests.md),
   [ADR-0078](0078-sort-pull-requests-by-levels-l1-to-l4.md),
   [ADR-0083](0083-run-the-ci-gate-locally-as-make-ci.md)
+- Amended in part by: [ADR-0090](0090-scope-action-pins-and-check-them-repository-wide.md)
 - External: [GitHub, security hardening for GitHub Actions: using
   third-party actions](https://docs.github.com/en/actions/security-for-github-actions/security-guides/security-hardening-for-github-actions#using-third-party-actions)

@@ -190,6 +190,12 @@ decision to build it needs all of these:
 - The owner's settings step for each repository (`allow_auto_merge`), and a
   separate workflow change that calls `gh pr merge --auto`. The `shadow` step
   itself never gets that power.
+- A bump of an action pin (a `uses:` value) stays outside the class: S3
+  already leaves it out, because `.github/workflows/**` and
+  `.github/actions/**` are L2, and the owner's review of that bump is the
+  check that [ADR-0088](../adr/0088-read-the-action-pin-in-workflow-tests-never-hard-code-it.md)
+  rests on. A class that takes such a bump needs an ADR that amends
+  [ADR-0090](../adr/0090-scope-action-pins-and-check-them-repository-wide.md).
 
 ## Operational notes
 
@@ -206,6 +212,6 @@ decision to build it needs all of these:
 
 ## References
 
-- Rationale: [ADR-0019](../adr/0019-governance-as-code-and-risk-tiers.md), [ADR-0021](../adr/0021-sha-pinned-actions-and-least-privilege-ci.md), [ADR-0040](../adr/0040-publish-the-repository-settings-contract.md), [ADR-0042](../adr/0042-adopt-a-merge-queue-on-the-default-branch.md), [ADR-0075](../adr/0075-batch-routine-pull-requests.md), [ADR-0076](../adr/0076-require-status-checks-on-every-default-branch.md), [ADR-0077](../adr/0077-bind-ready-for-human-to-the-head-commit.md), [ADR-0078](../adr/0078-sort-pull-requests-by-levels-l1-to-l4.md)
+- Rationale: [ADR-0019](../adr/0019-governance-as-code-and-risk-tiers.md), [ADR-0021](../adr/0021-sha-pinned-actions-and-least-privilege-ci.md), [ADR-0040](../adr/0040-publish-the-repository-settings-contract.md), [ADR-0042](../adr/0042-adopt-a-merge-queue-on-the-default-branch.md), [ADR-0075](../adr/0075-batch-routine-pull-requests.md), [ADR-0076](../adr/0076-require-status-checks-on-every-default-branch.md), [ADR-0077](../adr/0077-bind-ready-for-human-to-the-head-commit.md), [ADR-0078](../adr/0078-sort-pull-requests-by-levels-l1-to-l4.md), [ADR-0090](../adr/0090-scope-action-pins-and-check-them-repository-wide.md)
 - Contracts: [PR triage](../specs/pr-triage.md), [risk paths](../specs/risk-paths.md)
 - Context: [quality loop](quality-loop.md)
