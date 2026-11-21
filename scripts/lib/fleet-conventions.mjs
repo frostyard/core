@@ -1,6 +1,6 @@
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
-import { parse } from "yaml";
+import { parse, parseAllDocuments } from "yaml";
 
 import { ciCoverageGaps, lintGaps, lintScriptPaths, namesMakeCi, runsOnPullRequest } from "./ci-gate.mjs";
 import { triggerEvents } from "./workflow-triggers.mjs";
@@ -16,6 +16,56 @@ export function pullRequestTargetGaps(workflows) {
       && !PULL_REQUEST_TARGET_CALLERS.includes(name))
     .map(([name]) => name)
     .sort();
+}
+
+// ADR-0091: no frostyard workflow or action uses anthropics/claude-code-action
+// or anthropics/claude-code-base-action. Owners and repository names are
+// case-insensitive on GitHub, and a fork or mirror under the same repository
+// name is the same action, so the match ignores case and owner.
+export const CLAUDE_ACTION = /(^|\/)claude-code(-base)?-action(\/|@|:|$)/i;
+const CLAUDE_ACTION_TEXT = /claude-code(-base)?-action/i;
+
+// The files the check reads: each workflow in .github/workflows (GitHub reads
+// no subdirectory there) and each YAML file under .github/actions.
+export function isWorkflowOrActionFile(filePath) {
+  return /^\.github\/workflows\/[^/]+\.ya?ml$/i.test(filePath)
+    || /^\.github\/actions\/.+\.ya?ml$/i.test(filePath);
+}
+
+function usesValues(node, out) {
+  if (Array.isArray(node)) {
+    for (const item of node) usesValues(item, out);
+    return;
+  }
+  if (node === null || typeof node !== "object") return;
+  for (const [key, value] of Object.entries(node)) {
+    if (key.trim().toLowerCase() === "uses" && typeof value === "string") out.push(value.trim());
+    usesValues(value, out);
+  }
+}
+
+// files: path -> text. Returns "<path>: uses <value>" for each uses: value that
+// names the action, read with the yaml parser in every document, so quotes, flow
+// mappings, anchors and aliases count; a comment or run: text does not. A file
+// the parser rejects fails when its text names the action (fail closed).
+export function claudeActionGaps(files) {
+  const gaps = [];
+  for (const [file, text] of Object.entries(files)) {
+    const values = [];
+    try {
+      for (const document of parseAllDocuments(text)) {
+        if (document.errors.length > 0) throw document.errors[0];
+        usesValues(document.toJS(), values);
+      }
+    } catch {
+      if (CLAUDE_ACTION_TEXT.test(text)) gaps.push(`${file}: not valid YAML and names claude-code-action`);
+      continue;
+    }
+    for (const value of values) {
+      if (CLAUDE_ACTION.test(value)) gaps.push(`${file}: uses ${value}`);
+    }
+  }
+  return gaps.sort();
 }
 
 export const TRIAGE_CALLER_GRANT = Object.freeze({
@@ -168,6 +218,13 @@ export async function checkRepository(fetchImpl, owner, name) {
   for (const gap of triageCallerGrantGaps(workflows)) {
     failures.push(`triage caller grant: ${gap}`);
   }
+  const actionFiles = {
+    ...Object.fromEntries(Object.entries(workflows).map(([file, text]) => [`.github/workflows/${file}`, text])),
+    ...(await fetchActionFiles(fetchImpl, owner, name, ".github/actions")),
+  };
+  for (const gap of claudeActionGaps(actionFiles)) {
+    failures.push(`claude-code-action: ${gap} (ADR-0091)`);
+  }
 
   return { label, failures, workflows: Object.keys(workflows).length };
 }
@@ -191,6 +248,32 @@ async function fetchWorkflows(fetchImpl, owner, name) {
     if (text !== null) workflows[entry.name] = text;
   }
   return workflows;
+}
+
+// The YAML files under dir, at any depth: path -> text. A repository with no
+// such directory has none. A failed request or a listing that is not JSON
+// throws, so the repository fails rather than passes unread.
+async function fetchActionFiles(fetchImpl, owner, name, dir) {
+  const listing = await fetchFile(fetchImpl, owner, name, dir, "application/vnd.github+json");
+  if (listing === null) return {};
+  let entries;
+  try {
+    entries = JSON.parse(listing);
+  } catch {
+    throw new FleetConventionsError(`${owner}/${name}: ${dir} listing is not JSON`);
+  }
+  if (!Array.isArray(entries)) return {};
+  const files = {};
+  for (const entry of entries) {
+    const entryPath = `${dir}/${entry.name}`;
+    if (entry.type === "dir") {
+      Object.assign(files, await fetchActionFiles(fetchImpl, owner, name, entryPath));
+    } else if (entry.type === "file" && isWorkflowOrActionFile(entryPath)) {
+      const text = await fetchFile(fetchImpl, owner, name, entryPath);
+      if (text !== null) files[entryPath] = text;
+    }
+  }
+  return files;
 }
 
 // ADR-0083: `make ci` is the 1 local entry point to the CI gate. Row B12:

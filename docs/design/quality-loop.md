@@ -74,7 +74,10 @@ PR template ──► review rubric ──► CI gates ──► corrections ─
   included, apart from checks that need network access or a credential;
   no pull-request workflow lints or formats outside it; and `AGENTS.md`
   names it. The organization gate checks the mechanical part (baseline
-  rows B12 and B19) with the readers in `scripts/lib/ci-gate.mjs`; with
+  rows B12 and B19) with the readers in `scripts/lib/ci-gate.mjs`, and
+  row B20 (no `claude-code-action` in a workflow or action,
+  [ADR-0091](../adr/0091-run-no-claude-code-action-in-frostyard-workflows.md));
+  with
   `OWNER/REPO` arguments, `node scripts/check-fleet-conventions.mjs`
   checks any repository, not only the enabled ones. Run `npm ci` first in
   the core checkout.
@@ -84,7 +87,7 @@ PR template ──► review rubric ──► CI gates ──► corrections ─
     a second push and a cancelled run.
 - **Sweep (every code repository)** — the
   [repository baseline](../specs/repository-baseline.md) lists, as rows
-  `B1` to `B19`, what every frostyard code repository carries
+  `B1` to `B20`, what every frostyard code repository carries
   ([ADR-0071](../adr/0071-hold-every-code-repository-to-one-baseline.md)),
   including the tool documentation home
   ([ADR-0070](../adr/0070-build-tool-docs-sites-with-materialx-on-github-pages.md),

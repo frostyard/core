@@ -127,15 +127,16 @@ Start from .agents/skills/TEMPLATE/SKILL.md. -->
   ([ADR-0019](docs/adr/0019-governance-as-code-and-risk-tiers.md)).
 - Every frostyard code repository carries the
   [repository baseline](docs/specs/repository-baseline.md) (rows `B1` to
-  `B19`: instruction surface, corrections inbox, docs shape, make gate,
+  `B20`: instruction surface, corrections inbox, docs shape, make gate,
   pinned actions, risk paths, PR template, svu, tool docs site, license,
   fleet Go toolchain, `ci.yml`, Dependabot, `SECURITY.md`, no `CODEOWNERS`,
   no leftover agent-framework trees, README, required status checks, local
-  CI gate), with its named exemptions
+  CI gate, no Claude Code action), with its named exemptions
   ([ADR-0071](docs/adr/0071-hold-every-code-repository-to-one-baseline.md),
   [ADR-0072](docs/adr/0072-write-every-readme-to-one-standard.md),
   [ADR-0076](docs/adr/0076-require-status-checks-on-every-default-branch.md),
-  [ADR-0083](docs/adr/0083-run-the-ci-gate-locally-as-make-ci.md)).
+  [ADR-0083](docs/adr/0083-run-the-ci-gate-locally-as-make-ci.md),
+  [ADR-0091](docs/adr/0091-run-no-claude-code-action-in-frostyard-workflows.md)).
   `scripts/apply-triage-settings.sh` drafts the required-checks ruleset
   (dry run by default; an admin runs `--apply`), and
   `scripts/required-checks-survey.mjs` reads the live state, read only.
@@ -240,7 +241,10 @@ removed. -->
   ([pull_request_target policy](docs/design/pull-request-target-policy.md#code-guard)).
   It also fails a job that calls `pr-triage.yml` without its own narrow
   `permissions` mapping ([ADR-0086](docs/adr/0086-let-each-pr-triage-caller-grant-the-triage-token.md)),
-  read with the `yaml` parser.
+  read with the `yaml` parser, and a workflow or a file under
+  `.github/actions/` that uses `claude-code-action` or
+  `claude-code-base-action` (row B20,
+  [ADR-0091](docs/adr/0091-run-no-claude-code-action-in-frostyard-workflows.md)).
   It runs as CI's required `fleet-conventions` job, not part of `check`/`verify`;
   run `npm ci` first in the core checkout, then
   `node scripts/check-fleet-conventions.mjs OWNER/REPO...` to check other

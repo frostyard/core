@@ -10,7 +10,9 @@ Living document. Rationale:
 [ADR-0020](../adr/0020-ai-automation-trust-boundaries.md)
 (no pull request code in a privileged job),
 [ADR-0021](../adr/0021-sha-pinned-actions-and-least-privilege-ci.md)
-(SHA pins, least privilege).
+(SHA pins, least privilege),
+[ADR-0091](../adr/0091-run-no-claude-code-action-in-frostyard-workflows.md)
+(no Claude Code action).
 Contracts: [PR triage](../specs/pr-triage.md),
 [risk paths](../specs/risk-paths.md).
 
@@ -211,7 +213,7 @@ of frostyard and bketelsen (331 repositories).
 | frostyard/frostyard-org | `risk-paths.yml` | Tamalane | keep: step 1 | PR triage caller |
 | bketelsen: agentic-template (Lucilla), pi-pocket-dune, pi-pocket-team (Sheeana), trimlights (Irulan), truenas-mcp (Moneo) | `risk-paths.yml` | as named | keep: step 2 | PR triage caller |
 | frostyard/apt-publisher, bketelsen/fleet | `risk-paths.yml` | Lucilla, Teg | keep: no step | private: the default policy does not apply |
-| frostyard/updex | `claude-code-review.yml` | Lucilla | done: moved to `pull_request` in [updex#530](https://github.com/frostyard/updex/pull/530) on 2026-11-16 | it only requests a Copilot review with `pull-requests: write` |
+| frostyard/updex | `claude-code-review.yml` | Lucilla | done: moved to `pull_request` in [updex#530](https://github.com/frostyard/updex/pull/530) on 2026-11-16 | it only requests a Copilot review with `pull-requests: write`; despite its name it runs no Claude action ([ADR-0091](../adr/0091-run-no-claude-code-action-in-frostyard-workflows.md)) |
 | frostyard/homebrew-tap | `publish.yml` | Lucilla | done: removed in [homebrew-tap#49](https://github.com/frostyard/homebrew-tap/pull/49) on 2026-11-16 | every pull request head is a branch of the tap, and the job had never run (51 runs, all skipped) |
 | bketelsen forks: bluefin-1 (`cherry-pick-to-stable.yml`), dakota (`pr-triage.yml`), hive (`ai-fix.yml`, `copilot-automation.yml`, `greetings.yml`, `pr-verifier.yml`), incus (`triage.yml`), openchamber (`label-merge-conflict.yml`, `pr-review.yml`) | upstream workflows | bketelsen (account owner) | leave blocked | forks with 0 `pull_request_target` runs; no policy |
 
@@ -271,6 +273,22 @@ It reads YAML with the `yaml` parser and fails a job without its own narrow
 may be added. This check has the same scope: enabled declarations, default
 branch only. Explicit `OWNER/REPO` arguments can check other default
 branches. `test/fleet-conventions.test.mjs` tests it.
+
+The same gate runs row B20 of the
+[repository baseline](../specs/repository-baseline.md)
+([ADR-0091](../adr/0091-run-no-claude-code-action-in-frostyard-workflows.md)):
+`claudeActionGaps` in `scripts/lib/fleet-conventions.mjs` fails a
+repository when a workflow, or a YAML file under `.github/actions/` at any
+depth, has a `uses:` value that names `claude-code-action` or
+`claude-code-base-action`. It reads the values with the `yaml` parser,
+ignores case and owner, and fails a file that does not parse and names the
+action, or a directory it cannot read. No frostyard workflow runs a Claude
+review, on `pull_request_target` or on any other event; the AI review of a
+pull request is pocketd's cross-review. On 2026-11-21 the check fails
+chairlift, lab and pilothouse (`claude-code-review.yml`) until they remove
+the workflow; none of them is enabled, so the CI job stays green. Its
+tests are in `test/fleet-conventions.test.mjs` and
+`test/repository-baseline.test.mjs`.
 
 The rule holds in a private repository too. There the default policy does
 not apply, but a `pull_request_target` job still runs with a write token in
@@ -363,7 +381,8 @@ gh api -H "X-GitHub-Api-Version: 2026-03-10" \
   [ADR-0020](../adr/0020-ai-automation-trust-boundaries.md),
   [ADR-0021](../adr/0021-sha-pinned-actions-and-least-privilege-ci.md),
   [ADR-0086](../adr/0086-let-each-pr-triage-caller-grant-the-triage-token.md),
-  [ADR-0087](../adr/0087-start-pr-triage-by-dispatch-for-bot-pull-requests.md)
+  [ADR-0087](../adr/0087-start-pr-triage-by-dispatch-for-bot-pull-requests.md),
+  [ADR-0091](../adr/0091-run-no-claude-code-action-in-frostyard-workflows.md)
 - Contracts: [specs/pr-triage.md](../specs/pr-triage.md),
   [specs/risk-paths.md](../specs/risk-paths.md)
 - GitHub: [securely using pull_request_target](https://docs.github.com/en/actions/reference/security/securely-using-pull_request_target),

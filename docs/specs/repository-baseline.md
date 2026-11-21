@@ -8,12 +8,13 @@ that fails is a `sweep` finding with the row's ID in its key. Owners and
 reviewers use the same rows. The organization gate
 (`npm run check:fleet`) stays narrower: it checks the presence part of B4
 (ADR-0043 and ADR-0044), row B12 and the mechanical part of row B19
-([ADR-0083](../adr/0083-run-the-ci-gate-locally-as-make-ci.md)), for the
-enabled repositories or for the `OWNER/REPO` arguments it gets.
+([ADR-0083](../adr/0083-run-the-ci-gate-locally-as-make-ci.md)), and row
+B20 ([ADR-0091](../adr/0091-run-no-claude-code-action-in-frostyard-workflows.md)),
+for the enabled repositories or for the `OWNER/REPO` arguments it gets.
 
 ## Interface
 
-Each row has an ID (`B1` to `B19`), the rule, its source, and a read-only
+Each row has an ID (`B1` to `B20`), the rule, its source, and a read-only
 check. Run each check in a clone of the repository at the commit you read
 (`git ls-tree`, `git show <commit>:<path>`, or `gh api`); nothing writes.
 
@@ -38,6 +39,7 @@ check. Run each check in a clone of the repository at the commit you read
 | B17 | README | The root `README.md` follows the [README spec](readme.md) for the kind that its marker declares: rules R1 to R12 (kind marker, title and lead, status line, documentation line, badges, the kind's sections, `Develop` and `Where to go next`, at most 1000 words, nothing that belongs in `docs/`). | [ADR-0072](../adr/0072-write-every-readme-to-one-standard.md) | From a core checkout at `origin/main`: `node .agents/skills/frostyard-readme/scripts/check-readme.mjs --ref <commit> <clone>` prints `ok`. Each `FAIL R<n>` line is 1 part of the finding. |
 | B18 | Required status checks | The default branch has at least 1 required status check. The names cover the repository's acceptance gate and meet rules N1 to N5 of ADR-0076; the row checks presence only. | [ADR-0076](../adr/0076-require-status-checks-on-every-default-branch.md) | `gh api repos/frostyard/<repo>/rules/branches/<default branch> --jq '[.[]\|select(.type=="required_status_checks")\|.parameters.required_status_checks[]]\|length'` prints a number greater than 0. It counts check entries from every ruleset that applies, not rules. `node scripts/required-checks-survey.mjs frostyard/<repo>` in a core checkout shows the names. |
 | B19 | Local CI gate | `make ci` runs every check that `ci.yml` runs on pull requests, lint and format included; only a check that needs network access or a credential when it runs (a vulnerability database, a GitHub API read, a package install inside the test) stays outside it, in a job of its own. No workflow that runs on pull requests runs a lint or format check that `make ci` does not run. `AGENTS.md` names `make ci` as the command to run before a push. | [ADR-0083](../adr/0083-run-the-ci-gate-locally-as-make-ci.md) | From a core checkout at `origin/main`, run `npm ci` first. Then `node scripts/check-fleet-conventions.mjs frostyard/<repo>` prints no `B19:` part (each `B19:` part is 1 part of the finding; its `B12:` parts belong to row B12). It reads the default branch, not `<commit>`. Then compare each other `run:` command of `ci.yml` with what `make ci` runs: a check outside `make ci` that needs neither network access nor a credential is the judgment part of the finding. |
+| B20 | No Claude Code action | No file under `.github/workflows/` or `.github/actions/` uses `anthropics/claude-code-action` or `anthropics/claude-code-base-action`: not as a step, a job's reusable workflow or a composite action's step, at any ref. A fork or mirror under the same repository name counts. The AI review of a pull request is pocketd's cross-review. | [ADR-0091](../adr/0091-run-no-claude-code-action-in-frostyard-workflows.md) | From a core checkout at `origin/main`, run `npm ci` first. Then `node scripts/check-fleet-conventions.mjs frostyard/<repo>` prints no `claude-code-action:` part; each part names the file and its `uses:` value. It reads the default branch, not `<commit>`. At a commit: `git grep -niE 'claude-code(-base)?-action' <commit> -- .github/workflows .github/actions` and read each hit. A `uses:` value that names either repository (any case, quoted or not, under any owner) is the finding; a comment, a step name, a `run:` text or a Markdown file is not. A YAML file that does not parse and names the action is a finding (core's `claudeActionGaps` in `scripts/lib/fleet-conventions.mjs` reads it this way and fails closed). |
 
 ## Rules
 
@@ -110,5 +112,6 @@ check. Run each check in a clone of the repository at the commit you read
   [ADR-0084](../adr/0084-accept-a-tools-own-site-or-a-frostyard-org-guide-as-its-docs-home.md) (row B9, the docs home),
   [ADR-0081](../adr/0081-store-each-correction-in-a-file-of-its-own.md) (row B2),
   [ADR-0083](../adr/0083-run-the-ci-gate-locally-as-make-ci.md) (row B19, and row B12 in the organization gate)
+  [ADR-0091](../adr/0091-run-no-claude-code-action-in-frostyard-workflows.md) (row B20)
 - Row B17's contract: [spec: README](readme.md)
 - Context: [design: quality loop](../design/quality-loop.md)

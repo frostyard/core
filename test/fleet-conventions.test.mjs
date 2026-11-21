@@ -11,6 +11,7 @@ import {
   TRIAGE_CALLER_GRANT,
   TRIAGE_CALLER_REQUIRED,
   checkFleetConventions,
+  claudeActionGaps,
   pullRequestTargetGaps,
   summaryLine,
   triageCallerGrantGaps,
@@ -30,7 +31,8 @@ async function makeRepositoriesRoot(declarations) {
 }
 
 // A fake GitHub contents API. A path that is a prefix directory of files
-// answers with the listing JSON, as the API does for a directory.
+// answers with the listing JSON, as the API does for a directory: its files,
+// and each subdirectory once as type "dir".
 function fakeFetch(files) {
   const calls = [];
   const fetchImpl = async (url) => {
@@ -42,9 +44,12 @@ function fakeFetch(files) {
       return { status: 200, ok: true, text: async () => content };
     }
     const prefix = `${owner}/${name}/${filePath}/`;
-    const listing = Object.keys(files)
-      .filter((key) => key.startsWith(prefix) && !key.slice(prefix.length).includes("/"))
-      .map((key) => ({ type: "file", name: key.slice(prefix.length) }));
+    const children = new Map();
+    for (const key of Object.keys(files).filter((k) => k.startsWith(prefix))) {
+      const [child, ...rest] = key.slice(prefix.length).split("/");
+      if (!children.has(child)) children.set(child, rest.length > 0 ? "dir" : "file");
+    }
+    const listing = [...children].map(([name, type]) => ({ type, name }));
     if (listing.length > 0) {
       return { status: 200, ok: true, text: async () => JSON.stringify(listing) };
     }
@@ -619,6 +624,86 @@ test("a repository request error reports zero workflow files read", async () => 
     failures: ["frostyard/repo: mise.toml request failed with status 503"],
     workflows: 0,
   }]);
+});
+
+// ADR-0091, row B20: the gate reads every workflow and every YAML file under
+// .github/actions, at any depth.
+const CLAUDE_STEP = "on: pull_request\njobs:\n  review:\n    steps:\n      - uses: \"Anthropics/Claude-Code-Action@v1\"\n";
+
+test("B20: a workflow or a nested action that uses claude-code-action fails; a doc that names it passes", async () => {
+  const root = await makeRepositoriesRoot([
+    { repository: { owner: "frostyard", name: "bad" }, fleet_state: "enabled" },
+    { repository: { owner: "frostyard", name: "good" }, fleet_state: "enabled" },
+  ]);
+  const fetchImpl = fakeFetch({
+    ...conformant("frostyard", "bad", {
+      ".github/workflows/claude-code-review.yml": CLAUDE_STEP,
+      ".github/actions/review/action.yml": "runs:\n  using: composite\n  steps:\n    - uses: anthropics/claude-code-base-action@v0\n",
+      ".github/actions/deep/er/action.yaml": "runs:\n  using: composite\n  steps:\n    - uses: anthropics/claude-code-action@v1\n",
+    }),
+    ...conformant("frostyard", "good", {
+      ".github/actions/review/README.md": "This action replaced anthropics/claude-code-action.\n",
+      ".github/actions/review/action.yml": "# Not anthropics/claude-code-action.\nruns:\n  using: composite\n  steps:\n    - run: echo anthropics/claude-code-action\n      shell: bash\n",
+      "docs/review.md": "uses: anthropics/claude-code-action@v1\n",
+    }),
+  });
+
+  const results = await checkFleetConventions(fetchImpl, root);
+
+  assert.deepEqual(results, [
+    {
+      label: "frostyard/bad",
+      failures: [
+        "claude-code-action: .github/actions/deep/er/action.yaml: uses anthropics/claude-code-action@v1 (ADR-0091)",
+        "claude-code-action: .github/actions/review/action.yml: uses anthropics/claude-code-base-action@v0 (ADR-0091)",
+        "claude-code-action: .github/workflows/claude-code-review.yml: uses Anthropics/Claude-Code-Action@v1 (ADR-0091)",
+      ],
+      workflows: 2,
+    },
+    { label: "frostyard/good", failures: [], workflows: 1 },
+  ]);
+  assert.ok(!fetchImpl.calls.some((url) => url.endsWith("README.md")), "a doc under .github/actions is not read");
+});
+
+test("B20: a failed .github/actions request fails the repository rather than passing it unread", async () => {
+  const root = await makeRepositoriesRoot([
+    { repository: { owner: "frostyard", name: "repo" }, fleet_state: "enabled" },
+  ]);
+  const files = fakeFetch(conformant("frostyard", "repo"));
+  const fetchImpl = async (url) => (url.endsWith("/contents/.github/actions")
+    ? { status: 502, ok: false, text: async () => "" }
+    : files(url));
+
+  const results = await checkFleetConventions(fetchImpl, root);
+
+  assert.deepEqual(results, [{
+    label: "frostyard/repo",
+    failures: ["frostyard/repo: .github/actions request failed with status 502"],
+    workflows: 0,
+  }]);
+});
+
+test("B20: a .github/actions listing that is not JSON fails the repository", async () => {
+  const root = await makeRepositoriesRoot([
+    { repository: { owner: "frostyard", name: "repo" }, fleet_state: "enabled" },
+  ]);
+  const files = fakeFetch(conformant("frostyard", "repo"));
+  const fetchImpl = async (url) => (url.endsWith("/contents/.github/actions")
+    ? { status: 200, ok: true, text: async () => "<html>" }
+    : files(url));
+
+  const results = await checkFleetConventions(fetchImpl, root);
+
+  assert.deepEqual(results[0].failures, ["frostyard/repo: .github/actions listing is not JSON"]);
+});
+
+test("B20: claudeActionGaps passes every core workflow on disk", async () => {
+  const dir = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", ".github", "workflows");
+  const names = (await readdir(dir)).filter((name) => /\.ya?ml$/.test(name));
+  const files = {};
+  for (const name of names) files[`.github/workflows/${name}`] = await readFile(path.join(dir, name), "utf8");
+  assert.ok(names.length > 0);
+  assert.deepEqual(claudeActionGaps(files), []);
 });
 
 // fleet-conventions.mjs imports the npm package yaml, so the CI job that runs
