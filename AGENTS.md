@@ -149,15 +149,18 @@ Start from .agents/skills/TEMPLATE/SKILL.md. -->
   before it pushes there: `make ci` is each repository's local CI gate,
   lint and format included, and a pass in 1 repository proves nothing for
   another ([ADR-0083](docs/adr/0083-run-the-ci-gate-locally-as-make-ci.md)).
-- A test or check that guards a workflow pin reads the pin from the
-  workflow and asserts its properties: a 40-hex commit SHA, its version
-  comment, 1 pin for each action, least-privilege permissions. It never
-  compares a real pin with a SHA written in the test, and a mutation test
-  takes the pin it edits from its copy, so a Dependabot bump that keeps
-  those properties passes. A repository that wants each new commit of an
-  action reviewed does it in the bump pull request, with an optional
-  online tag check outside `make ci`
-  ([ADR-0088](docs/adr/0088-read-the-action-pin-in-workflow-tests-never-hard-code-it.md)).
+- A test or check that guards an action pin (a `uses:` value) reads the
+  pin from the workflow and asserts its properties: a 40-hex commit SHA,
+  its version comment, 1 SHA for each action, least-privilege permissions.
+  It never compares a real pin with a SHA written in the test, and a
+  mutation test takes the pin it edits from its copy. A repository that
+  removes a literal SHA has, or adds in the same pull request, a
+  repository-wide check of the comment and of 1 SHA for each action.
+  Image digests and hash pins of vendored core files are not action pins.
+  An action pin bump is reviewed in its pull request and stays outside
+  any auto-merge class
+  ([ADR-0088](docs/adr/0088-read-the-action-pin-in-workflow-tests-never-hard-code-it.md),
+  [ADR-0090](docs/adr/0090-scope-action-pins-and-check-them-repository-wide.md)).
 - A skill step that stands in for a command (hand tag steps for
   `make bump`) keeps every guard of that command, in the same order. A
   skill's check after a release binds to that release: an attestation

@@ -51,5 +51,6 @@ over-broad.
 - Builds on: [ADR-0001](0001-record-architecture-decisions.md)
 - Related: [ADR-0010](0010-publish-packages-via-repogen-to-r2.md),
   [ADR-0020](0020-ai-automation-trust-boundaries.md)
-- Amended in part by: [ADR-0086](0086-let-each-pr-triage-caller-grant-the-triage-token.md)
+- Amended in part by: [ADR-0086](0086-let-each-pr-triage-caller-grant-the-triage-token.md),
+  [ADR-0090](0090-scope-action-pins-and-check-them-repository-wide.md)
 - Extended by: [ADR-0088](0088-read-the-action-pin-in-workflow-tests-never-hard-code-it.md)

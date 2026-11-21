@@ -1,0 +1,7 @@
+{
+  "date": "2026-11-21",
+  "scope": "adr",
+  "correction": "An online pin check that resolves a version comment upstream tries the tag as written and, only when it is missing, the tag without its leading v; ADR-0088's script asked only for refs/tags/vX.Y.Z and exited 1 on snosi main for bats-core/bats-action, whose upstream tag is 4.1.0, although the pin was right",
+  "evidence": "Owner review of frostyard/core#281 for lab and snosi (https://github.com/frostyard/core/pull/281#issuecomment-7056402326, point 1, blocking); fixed in frostyard/core#283 (ADR-0090) with the fallback in the ADR's script and a test that runs that script with stand-ins for git and gh",
+  "promoted_to": "test/pin-check-script.test.mjs"
+}

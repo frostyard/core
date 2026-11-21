@@ -1,0 +1,7 @@
+{
+  "date": "2026-11-21",
+  "scope": "adr",
+  "correction": "A line-based pin scanner that promises to print what it skips reports every uses: key it cannot read, with its file and line; ADR-0090's first script matched only bare line-leading uses: keys, so a quoted key or a flow mapping was neither checked nor reported",
+  "evidence": "Cross-review of frostyard/core#283 at 571521f (medium, blocking); fixed in frostyard/core#283 at cd502ef with quoted keys, CRLF and BOM read, every other uses: line printed as skipped, and shape tests in test/pin-check-script.test.mjs",
+  "promoted_to": "test/pin-check-script.test.mjs"
+}
