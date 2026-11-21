@@ -22,8 +22,21 @@ export function pullRequestTargetGaps(workflows) {
 // or anthropics/claude-code-base-action. Owners and repository names are
 // case-insensitive on GitHub, and a fork or mirror under the same repository
 // name is the same action, so the match ignores case and owner.
-export const CLAUDE_ACTION = /(^|\/)claude-code(-base)?-action(\/|@|:|$)/i;
+export const CLAUDE_ACTION = /^claude-code(-base)?-action$/i;
 const CLAUDE_ACTION_TEXT = /claude-code(-base)?-action/i;
+
+// The repository that a uses: value names: REPO of OWNER/REPO[/PATH][@REF], or
+// the last path segment of a docker:// image without its tag or digest. A local
+// ./ path names none: the check reads its files under .github/actions itself.
+export function usesRepository(value) {
+  const text = value.trim();
+  if (/^docker:\/\//i.test(text)) {
+    const image = text.slice("docker://".length).split("@")[0];
+    return image.split("/").pop().split(":")[0];
+  }
+  if (text.startsWith("./") || text.startsWith("../")) return "";
+  return text.split("@")[0].split("/")[1] ?? "";
+}
 
 // The files the check reads: each workflow in .github/workflows (GitHub reads
 // no subdirectory there) and each YAML file under .github/actions.
@@ -62,7 +75,7 @@ export function claudeActionGaps(files) {
       continue;
     }
     for (const value of values) {
-      if (CLAUDE_ACTION.test(value)) gaps.push(`${file}: uses ${value}`);
+      if (CLAUDE_ACTION.test(usesRepository(value))) gaps.push(`${file}: uses ${value}`);
     }
   }
   return gaps.sort();

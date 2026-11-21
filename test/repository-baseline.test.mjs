@@ -837,7 +837,17 @@ test("B20: claudeActionGaps passes a name in a comment, a run step, a step name 
   ].join("\n");
   assert.deepEqual(claudeActionGaps({ ".github/workflows/review.yml": mention }), []);
   // Near names that are other actions pass.
-  for (const uses of ["anthropics/claude-code-actions@v1", "anthropics/claude-code@v1", "x/my-claude-code-action@v1"]) {
+  // Only the repository name counts: another repository's subaction or a local
+  // directory of that name is not the action (its action.yml is read itself).
+  for (const uses of [
+    "anthropics/claude-code-actions@v1",
+    "anthropics/claude-code@v1",
+    "x/my-claude-code-action@v1",
+    "owner/tools/claude-code-action@v1",
+    "claude-code-action@v1",
+    "./.github/actions/claude-code-action",
+    "docker://ghcr.io/anthropics/claude-code-action-runner:1",
+  ]) {
     assert.deepEqual(claudeActionGaps({ ".github/workflows/w.yml": step(`uses: ${uses}`) }), [], uses);
   }
   // Invalid YAML that does not name the action is left to the other checks.
