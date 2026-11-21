@@ -282,7 +282,9 @@ repository when a workflow, or a YAML file under `.github/actions/` at any
 depth, has a `uses:` value that names `claude-code-action` or
 `claude-code-base-action`. It reads the values with the `yaml` parser,
 ignores case and owner, and fails a file that does not parse and names the
-action, or a directory it cannot read. No frostyard workflow runs a Claude
+action, a directory it cannot read, or a symlink under `.github/actions/`
+that is not a YAML file (the contents API does not list a linked
+directory). No frostyard workflow runs a Claude
 review, on `pull_request_target` or on any other event; the AI review of a
 pull request is pocketd's cross-review. On 2026-11-21 the check fails
 chairlift, lab and pilothouse (`claude-code-review.yml`) until they remove

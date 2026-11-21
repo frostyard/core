@@ -697,6 +697,28 @@ test("B20: a .github/actions listing that is not JSON fails the repository", asy
   assert.deepEqual(results[0].failures, ["frostyard/repo: .github/actions listing is not JSON"]);
 });
 
+test("B20: a symlinked action file is read; a symlink the check cannot follow fails the repository", async () => {
+  const root = await makeRepositoriesRoot([
+    { repository: { owner: "frostyard", name: "repo" }, fleet_state: "enabled" },
+  ]);
+  const files = fakeFetch(conformant("frostyard", "repo", {
+    ".github/actions/review/action.yml": "runs:\n  using: composite\n  steps:\n    - uses: anthropics/claude-code-action@v1\n",
+  }));
+  const listing = (entries) => ({ status: 200, ok: true, text: async () => JSON.stringify(entries) });
+  const linkedFile = async (url) => (url.endsWith("/contents/.github/actions/review")
+    ? listing([{ type: "symlink", name: "action.yml" }])
+    : files(url));
+  assert.deepEqual((await checkFleetConventions(linkedFile, root))[0].failures, [
+    "claude-code-action: .github/actions/review/action.yml: uses anthropics/claude-code-action@v1 (ADR-0091)",
+  ]);
+  const linkedDir = async (url) => (url.endsWith("/contents/.github/actions")
+    ? listing([{ type: "symlink", name: "review" }])
+    : files(url));
+  assert.deepEqual((await checkFleetConventions(linkedDir, root))[0].failures, [
+    "frostyard/repo: .github/actions/review is a symlink the check cannot follow",
+  ]);
+});
+
 test("B20: claudeActionGaps passes every core workflow on disk", async () => {
   const dir = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", ".github", "workflows");
   const names = (await readdir(dir)).filter((name) => /\.ya?ml$/.test(name));

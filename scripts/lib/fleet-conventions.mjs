@@ -251,8 +251,10 @@ async function fetchWorkflows(fetchImpl, owner, name) {
 }
 
 // The YAML files under dir, at any depth: path -> text. A repository with no
-// such directory has none. A failed request or a listing that is not JSON
-// throws, so the repository fails rather than passes unread.
+// such directory has none. A failed request, a listing that is not JSON, or a
+// symlink that is not a YAML file (the contents API does not list a linked
+// directory) throws, so the repository fails rather than passes unread. The
+// contents API answers a symlink to a file with the file's text.
 async function fetchActionFiles(fetchImpl, owner, name, dir) {
   const listing = await fetchFile(fetchImpl, owner, name, dir, "application/vnd.github+json");
   if (listing === null) return {};
@@ -268,9 +270,11 @@ async function fetchActionFiles(fetchImpl, owner, name, dir) {
     const entryPath = `${dir}/${entry.name}`;
     if (entry.type === "dir") {
       Object.assign(files, await fetchActionFiles(fetchImpl, owner, name, entryPath));
-    } else if (entry.type === "file" && isWorkflowOrActionFile(entryPath)) {
+    } else if ((entry.type === "file" || entry.type === "symlink") && isWorkflowOrActionFile(entryPath)) {
       const text = await fetchFile(fetchImpl, owner, name, entryPath);
       if (text !== null) files[entryPath] = text;
+    } else if (entry.type === "symlink") {
+      throw new FleetConventionsError(`${owner}/${name}: ${entryPath} is a symlink the check cannot follow`);
     }
   }
   return files;
