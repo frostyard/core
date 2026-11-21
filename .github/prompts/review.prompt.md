@@ -18,6 +18,9 @@ authored ([ADR-0019](../../docs/adr/0019-governance-as-code-and-risk-tiers.md)).
    full 40-char SHA with a `# vX.Y.Z` comment, `permissions: {}` at top
    level, and `persist-credentials: false` on checkouts
    ([ADR-0021](../../docs/adr/0021-sha-pinned-actions-and-least-privilege-ci.md)).
+   A test that guards a pin reads it from the workflow and never names
+   the SHA of a real pin
+   ([ADR-0088](../../docs/adr/0088-read-the-action-pin-in-workflow-tests-never-hard-code-it.md)).
 5. Confirm the PR body declares a risk tier (highest applicable, never
    lower) in the template's Risk tier section.
 6. If the diff adds or edits an ADR, confirm its text states context,
