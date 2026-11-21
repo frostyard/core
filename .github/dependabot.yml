@@ -1,7 +1,15 @@
 # Dependabot (ADR-0071 row B13): 1 entry for each ecosystem with a manifest in
 # this repository. Each entry has 1 group with `patterns: ["*"]`, so each entry
 # opens at most 1 version-update PR for each run (ADR-0075). The group has no
-# `applies-to`, so security updates stay 1 PR each.
+# `applies-to`, so security updates stay 1 PR each, and GitHub opens them when
+# an alert opens, not on this schedule.
+#
+# Version updates run monthly (ADR-0089): GitHub runs `monthly` on the 1st of
+# the month. The schedule has no `day` (GitHub reads it only for `weekly`) and
+# no `time`, so GitHub picks this file's time and the organization's runs
+# spread over the day. An ecosystem with manifests in several directories
+# keeps 1 entry with a `directories:` list, so it opens 1 PR, not 1 for each
+# directory.
 #
 # The hash-locked .agents/skills/frostyard-docs-site/scaffold/requirements.txt
 # is refreshed by the repository-hygiene line with `uv pip compile`, not by
@@ -11,7 +19,7 @@ updates:
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "monthly"
     open-pull-requests-limit: 5
     commit-message:
       prefix: "ci"
@@ -22,7 +30,7 @@ updates:
   - package-ecosystem: "npm"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "monthly"
     open-pull-requests-limit: 5
     commit-message:
       prefix: "build"

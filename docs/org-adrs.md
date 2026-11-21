@@ -103,6 +103,11 @@ names what the decision binds in core and where it lives here.
   `dependabot/fetch-metadata` pin from
   [pr-triage.yml](../.github/workflows/pr-triage.yml) with the `yaml`
   parser and asserts a full SHA and a `# vX.Y.Z` comment, not the SHA.
+- [ADR-0089 — Run Dependabot version updates monthly, in 1 entry for each ecosystem](adr/0089-run-dependabot-version-updates-monthly-in-one-entry-per-ecosystem.md)
+  — each entry of core's [dependabot.yml](../.github/dependabot.yml) runs
+  `interval: monthly`, and each ecosystem has 1 entry; `entryGaps` in
+  [test/repository-baseline.test.mjs](../test/repository-baseline.test.mjs)
+  checks it.
 
 ## Rows that do not apply to core
 

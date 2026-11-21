@@ -5,6 +5,8 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
+import { parse } from "yaml";
+
 import { ciCoverageGaps, lintGaps, namesMakeCi, workflowCommands } from "../scripts/lib/ci-gate.mjs";
 
 // B12 (ADR-0073): the comparison of `make ci` with a CI workflow lives in
@@ -170,6 +172,47 @@ export function ungroupedEntries(dependabotText) {
     if (groupCount !== 1 || !starGroup || securityGroup) failing.push(`${ecosystem} ${directory}`);
   }
   if (parsed === 0 || parsed !== ecosystemLines) return [...unparsed, ...failing];
+  return failing;
+}
+
+// B13 (ADR-0089): the schedule, the entry count and `group-by`. Each entry's
+// `schedule` is exactly { interval: monthly } (GitHub runs it on the 1st of
+// the month and, with no `time`, picks the time of each file); each
+// `package-ecosystem` value is in exactly 1 entry (manifests in several
+// directories go in its `directories` list); no group has `group-by`, which
+// opens 1 PR for each dependency. Reads the file with the `yaml` parser.
+// Returns "<ecosystem> <directory>: schedule", "<ecosystem> <directory>:
+// group-by" and "<ecosystem>: <n> entries"; a file that is not valid YAML or
+// has no `updates` list of mappings returns "(unparsed) updates" (fails
+// closed).
+export function entryGaps(dependabotText) {
+  const isMapping = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
+  let doc;
+  try {
+    doc = parse(dependabotText);
+  } catch {
+    return ["(unparsed) updates"];
+  }
+  const updates = isMapping(doc) ? doc.updates : undefined;
+  if (!Array.isArray(updates) || updates.length === 0 || !updates.every(isMapping)) {
+    return ["(unparsed) updates"];
+  }
+  const failing = [];
+  const counts = new Map();
+  for (const entry of updates) {
+    const ecosystem = String(entry["package-ecosystem"] ?? "(no ecosystem)");
+    const directory =
+      typeof entry.directory === "string" ? entry.directory : "directories" in entry ? "(directories)" : "(no directory)";
+    counts.set(ecosystem, (counts.get(ecosystem) ?? 0) + 1);
+    const schedule = entry.schedule;
+    const monthly = isMapping(schedule) && Object.keys(schedule).length === 1 && schedule.interval === "monthly";
+    if (!monthly) failing.push(`${ecosystem} ${directory}: schedule`);
+    const groups = isMapping(entry.groups) ? Object.values(entry.groups) : [];
+    if (groups.some((group) => isMapping(group) && "group-by" in group)) failing.push(`${ecosystem} ${directory}: group-by`);
+  }
+  for (const [ecosystem, count] of counts) {
+    if (count > 1) failing.push(`${ecosystem}: ${count} entries`);
+  }
   return failing;
 }
 
@@ -517,6 +560,93 @@ test("B13: ungroupedEntries fails closed on a file it cannot read", () => {
 
 test("B13: core's Dependabot configuration groups every entry (ADR-0075)", () => {
   assert.deepEqual(ungroupedEntries(read(".github/dependabot.yml")), []);
+});
+
+test("B13: entryGaps names each entry that is not monthly, each group-by and each ecosystem in 2 entries (ADR-0089)", () => {
+  const text = [
+    "# Dependabot",
+    "version: 2",
+    "updates:",
+    "  - package-ecosystem: \"github-actions\" # monthly, quoted",
+    "    directory: \"/\"",
+    "",
+    "    schedule:",
+    "      # the 1st of the month",
+    "      interval: \"monthly\"",
+    "  - package-ecosystem: gomod # weekly",
+    "    directory: /",
+    "    schedule: { interval: weekly }",
+    "  - directories: # several directories in 1 entry; the first key is not the ecosystem",
+    "    - /client",
+    "    - /ui",
+    "    package-ecosystem: npm",
+    "    schedule: {interval: 'monthly'}",
+    "    groups:",
+    "      npm:",
+    "        patterns: [\"*\"]",
+    "  - package-ecosystem: cargo # monthly with a time",
+    "    directory: /",
+    "    schedule:",
+    "      interval: monthly",
+    "      time: \"06:00\"",
+    "  - package-ecosystem: docker # no schedule",
+    "    directory: /",
+    "    env:",
+    "      interval: monthly",
+    "  - package-ecosystem: pip # first of 2 entries for 1 ecosystem",
+    "    directory: /",
+    "    schedule:",
+    "      interval: monthly",
+    "  - package-ecosystem: pip # second entry: a second PR each run",
+    "    directory: /site",
+    "    schedule:",
+    "      interval: >-",
+    "        monthly",
+    "  -",
+    "    package-ecosystem: \"bundler\" # standalone dash, cron",
+    "    directory: \"/\"",
+    "    schedule:",
+    "      interval: cron",
+    "      cronjob: \"0 6 1 * *\"",
+    "  - package-ecosystem: \"gomodules\" # group-by: 1 PR for each dependency",
+    "    directories: [\"/a\", \"/b\"]",
+    "    schedule:",
+    "      interval: |",
+    "        monthly",
+    "    groups:",
+    "      go:",
+    "        patterns: [\"*\"]",
+    "        group-by: dependency-name",
+    "",
+  ].join("\n");
+  assert.deepEqual(entryGaps(text), [
+    "gomod /: schedule",
+    "cargo /: schedule",
+    "docker /: schedule",
+    "bundler /: schedule",
+    "gomodules (directories): schedule",
+    "gomodules (directories): group-by",
+    "pip: 2 entries",
+  ]);
+});
+
+test("B13: entryGaps reads CRLF, a BOM and a file with no final newline", () => {
+  const lines = ["version: 2", "updates:", "  - package-ecosystem: npm", "    directory: /", "    schedule:", "      interval: monthly"];
+  assert.deepEqual(entryGaps(lines.join("\r\n")), []);
+  assert.deepEqual(entryGaps(`\uFEFF${lines.join("\n")}\n`), []);
+  assert.deepEqual(entryGaps(lines.join("\n").replace("monthly", "monthlyish")), ["npm /: schedule"]);
+});
+
+test("B13: entryGaps fails closed on a file it cannot read", () => {
+  assert.deepEqual(entryGaps(""), ["(unparsed) updates"]);
+  assert.deepEqual(entryGaps("version: 2\n"), ["(unparsed) updates"]);
+  assert.deepEqual(entryGaps("version: 2\nupdates: []\n"), ["(unparsed) updates"]);
+  assert.deepEqual(entryGaps("version: 2\nupdates:\n  - npm\n"), ["(unparsed) updates"]);
+  assert.deepEqual(entryGaps("version: 2\nupdates:\n  - package-ecosystem: [\n"), ["(unparsed) updates"]);
+});
+
+test("B13: core's Dependabot configuration runs monthly in 1 entry for each ecosystem (ADR-0089)", () => {
+  assert.deepEqual(entryGaps(read(".github/dependabot.yml")), []);
 });
 
 test("B14: SECURITY.md names GitHub private vulnerability reporting", () => {
