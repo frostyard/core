@@ -109,9 +109,13 @@ job that checks each `# vX.Y.Z` comment against its tag upstream.
     core reusable workflow pin (branch `main`) with the compare API: the
     status of `compare/BRANCH...SHA` is `identical` or `behind`, so the
     commit is on the upstream branch and not only in a fork;
+  - reads each `uses:` key that has its value on the same line, the key
+    and the value plain or quoted, in files with LF or CRLF line ends;
   - prints each pin it does not check (a `# v2` or `# v1.5` comment, any
-    other comment, a ref that is not a 40-hex SHA), then the count of pins
-    checked and skipped.
+    other comment, a ref that is not a 40-hex SHA), and the file and line
+    of each `uses:` key it cannot read (a flow mapping, a block scalar,
+    `uses:` inside a `run:` text), then the count of pins checked and
+    skipped. A line that is a YAML comment is not read.
 - **A repository whose correction record requires a literal SHA in a test
   adds a new record** whose `correction` text names the old record's file,
   ADR-0088 and this ADR, and says that it replaces the old record. The old
@@ -131,8 +135,8 @@ job that checks each `# vX.Y.Z` comment against its tag upstream.
   - In Consequences, "A comment that names a moving major tag (`# v4`)
     fails it as soon as upstream moves the tag" and "The script above reads
     only unquoted `uses:` lines with a full version comment" no longer
-    hold: the script prints such a pin as skipped, and it reads quoted
-    `uses:` values.
+    hold: the script prints such a pin as skipped, it reads quoted keys
+    and values, and it prints each `uses:` line it cannot read.
   - "The repository replaces the assertion and records the change in a new
     correction record": the record also names the old record's file,
     ADR-0088 and this ADR.
@@ -188,8 +192,9 @@ func checkOneSHA(t *testing.T, shas map[string]map[string]bool) {
 }
 ```
 
-The online check, as a script for a job of its own. It needs `git` and an
-authenticated `gh` (`GH_TOKEN`):
+The online check, as a script for a job of its own. It needs bash 4, `git`
+and an authenticated `gh` (`GH_TOKEN`). It reads lines, not YAML: what it
+cannot read, it reports instead of passing over:
 
 ```bash
 #!/usr/bin/env bash
@@ -197,11 +202,29 @@ authenticated `gh` (`GH_TOKEN`):
 #   OWNER/REPO[/PATH]@SHA # vX.Y.Z             tag vX.Y.Z (X.Y.Z if vX.Y.Z is missing) names SHA
 #   OWNER/REPO[/PATH]@SHA # BRANCH YYYY-MM-DD  SHA is on BRANCH (compare: identical or behind)
 #   frostyard/core/.github/workflows/F@SHA     SHA is on core's main
-# It prints every other pin as skipped. Needs git and an authenticated gh.
+# It prints every other pin, and every uses: key on a line it cannot read, as skipped.
+# Needs bash 4, git and an authenticated gh.
 set -euo pipefail
 status=0 checked=0 skipped=0
-while read -r ref comment; do
-	[[ $ref == ./* ]] && continue
+declare -A seen
+# 1 line `[- ]uses: VALUE [# COMMENT]`; the key may be quoted, the value may be quoted.
+pin='^[[:space:]]*(-[[:space:]]+)?(uses|"uses"|'\''uses'\'')[[:space:]]*:[[:space:]]+([^][:space:]#|>{}&*!"'\''[][^[:space:]]*|"[^"]*"|'\''[^'\'']*'\'')([[:space:]]+#[[:space:]]*(.*))?$'
+while IFS= read -r hit; do
+	file=${hit%%:*} rest=${hit#*:}
+	line=${rest%%:*} text=${rest#*:}
+	text=${text%$'\r'}
+	text=${text#$'\xef\xbb\xbf'}
+	[[ $text =~ ^[[:space:]]*# ]] && continue
+	if [[ ! $text =~ $pin ]]; then
+		echo "skipped: $file:$line: a uses: key this script cannot read (flow mapping, block scalar, text)"
+		skipped=$((skipped + 1))
+		continue
+	fi
+	ref=${BASH_REMATCH[3]} comment=${BASH_REMATCH[5]}
+	ref=${ref#[\"\']} && ref=${ref%[\"\']}
+	comment=${comment%"${comment##*[![:space:]]}"}
+	[[ $ref == ./* || -n ${seen["$ref # $comment"]:-} ]] && continue
+	seen["$ref # $comment"]=1
 	tag='' branch='' why=''
 	if [[ ! $ref =~ ^[^./][^@]*/[^@]+@[0-9a-f]{40}$ ]]; then
 		why="not OWNER/REPO[/PATH]@SHA"
@@ -232,9 +255,7 @@ while read -r ref comment; do
 		got=$(gh api "repos/$repo/compare/$branch...$sha" --jq .status 2>/dev/null) || got="no comparison"
 		[[ $got == identical || $got == behind ]] || { echo "$ref: not on $branch upstream ($got)" >&2; status=1; }
 	fi
-done < <(grep -rhsE '^[[:space:]-]*uses:' .github/workflows .github/actions |
-	sed -E 's/^[[:space:]-]*uses:[[:space:]]*//; s/^["'\'']([^"'\'']*)["'\'']/\1/; s/[[:space:]]+#[[:space:]]*/ /' |
-	sort -u)
+done < <(grep -rnsE '(^|[[:space:]{,[])["'\'']?uses["'\'']?[[:space:]]*:' .github/workflows .github/actions)
 echo "checked $checked pins, skipped $skipped"
 exit "$status"
 ```

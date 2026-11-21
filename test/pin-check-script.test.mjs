@@ -197,3 +197,61 @@ test("a failing pin does not stop the check of the others", () => {
   assert.equal(out.stderr, `actions/checkout@${A}: tag v7.0.0 is missing upstream\n`);
   assert.equal(out.stdout, "checked 2 pins, skipped 0\n");
 });
+
+// Input shapes (AGENTS.md, hand-written readers): the script reads lines, so
+// each shape is either read as a pin or reported with its file and line.
+test("the script reads quoted keys and values, CRLF, a BOM and a missing final newline", () => {
+  const tags = (...pairs) => pairs.map(([repo, tag, sha]) => `tag ${url(repo)} refs/tags/${tag} ${sha}`);
+  const fixture = tags(["actions/checkout", "v7.0.1", A], ["actions/setup-go", "v6.0.0", B], ["actions/cache", "v5.0.0", C], ["actions/upload-artifact", "v6.1.0", D]);
+  const out = run({
+    workflows: {
+      "keys.yml": steps(`"uses": actions/checkout@${A} # v7.0.1`, `'uses' : 'actions/setup-go@${B}'   # v6.0.0  `),
+      "crlf.yml": steps(`uses: actions/cache@${C} # v5.0.0`).replaceAll("\n", "\r\n"),
+      // A BOM right before the key: a top-level step list, as in an action's steps file.
+      "bom.yml": `\uFEFF- uses: actions/checkout@${A} # v7.0.1\n`,
+      "eof.yml": `jobs:\n  j:\n    steps:\n      - uses: actions/upload-artifact@${D} # v6.1.0`,
+      "empty.yml": "",
+    },
+    fixture,
+  });
+  assert.equal(out.stderr, "");
+  assert.equal(out.stdout, "checked 4 pins, skipped 0\n");
+  assert.equal(out.status, 0);
+  // The same shapes with a wrong tag fail: they were checked, not passed over.
+  const wrong = run({ workflows: { "crlf.yml": steps(`"uses": actions/cache@${C} # v5.0.0`).replaceAll("\n", "\r\n") } });
+  assert.equal(wrong.status, 1);
+  assert.equal(wrong.stderr, `actions/cache@${C}: tag v5.0.0 is missing upstream\n`);
+  // A CRLF line with a quoted value and no comment is read as that pin.
+  const bare = run({ workflows: { "crlf.yml": steps(`uses: "actions/cache@${C}"`).replaceAll("\n", "\r\n") } });
+  assert.equal(bare.stdout, `skipped: actions/cache@${C} #  (the comment names no vX.Y.Z tag and no BRANCH YYYY-MM-DD)\nchecked 0 pins, skipped 1\n`);
+});
+
+test("the script reports each uses: key it cannot read, with its file and line", () => {
+  const out = run({
+    workflows: {
+      "shapes.yml": [
+        "jobs:",
+        "  j:",
+        "    steps:",
+        `      - {uses: actions/checkout@${A}, with: {fetch-depth: 1}} # v7.0.1`,
+        "      - uses: >-",
+        `          actions/checkout@${A}`,
+        "      - run: |",
+        `          echo "uses: actions/checkout@${A}"`,
+        `      # - uses: actions/checkout@${B} # v1.0.0`,
+        `      - uses:actions/checkout@${A}`,
+        "",
+      ].join("\n"),
+    },
+  });
+  assert.equal(out.stderr, "");
+  assert.equal(out.status, 0);
+  const why = "a uses: key this script cannot read (flow mapping, block scalar, text)";
+  assert.deepEqual(out.stdout.trimEnd().split("\n"), [
+    `skipped: .github/workflows/shapes.yml:4: ${why}`,
+    `skipped: .github/workflows/shapes.yml:5: ${why}`,
+    `skipped: .github/workflows/shapes.yml:8: ${why}`,
+    `skipped: .github/workflows/shapes.yml:10: ${why}`,
+    "checked 0 pins, skipped 4",
+  ]);
+});
