@@ -98,6 +98,11 @@ names what the decision binds in core and where it lives here.
   — [pr-triage.yml](../.github/workflows/pr-triage.yml) takes the input `pr`
   and runs only the `levels` step on `workflow_dispatch`. Core opens no PR
   with `GITHUB_TOKEN`, so it has no dispatch caller.
+- [ADR-0088 — Read the action pin in workflow tests, never hard-code it](adr/0088-read-the-action-pin-in-workflow-tests-never-hard-code-it.md)
+  — [test/pr-triage.test.mjs](../test/pr-triage.test.mjs) reads the
+  `dependabot/fetch-metadata` pin from
+  [pr-triage.yml](../.github/workflows/pr-triage.yml) with the `yaml`
+  parser and asserts a full SHA and a `# vX.Y.Z` comment, not the SHA.
 
 ## Rows that do not apply to core
 

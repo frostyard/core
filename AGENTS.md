@@ -149,6 +149,15 @@ Start from .agents/skills/TEMPLATE/SKILL.md. -->
   before it pushes there: `make ci` is each repository's local CI gate,
   lint and format included, and a pass in 1 repository proves nothing for
   another ([ADR-0083](docs/adr/0083-run-the-ci-gate-locally-as-make-ci.md)).
+- A test or check that guards a workflow pin reads the pin from the
+  workflow and asserts its properties: a 40-hex commit SHA, its version
+  comment, 1 pin for each action, least-privilege permissions. It never
+  compares a real pin with a SHA written in the test, and a mutation test
+  takes the pin it edits from its copy, so a Dependabot bump that keeps
+  those properties passes. A repository that wants each new commit of an
+  action reviewed does it in the bump pull request, with an optional
+  online tag check outside `make ci`
+  ([ADR-0088](docs/adr/0088-read-the-action-pin-in-workflow-tests-never-hard-code-it.md)).
 - A skill step that stands in for a command (hand tag steps for
   `make bump`) keeps every guard of that command, in the same order. A
   skill's check after a release binds to that release: an attestation

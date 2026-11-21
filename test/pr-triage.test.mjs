@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+import { isScalar, parseDocument, visit } from "yaml";
 import { FILE_LIST_LIMIT, createGitHubApi } from "../scripts/lib/risk-paths.mjs";
 import {
   DEPENDABOT_LOGIN,
@@ -1872,6 +1873,20 @@ function codeLines(text) {
   return text.split("\n").filter((line) => !/^\s*#/.test(line));
 }
 
+// Every `uses:` value of a workflow, with the comment on its line, read with
+// the yaml parser (ADR-0088).
+function workflowPins(text) {
+  const pins = [];
+  visit(parseDocument(text), {
+    Pair(_, pair) {
+      if (isScalar(pair.key) && pair.key.value === "uses" && isScalar(pair.value)) {
+        pins.push({ ref: String(pair.value.value), comment: pair.value.comment ?? "" });
+      }
+    },
+  });
+  return pins;
+}
+
 // Every line of a workflow outside the embedded heredocs.
 function outsideBlocks(text) {
   const out = [];
@@ -2190,6 +2205,13 @@ test("the workflow has the inputs and the job, sets no permissions and has no ch
 
 test("the workflow writes the scripts, then runs the levels, readiness and shadow steps with exact conditions", async () => {
   const workflow = await readFile(workflowPath, "utf8");
+  // ADR-0088: read the pin from the workflow, then assert its properties, so
+  // a Dependabot bump that keeps them passes.
+  const pins = workflowPins(workflow).filter((pin) => pin.ref.startsWith("dependabot/fetch-metadata@"));
+  assert.equal(pins.length, 1, "exactly 1 dependabot/fetch-metadata step");
+  const [fetchMetadata] = pins;
+  assert.match(fetchMetadata.ref, /^dependabot\/fetch-metadata@[0-9a-f]{40}$/, "pinned to a full commit SHA");
+  assert.match(fetchMetadata.comment, /^ v\d+\.\d+\.\d+$/, "the pin carries its # vX.Y.Z comment");
   const text = outsideBlocks(workflow).join("\n");
   assert.ok(text.includes('mkdir -p "$RUNNER_TEMP/pr-triage"'));
   assert.ok(text.includes("      - name: Write the triage scripts\n        run: |\n"));
@@ -2225,7 +2247,7 @@ test("the workflow writes the scripts, then runs the levels, readiness and shado
         "        id: deps\n" +
         `        if: ${SHADOW_IF}\n` +
         "        continue-on-error: true\n" +
-        "        uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0\n" +
+        `        uses: ${fetchMetadata.ref} #${fetchMetadata.comment}\n` +
         "        with:\n" +
         "          github-token: ${{ github.token }}\n" +
         "      - name: Write the Dependabot shadow call\n" +
@@ -2237,9 +2259,6 @@ test("the workflow writes the scripts, then runs the levels, readiness and shado
         "          DEPENDABOT_UPDATES: ${{ steps.deps.outputs.updated-dependencies-json }}\n" +
         '        run: node "$RUNNER_TEMP/pr-triage/pr-triage.mjs"\n',
     ),
-  );
-  assert.ok(
-    text.includes("        uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0\n"),
   );
   assert.ok(
     text.includes("        description: Run the Dependabot shadow step (docs/design/dependabot-shadow.md). " +
