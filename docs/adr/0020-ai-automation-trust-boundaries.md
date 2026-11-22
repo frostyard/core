@@ -53,7 +53,7 @@ itself can carry injected instructions.
 
 - Shapes: [chairlift `claude-code-review.yml` (historical)](https://github.com/frostyard/chairlift/blob/c21d2d99609c8e32ec3953604240a8bf187c144f/.github/workflows/claude-code-review.yml),
   [snosi `docs/copilot-automation-secret.md`](https://github.com/frostyard/snosi/blob/main/docs/copilot-automation-secret.md),
-  [lab `docs/automated-review.md`](https://github.com/frostyard/lab/blob/main/docs/automated-review.md),
+  [lab `docs/automated-review.md` (historical)](https://github.com/frostyard/lab/blob/c163853d9ed837c58cb2e54b3b4a8f8ba2fe65ad/docs/automated-review.md),
   ai-fix workflows in updex/pilothouse
 - Builds on: [ADR-0019](0019-governance-as-code-and-risk-tiers.md)
 - Related: [ADR-0021](0021-sha-pinned-actions-and-least-privilege-ci.md)

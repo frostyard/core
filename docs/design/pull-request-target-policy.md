@@ -286,9 +286,11 @@ action, a directory it cannot read, or a symlink under `.github/actions/`
 that is not a YAML file (the contents API does not list a linked
 directory). No frostyard workflow runs a Claude
 review, on `pull_request_target` or on any other event; the AI review of a
-pull request is pocketd's cross-review. On 2026-11-21 the check fails
-chairlift, lab and pilothouse (`claude-code-review.yml`) until they remove
-the workflow; none of them is enabled, so the CI job stays green. Its
+pull request is pocketd's cross-review. Row B20 passes chairlift, lab and
+pilothouse since 2026-11-21: each removed its `claude-code-review.yml`
+([chairlift#329](https://github.com/frostyard/chairlift/pull/329),
+[lab#267](https://github.com/frostyard/lab/pull/267),
+[pilothouse#283](https://github.com/frostyard/pilothouse/pull/283)). Its
 tests are in `test/fleet-conventions.test.mjs` and
 `test/repository-baseline.test.mjs`.
 

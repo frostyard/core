@@ -71,5 +71,5 @@ in the companion [ADR-0028](0028-retire-snosi-install-superseded-by-firn.md).
   [firn ADR-0004](https://github.com/frostyard/firn/blob/main/docs/adr/0004-single-installer-scope-and-support-matrix.md),
   [firn ADR-0010](https://github.com/frostyard/firn/blob/main/docs/adr/0010-single-installer-iso-in-snosi.md),
   [firn ADR-0012](https://github.com/frostyard/firn/blob/main/docs/adr/0012-bootc-install-from-ram-installer.md)
-- Source: retired [fisherman `internal/install/bootc.go`](https://github.com/frostyard/fisherman/blob/main/internal/install/bootc.go)
+- Source: retired [fisherman `internal/install/bootc.go` (historical)](https://github.com/frostyard/fisherman/blob/0d43cf621a684d50a3aa8e37e0d52adfe60b23db/fisherman/internal/install/bootc.go)
 - Related: [ADR-0028](0028-retire-snosi-install-superseded-by-firn.md) (retires the A/B installer)
