@@ -139,6 +139,8 @@ On `pull_request_target`, a non-empty `pr` input fails the step before any API c
 - Readiness unknown. The workflow takes the calling job's grant. A private caller grants `checks: read` and `statuses: read` so trigger 2 can read checks and commit statuses. Without them, the reads can return HTTP 403 ([bketelsen/fleet run 42646228960](https://github.com/bketelsen/fleet/actions/runs/42646228960)). When the check-run read or the commit-status read gets HTTP 403, the step stops with the outcome `unknown`. It writes a `::notice::` annotation and a `## Readiness` section that start with `readiness unknown`, changes no label, writes no comment, and passes. After a 403 on the check runs, it does not read the statuses.
 - Only HTTP 403 gives `unknown`. The step reads the status from the `status` field of the client error, not from its message. Any other HTTP status, or a network error, on these reads fails the step.
 
+The API client retries HTTP 5xx and network errors for GET, DELETE and the add-labels POST. It makes at most 3 attempts, with 1 s and 2 s backoff. It never retries a 4xx or the comment POST. For retried errors, the step fails only after the last attempt ([core#286](https://github.com/frostyard/core/issues/286)).
+
 ### E. The `readiness` step: revoke
 
 The step revokes in this order:

@@ -1666,7 +1666,7 @@ function response(status, body, headers = {}) {
 }
 
 function client(fetch) {
-  return createGitHubApi({ token: "secret-token", apiUrl: "https://api.example.test", fetch });
+  return createGitHubApi({ token: "secret-token", apiUrl: "https://api.example.test", fetch, sleep: async () => {} });
 }
 
 test("listCheckRuns asks for the latest run of each check name and reads the check_runs of 2 pages", async () => {

@@ -160,6 +160,7 @@ The reusable workflow is `frostyard/core/.github/workflows/pr-triage.yml`, with 
 - Code that the job runs comes only from `frostyard/core` at a pinned commit, never from the PR's repository.
 - The job reads `.github/risk-paths.json` at the PR's base SHA: from `github.event.pull_request.base.sha` on `pull_request_target`, or from the pulls API on `workflow_dispatch` ([ADR-0087](../adr/0087-start-pr-triage-by-dispatch-for-bot-pull-requests.md)). A repository with bot PRs adds the separate [dispatch caller](pr-triage.md#a2-the-dispatch-caller).
 - The job MUST NOT check out, read as code or run anything from the PR head or the merge ref.
+- The API client retries HTTP 5xx and network errors for GET, DELETE and the add-labels POST. It makes at most 3 attempts, with 1 s and 2 s backoff. It never retries a 4xx or the comment POST. For retried errors, the step fails only after the last attempt ([core#286](https://github.com/frostyard/core/issues/286)).
 - The changed files come from `GET /repos/{owner}/{repo}/pulls/{number}/files`, all pages.
 - The GitHub API returns at most 3000 files for 1 PR. When the list has 3000 or more entries, the level is L1 and the job summary says that the file list is truncated. This behavior is fail safe.
 - With no list at the base SHA, for example in a PR that adds the list, the job writes "no list on base" to the job summary, adds no label and passes.
