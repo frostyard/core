@@ -638,6 +638,143 @@ function response(status, body, headers = {}) {
   };
 }
 
+test("listPullFiles retries an HTTP 500 and passes on attempt 2", async () => {
+  const sleeps = [];
+  let calls = 0;
+  const api = createGitHubApi({
+    token: "t",
+    sleep: async (ms) => { sleeps.push(ms); },
+    fetch: async () => response(++calls === 1 ? 500 : 200, [{ filename: "a" }]),
+  });
+  assert.deepEqual(await api.listPullFiles("o", "r", 5), [{ filename: "a" }]);
+  assert.equal(calls, 2);
+  assert.deepEqual(sleeps, [1000]);
+});
+
+test("listPullFiles retries a network error and passes on attempt 2", async () => {
+  const sleeps = [];
+  let calls = 0;
+  const api = createGitHubApi({
+    token: "t",
+    sleep: async (ms) => { sleeps.push(ms); },
+    fetch: async () => {
+      if (++calls === 1) throw new TypeError("fetch failed");
+      return response(200, [{ filename: "a" }]);
+    },
+  });
+  assert.deepEqual(await api.listPullFiles("o", "r", 5), [{ filename: "a" }]);
+  assert.equal(calls, 2);
+  assert.deepEqual(sleeps, [1000]);
+});
+
+test("listPullFiles stops after 3 HTTP 503 attempts", async () => {
+  const sleeps = [];
+  let calls = 0;
+  const api = createGitHubApi({
+    token: "t",
+    sleep: async (ms) => { sleeps.push(ms); },
+    fetch: async () => { calls++; return response(503, {}); },
+  });
+  await assert.rejects(api.listPullFiles("o", "r", 5), (error) => {
+    assert.match(error.message, /GET \/repos\/o\/r\/pulls\/5\/files failed: HTTP 503/);
+    assert.equal(error.status, 503);
+    return true;
+  });
+  assert.equal(calls, 3);
+  assert.deepEqual(sleeps, [1000, 2000]);
+});
+
+test("listPullFiles stops after 3 network errors", async () => {
+  const sleeps = [];
+  let calls = 0;
+  const api = createGitHubApi({
+    token: "t",
+    sleep: async (ms) => { sleeps.push(ms); },
+    fetch: async () => { calls++; throw new TypeError("fetch failed"); },
+  });
+  await assert.rejects(api.listPullFiles("o", "r", 5), /failed: fetch failed/);
+  assert.equal(calls, 3);
+  assert.deepEqual(sleeps, [1000, 2000]);
+});
+
+for (const status of [400, 403, 404, 422, 429]) {
+  test(`listPullFiles never retries HTTP ${status}`, async () => {
+    const sleeps = [];
+    let calls = 0;
+    const api = createGitHubApi({
+      token: "t",
+      sleep: async (ms) => { sleeps.push(ms); },
+      fetch: async () => { calls++; return response(status, {}); },
+    });
+    await assert.rejects(api.listPullFiles("o", "r", 5), (error) => {
+      assert.equal(error.status, status);
+      return true;
+    });
+    assert.equal(calls, 1);
+    assert.deepEqual(sleeps, []);
+  });
+}
+
+test("getFileAtRef returns null on HTTP 404 without retrying", async () => {
+  const sleeps = [];
+  let calls = 0;
+  const api = createGitHubApi({
+    token: "t",
+    sleep: async (ms) => { sleeps.push(ms); },
+    fetch: async () => { calls++; return response(404, {}); },
+  });
+  assert.equal(await api.getFileAtRef("o", "r", "missing", BASE_SHA), null);
+  assert.equal(calls, 1);
+  assert.deepEqual(sleeps, []);
+});
+
+test("createIssueComment never retries HTTP 500", async () => {
+  const sleeps = [];
+  let calls = 0;
+  const api = createGitHubApi({
+    token: "t",
+    sleep: async (ms) => { sleeps.push(ms); },
+    fetch: async () => { calls++; return response(500, {}); },
+  });
+  await assert.rejects(api.createIssueComment("o", "r", 5, "comment"), /POST .* failed: HTTP 500/);
+  assert.equal(calls, 1);
+  assert.deepEqual(sleeps, []);
+});
+
+test("addLabels retries HTTP 500 and passes on attempt 2", async () => {
+  const sleeps = [];
+  let calls = 0;
+  const api = createGitHubApi({
+    token: "t",
+    sleep: async (ms) => { sleeps.push(ms); },
+    fetch: async () => response(++calls === 1 ? 500 : 200, {}),
+  });
+  await api.addLabels("o", "r", 5, ["risk:high"]);
+  assert.equal(calls, 2);
+  assert.deepEqual(sleeps, [1000]);
+});
+
+test("removeIssueLabel retries HTTP 502 and passes on attempt 2", async () => {
+  const sleeps = [];
+  let calls = 0;
+  const api = createGitHubApi({
+    token: "t",
+    sleep: async (ms) => { sleeps.push(ms); },
+    fetch: async () => response(++calls === 1 ? 502 : 200, {}),
+  });
+  assert.equal(await api.removeIssueLabel("o", "r", 5, "risk:high"), true);
+  assert.equal(calls, 2);
+  assert.deepEqual(sleeps, [1000]);
+});
+
+test("createGitHubApi rejects a non-function sleep", () => {
+  assert.throws(() => createGitHubApi({ token: "t", fetch: async () => {}, sleep: 1 }), /no sleep function/);
+});
+
+test("createGitHubApi supplies a default sleep", () => {
+  assert.doesNotThrow(() => createGitHubApi({ token: "t", fetch: async () => response(200, {}) }));
+});
+
 test("listPullFiles follows Link rel=next over 3 pages", async () => {
   const requests = [];
   const pages = {
@@ -653,6 +790,7 @@ test("listPullFiles follows Link rel=next over 3 pages", async () => {
   };
   const api = createGitHubApi({
     token: "secret-token",
+    sleep: async () => {},
     apiUrl: "https://api.example.test/",
     fetch: async (url, init) => {
       requests.push({ url, init });
@@ -716,6 +854,7 @@ test("addLabels posts to the issues labels API; other errors throw without the t
   let status = 200;
   const api = createGitHubApi({
     token: "secret-token",
+    sleep: async () => {},
     apiUrl: "https://api.example.test",
     fetch: async (url, init) => {
       requests.push({ url, init });
