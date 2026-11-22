@@ -54,6 +54,6 @@ per repo.
 
 - Shapes: [chairlift `Makefile`](https://github.com/frostyard/chairlift/blob/main/Makefile),
   [pilothouse `Makefile`](https://github.com/frostyard/pilothouse/blob/main/Makefile),
-  [updex `test.yml`](https://github.com/frostyard/updex/blob/main/.github/workflows/test.yml),
+  [updex `test.yml` (historical)](https://github.com/frostyard/updex/blob/d5c3e156e9f55cca93bfc26c67595a4735e42fc7/.github/workflows/test.yml),
   the [frostyard-go-repo skill](../../.agents/skills/frostyard-go-repo/SKILL.md)
 - Builds on: [ADR-0012](0012-svu-versioning-and-rolling-dev-prerelease.md)

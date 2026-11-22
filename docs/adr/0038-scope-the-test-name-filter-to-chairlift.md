@@ -79,6 +79,6 @@ carried forward unchanged; only the scope of the name filter changes.
 
 - Supersedes: [ADR-0022](0022-make-ci-gate-and-test-naming-filter.md)
 - Shapes: [chairlift `Makefile`](https://github.com/frostyard/chairlift/blob/main/Makefile),
-  [updex `test.yml`](https://github.com/frostyard/updex/blob/main/.github/workflows/test.yml),
+  [updex `test.yml` (historical)](https://github.com/frostyard/updex/blob/d5c3e156e9f55cca93bfc26c67595a4735e42fc7/.github/workflows/test.yml),
   the [frostyard-go-repo skill](../../.agents/skills/frostyard-go-repo/SKILL.md)
 - Builds on: [ADR-0033](0033-link-maintenance-in-immutable-adrs.md)
